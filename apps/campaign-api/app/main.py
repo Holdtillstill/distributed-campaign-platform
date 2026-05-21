@@ -10,6 +10,7 @@ from uuid import uuid4
 import asyncpg
 import db
 from campaign_common.idempotency import generate_idempotency_key
+from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
@@ -17,6 +18,9 @@ from pydantic import BaseModel, Field
 SERVICE_NAME = "campaign-api"
 DEFAULT_BODY = "Hello from distributed campaign platform"
 STATUS_VALUES = tuple(status_value.value for status_value in MessageStatus)
+
+configure_logging(SERVICE_NAME)
+logger = get_logger(__name__)
 
 
 class CampaignCreateRequest(BaseModel):
@@ -99,6 +103,11 @@ class AsyncpgCampaignRepository:
             messages=[row.model_dump() for row in message_rows],
         )
         await self._publisher.publish(message_rows)
+        logger.info(
+            "campaign_created",
+            campaign_id=campaign_id,
+            message_count=len(message_rows),
+        )
         return {
             "id": campaign_id,
             "name": name,

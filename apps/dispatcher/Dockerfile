@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir \
     "httpx>=0.27" \
     "nats-py>=2.8" \
     "pydantic>=2.8" \
+    "structlog>=24.0" \
     "uvicorn[standard]>=0.30"
 
 COPY apps/shared /app/apps/shared

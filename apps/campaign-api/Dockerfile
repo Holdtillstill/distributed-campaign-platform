@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir \
     "fastapi>=0.115" \
     "nats-py>=2.8" \
     "pydantic>=2.8" \
+    "structlog>=24.0" \
     "uvicorn[standard]>=0.30"
 
 COPY apps/shared /app/apps/shared

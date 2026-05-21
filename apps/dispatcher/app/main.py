@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 import asyncpg
 import httpx
+from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -17,6 +18,9 @@ SERVICE_NAME = "dispatcher"
 DEFAULT_NATS_URL = "nats://nats:4222"
 DEFAULT_NATS_SUBJECT = "messages.dispatch"
 DEFAULT_PROVIDER_URL = "http://provider-simulator:8080"
+
+configure_logging(SERVICE_NAME)
+logger = get_logger(__name__)
 
 
 class MessageJob(BaseModel):
@@ -86,6 +90,12 @@ async def dispatch_message(
         status = MessageStatus.FAILED.value
 
     await update_status(job.message_id, status)
+    logger.info(
+        "message_dispatched",
+        message_id=job.message_id,
+        campaign_id=job.campaign_id,
+        status=status,
+    )
     return status
 
 

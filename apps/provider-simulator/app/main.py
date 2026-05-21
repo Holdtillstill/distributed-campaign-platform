@@ -7,11 +7,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import uuid4
 
+from campaign_common.logging import configure_logging, get_logger
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
 
 VALID_PROVIDER_MODES = {"success", "rate_limit", "server_error", "flaky"}
+
+configure_logging("provider-simulator")
+logger = get_logger(__name__)
 
 
 class SendRequest(BaseModel):
@@ -71,6 +75,13 @@ async def send_message(request: SendRequest) -> JSONResponse:
         await asyncio.sleep(settings.latency_ms / 1000)
 
     result = simulate_provider_response(request, settings)
+    logger.info(
+        "provider_send_simulated",
+        message_id=request.message_id,
+        channel=request.channel,
+        provider_status=result.body.status,
+        http_status=result.http_status,
+    )
     return JSONResponse(
         status_code=result.http_status,
         content=result.body.model_dump(exclude_none=result.body.reason is None),

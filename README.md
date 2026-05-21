@@ -2,7 +2,7 @@
 
 A production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
 
-> Status: Phase 0 planning and repository skeleton.
+> Status: Phase 1 local distributed app skeleton complete and verified end-to-end.
 
 ## Goals
 
