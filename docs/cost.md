@@ -29,6 +29,7 @@ Most development should happen in Docker Compose or kind at $0 AWS cost. EKS sho
 ## Guardrails
 
 - Create AWS Budgets alerts at $25, $50, and $100
+- Use `us-west-2` as the default workload region
 - Tag all resources with project/environment/owner
 - Use local mode for app development
 - Use short retention for logs/metrics/traces

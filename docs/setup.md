@@ -37,7 +37,7 @@ Decide and record locally, not in committed secrets:
 
 - AWS profile name
 - AWS account ID
-- default AWS region, recommended `us-west-2`
+- default AWS region: `us-west-2`
 - monthly budget guardrail
 - whether a domain/Route 53 hosted zone will be used later
 

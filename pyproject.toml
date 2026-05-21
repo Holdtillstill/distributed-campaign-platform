@@ -1,0 +1,40 @@
+[project]
+name = "distributed-campaign-platform"
+version = "0.1.0"
+description = "Distributed campaign delivery simulator for AWS EKS platform engineering portfolio"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.8",
+  "httpx>=0.27",
+  "structlog>=24.0",
+  "prometheus-client>=0.20",
+  "opentelemetry-api>=1.26",
+  "opentelemetry-sdk>=1.26",
+  "opentelemetry-instrumentation-fastapi>=0.47b0",
+  "opentelemetry-exporter-otlp>=1.26",
+  "asyncpg>=0.29",
+  "redis>=5.0",
+  "nats-py>=2.8",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+  "mypy>=1.11",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["apps/shared"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
