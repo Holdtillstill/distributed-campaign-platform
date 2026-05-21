@@ -1,0 +1,37 @@
+# Cost Model
+
+## Strategy
+
+This project is local-first and ephemeral-cloud by default.
+
+Most development should happen in Docker Compose or kind at $0 AWS cost. EKS should be created only for integration testing, final screenshots, and interview demo preparation.
+
+## Approximate costs
+
+| Scenario | Estimate |
+|---|---:|
+| Local-only development | $0 |
+| Short EKS workshop/demo, ~40 hours/month | ~$10/month |
+| Active ephemeral EKS development, ~176 hours/month | ~$40–75/month |
+| Always-on lean EKS, no NAT | ~$160/month |
+| Always-on EKS with 2 NAT Gateways | ~$225–250/month |
+| Full always-on demo with larger nodes/extra ALBs/NAT | ~$350–400/month |
+
+## Main cost drivers
+
+- EKS control plane: about $0.10/hour, roughly $73/month if always on
+- EC2 worker nodes
+- NAT Gateways: about $33/month each before data processing
+- Application Load Balancers
+- EBS volumes
+- log/metric/trace retention
+
+## Guardrails
+
+- Create AWS Budgets alerts at $25, $50, and $100
+- Tag all resources with project/environment/owner
+- Use local mode for app development
+- Use short retention for logs/metrics/traces
+- Prefer one dev environment initially
+- Tear down EKS after each cloud test window
+- Avoid NAT Gateway in early demos unless intentionally demonstrating production-style private subnets

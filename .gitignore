@@ -1,0 +1,48 @@
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.auto.tfvars.example
+.terraform.lock.hcl
+
+# Kubernetes/secrets
+*.kubeconfig
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# Local generated artifacts
+dist/
+build/
+.tmp/
+coverage/
+
+# Screenshots may contain account-specific details; curate before committing
+_docs_screenshots_raw/
