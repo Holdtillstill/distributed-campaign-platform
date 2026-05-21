@@ -69,6 +69,40 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
 2. **Local Kubernetes mode**: kind + Helm to validate Kubernetes manifests without AWS cost.
 3. **Ephemeral EKS mode**: Terraform creates EKS only for integration tests and screenshots, then destroys it.
 
+## Local Docker Compose end-to-end smoke test
+
+The local Compose stack runs PostgreSQL, Redis, NATS JetStream, Campaign API, Provider Simulator, and Dispatcher with host ports bound to loopback only:
+
+- Campaign API: <http://127.0.0.1:8081>
+- Provider Simulator: <http://127.0.0.1:8082>
+- Dispatcher health app: <http://127.0.0.1:8083>
+
+Run the stack and smoke test:
+
+```bash
+docker compose up --build -d
+scripts/local/e2e-smoke-test.sh
+```
+
+The smoke test waits for the local dependencies and service health endpoints, creates a campaign through the Campaign API, then polls `GET /campaigns/{id}` until every message has left `queued` and reached a terminal Phase 1 status (`sent`, `retried`, `failed`, or `dead_lettered`). Compose defaults the provider simulator to `PROVIDER_MODE=success`, so the deterministic expected result is `sent == message_count`.
+
+Useful overrides:
+
+```bash
+# Allow more time on slow machines.
+TIMEOUT_SECONDS=120 scripts/local/e2e-smoke-test.sh
+
+# Exercise non-success provider outcomes.
+PROVIDER_MODE=rate_limit docker compose up --build -d
+EXPECT_SENT_ALL=false scripts/local/e2e-smoke-test.sh
+```
+
+To stop the local stack:
+
+```bash
+docker compose down
+```
+
 ## Current next step
 
 See [`docs/plans/0000-phase-0-repo-foundation.md`](docs/plans/0000-phase-0-repo-foundation.md) and [`docs/setup.md`](docs/setup.md).

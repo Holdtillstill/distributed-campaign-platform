@@ -9,6 +9,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir \
     "asyncpg>=0.29" \
     "fastapi>=0.115" \
+    "nats-py>=2.8" \
     "pydantic>=2.8" \
     "uvicorn[standard]>=0.30"
 
