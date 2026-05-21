@@ -28,15 +28,41 @@ printf "%-14s %s\n" "COMMAND" "STATUS"
 printf "%-14s %s\n" "-------" "------"
 
 missing=()
+version_for() {
+  case "$1" in
+    kubectl) kubectl version --client=true 2>&1 | head -n 1 ;;
+    argocd) argocd version --client 2>&1 | head -n 1 ;;
+    eksctl) eksctl version 2>&1 | head -n 1 ;;
+    python3) python3 --version 2>&1 | head -n 1 ;;
+    *) "$1" --version 2>&1 | head -n 1 ;;
+  esac
+}
+
 for cmd in "${commands[@]}"; do
   if command -v "$cmd" >/dev/null 2>&1; then
-    version="$($cmd --version 2>&1 | head -n 1 || true)"
+    version="$(version_for "$cmd" || true)"
     printf "%-14s %s\n" "$cmd" "OK - ${version}"
   else
     printf "%-14s %s\n" "$cmd" "MISSING"
     missing+=("$cmd")
   fi
 done
+
+python_version="$(python3 - <<'PY'
+import sys
+print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)"
+if python3 - <<'PY'
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 12) else 1)
+PY
+then
+  printf "%-14s %s\n" "python>=3.12" "OK - ${python_version}"
+else
+  printf "%-14s %s\n" "python>=3.12" "MISSING - found ${python_version}"
+  missing+=("python>=3.12")
+fi
 
 printf "\nAWS caller identity:\n"
 if aws sts get-caller-identity >/tmp/dcp-aws-identity.json 2>/tmp/dcp-aws-identity.err; then
