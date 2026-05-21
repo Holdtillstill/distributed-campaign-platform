@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from collections.abc import Iterable, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, Protocol
@@ -57,9 +59,28 @@ class CampaignRepository(Protocol):
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None: ...
 
 
+class MessagePublisher(Protocol):
+    async def publish(self, rows: Sequence[MessageRow]) -> None: ...
+
+
+class NoopMessagePublisher:
+    async def publish(self, rows: Sequence[MessageRow]) -> None:
+        return None
+
+
+class NatsMessagePublisher:
+    def __init__(self, nats_url: str, subject: str = "messages.dispatch") -> None:
+        self._nats_url = nats_url
+        self._subject = subject
+
+    async def publish(self, rows: Sequence[MessageRow]) -> None:
+        await publish_message_jobs(self._nats_url, self._subject, rows)
+
+
 class AsyncpgCampaignRepository:
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, publisher: MessagePublisher | None = None) -> None:
         self._pool = pool
+        self._publisher = publisher or NoopMessagePublisher()
 
     async def create_campaign_with_messages(
         self,
@@ -77,6 +98,7 @@ class AsyncpgCampaignRepository:
             body=body,
             messages=[row.model_dump() for row in message_rows],
         )
+        await self._publisher.publish(message_rows)
         return {
             "id": campaign_id,
             "name": name,
@@ -110,7 +132,7 @@ async def get_pool() -> asyncpg.Pool:
 
 
 async def get_repository() -> AsyncpgCampaignRepository:
-    return AsyncpgCampaignRepository(await get_pool())
+    return AsyncpgCampaignRepository(await get_pool(), publisher_from_env())
 
 
 REPOSITORY_DEPENDENCY = Depends(get_repository)
@@ -180,6 +202,44 @@ def build_message_rows(campaign_id: str, recipients: Sequence[str], body: str) -
             )
         )
     return rows
+
+
+def message_job_from_row(row: MessageRow | dict[str, Any], channel: str = "sms") -> dict[str, Any]:
+    message = row.model_dump() if isinstance(row, MessageRow) else row
+    return {
+        "message_id": message["message_id"],
+        "campaign_id": message["campaign_id"],
+        "recipient": message["recipient"],
+        "body": message["body"],
+        "idempotency_key": message["idempotency_key"],
+        "channel": channel,
+    }
+
+
+async def publish_message_jobs(
+    nats_url: str,
+    subject: str,
+    rows: Sequence[MessageRow | dict[str, Any]],
+    *,
+    channel: str = "sms",
+) -> None:
+    import nats
+
+    nc = await nats.connect(nats_url)
+    try:
+        for row in rows:
+            payload = json.dumps(message_job_from_row(row, channel=channel)).encode("utf-8")
+            await nc.publish(subject, payload)
+        await nc.flush()
+    finally:
+        await nc.drain()
+
+
+def publisher_from_env() -> MessagePublisher:
+    nats_url = os.getenv("NATS_URL")
+    if not nats_url:
+        return NoopMessagePublisher()
+    return NatsMessagePublisher(nats_url, os.getenv("NATS_SUBJECT", "messages.dispatch"))
 
 
 def aggregate_status_counts(messages: Iterable[dict[str, Any] | MessageRow]) -> dict[str, int]:
