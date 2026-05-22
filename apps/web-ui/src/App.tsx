@@ -321,6 +321,79 @@ export default function App() {
     setCompanyPage('dashboard')
   }
 
+  const customerAccess = (
+    <main className="auth-screen">
+      <section className="auth-hero">
+        <p className="eyebrow">Customer access</p>
+        <h1>Sign in to your campaign workspace</h1>
+        <p>Use a company access code for first-time setup, or find existing company memberships by email.</p>
+      </section>
+
+      <section className="auth-grid" aria-label="Authentication choices">
+        <form className="panel" onSubmit={signupWithAccessCode}>
+          <div className="section-heading">
+            <span>Company signup</span>
+            <strong>Access code</strong>
+          </div>
+          <label>
+            Work email
+            <input type="email" value={signupEmail} onChange={(event) => setSignupEmail(event.target.value)} />
+          </label>
+          <label>
+            Full name
+            <input value={signupName} onChange={(event) => setSignupName(event.target.value)} />
+          </label>
+          <label>
+            Access code
+            <input value={accessCode} onChange={(event) => setAccessCode(event.target.value.toUpperCase())} />
+          </label>
+          <button>Sign up with access code</button>
+        </form>
+
+        <form className="panel" onSubmit={lookupMemberships}>
+          <div className="section-heading">
+            <span>Company login</span>
+            <strong>Email lookup</strong>
+          </div>
+          <label>
+            Login email
+            <input type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
+          </label>
+          <button>Find my companies</button>
+          {memberships.length ? (
+            <ul className="compact-list membership-list">
+              {memberships.map((membership) => (
+                <li aria-label={membership.company_name} key={membership.company_id}>
+                  <div>
+                    <strong>{membership.company_name}</strong>
+                    <span>{membership.role}</span>
+                  </div>
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => {
+                      persistSession({
+                        role: 'company_user',
+                        email: loginEmail,
+                        companyId: membership.company_id,
+                        companyName: membership.company_name,
+                        membershipRole: membership.role,
+                      })
+                      setCompanyPage('dashboard')
+                    }}
+                  >
+                    Open {membership.company_name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </form>
+      </section>
+      {authMessage ? <p className="notice">{authMessage}</p> : null}
+    </main>
+  )
+
   if (!session) {
     if (surface === 'marketing') {
       return <MarketingLanding onCustomerAccess={() => navigate('app')} />
@@ -349,81 +422,14 @@ export default function App() {
       )
     }
 
-    return (
-      <main className="auth-screen">
-        <section className="auth-hero">
-          <p className="eyebrow">Customer access</p>
-          <h1>Sign in to your campaign workspace</h1>
-          <p>Use a company access code for first-time setup, or find existing company memberships by email.</p>
-        </section>
-
-        <section className="auth-grid" aria-label="Authentication choices">
-          <form className="panel" onSubmit={signupWithAccessCode}>
-            <div className="section-heading">
-              <span>Company signup</span>
-              <strong>Access code</strong>
-            </div>
-            <label>
-              Work email
-              <input type="email" value={signupEmail} onChange={(event) => setSignupEmail(event.target.value)} />
-            </label>
-            <label>
-              Full name
-              <input value={signupName} onChange={(event) => setSignupName(event.target.value)} />
-            </label>
-            <label>
-              Access code
-              <input value={accessCode} onChange={(event) => setAccessCode(event.target.value.toUpperCase())} />
-            </label>
-            <button>Sign up with access code</button>
-          </form>
-
-          <form className="panel" onSubmit={lookupMemberships}>
-            <div className="section-heading">
-              <span>Company login</span>
-              <strong>Email lookup</strong>
-            </div>
-            <label>
-              Login email
-              <input type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} />
-            </label>
-            <button>Find my companies</button>
-            {memberships.length ? (
-              <ul className="compact-list membership-list">
-                {memberships.map((membership) => (
-                  <li aria-label={membership.company_name} key={membership.company_id}>
-                    <div>
-                      <strong>{membership.company_name}</strong>
-                      <span>{membership.role}</span>
-                    </div>
-                    <button
-                      className="secondary"
-                      type="button"
-                      onClick={() => {
-                        persistSession({
-                          role: 'company_user',
-                          email: loginEmail,
-                          companyId: membership.company_id,
-                          companyName: membership.company_name,
-                          membershipRole: membership.role,
-                        })
-                        setCompanyPage('dashboard')
-                      }}
-                    >
-                      Open {membership.company_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </form>
-        </section>
-        {authMessage ? <p className="notice">{authMessage}</p> : null}
-      </main>
-    )
+    return customerAccess
   }
 
-  if (session.role === 'internal_admin' && surface !== 'internal') {
+  if (surface === 'app' && session.role !== 'company_user') {
+    return customerAccess
+  }
+
+  if (session.role === 'internal_admin' && surface === 'marketing') {
     return <MarketingLanding onCustomerAccess={() => navigate('app')} onInternalAccess={() => navigate('internal')} />
   }
 

@@ -328,6 +328,18 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /find my companies/i })).toBeInTheDocument()
   })
 
+  it('shows customer access on /app even with an internal admin session', async () => {
+    mockFetch()
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ role: 'internal_admin', email: 'ops@example.test' }))
+    window.history.pushState(null, '', '/app')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /sign in to your campaign workspace/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^companies$/i })).not.toBeInTheDocument()
+  })
+
   it('lets internal admin log in and see admin nav only', async () => {
     mockFetch()
     const user = userEvent.setup()
