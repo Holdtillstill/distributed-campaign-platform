@@ -170,6 +170,17 @@ CREATE TABLE IF NOT EXISTS redemption_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS reminder_campaigns (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    source_campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    audience_rule TEXT NOT NULL CHECK (audience_rule IN ('not_clicked', 'clicked_not_redeemed')),
+    message_body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'sent', 'cancelled')),
+    estimated_recipient_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_subscribers_company_phone ON subscribers(company_id, phone_number);
 CREATE INDEX IF NOT EXISTS idx_consent_events_subscriber_created ON consent_events(subscriber_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_double_opt_in_tokens_subscriber ON double_opt_in_tokens(subscriber_id);
@@ -178,6 +189,8 @@ CREATE INDEX IF NOT EXISTS idx_campaign_links_company_id ON campaign_links(compa
 CREATE INDEX IF NOT EXISTS idx_campaign_links_campaign_id ON campaign_links(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_click_events_link_created ON click_events(campaign_link_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_redemption_events_link_created ON redemption_events(campaign_link_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reminder_campaigns_company_id ON reminder_campaigns(company_id);
+CREATE INDEX IF NOT EXISTS idx_reminder_campaigns_source_campaign_id ON reminder_campaigns(source_campaign_id);
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_company_id ON campaigns(company_id);
 CREATE INDEX IF NOT EXISTS idx_messages_company_id ON messages(company_id);

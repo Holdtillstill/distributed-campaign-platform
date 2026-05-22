@@ -97,6 +97,28 @@ type PerformanceTotals = {
   redemption_count: number
 }
 
+type ReminderCampaign = {
+  id?: string
+  company_id?: string
+  source_campaign_id?: string
+  audience_rule?: string
+  message_body?: string
+  status?: string
+  estimated_recipient_count?: number
+}
+
+type UsageRow = {
+  company_id: string
+  company_name: string
+  campaign_count: number
+  message_count: number
+  media_asset_count: number
+  tracked_link_count: number
+  click_count: number
+  redemption_count: number
+  reminder_count: number
+}
+
 type SystemCheck = {
   path: string
   label: string
@@ -148,6 +170,14 @@ export default function App() {
   const [landingPayload, setLandingPayload] = useState<LandingPayload | null>(null)
   const [redemption, setRedemption] = useState<RedemptionResult | null>(null)
   const [performance, setPerformance] = useState<PerformanceTotals | null>(null)
+  const [reminderSourceCampaignId, setReminderSourceCampaignId] = useState('')
+  const [reminderAudienceRule, setReminderAudienceRule] = useState('not_clicked')
+  const [reminderMessageBody, setReminderMessageBody] = useState('Still interested?')
+  const [reminderCampaigns, setReminderCampaigns] = useState<ReminderCampaign[]>([])
+  const [reminderCampaign, setReminderCampaign] = useState<ReminderCampaign | null>(null)
+  const [usageFromDate, setUsageFromDate] = useState('2026-05-01')
+  const [usageToDate, setUsageToDate] = useState('2026-05-21')
+  const [usageRows, setUsageRows] = useState<UsageRow[]>([])
   const [campaignName, setCampaignName] = useState('Portfolio demo campaign')
   const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
   const [recipients, setRecipients] = useState(DEMO_RECIPIENTS.join('\n'))
@@ -431,6 +461,60 @@ export default function App() {
       const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-performance`)
       if (!response.ok) throw new Error(`Campaign performance failed: ${response.status}`)
       setPerformance(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function createReminder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('creating a reminder')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_campaign_id: reminderSourceCampaignId,
+          audience_rule: reminderAudienceRule,
+          message_body: reminderMessageBody,
+        }),
+      })
+
+      if (!response.ok) throw new Error(`Create reminder failed: ${response.status}`)
+      const result = (await response.json()) as ReminderCampaign
+      setReminderCampaign(result)
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function refreshReminders() {
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('loading reminders')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`)
+      if (!response.ok) throw new Error(`Reminder list failed: ${response.status}`)
+      setReminderCampaigns(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function loadUsage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const params = new URLSearchParams({ from: usageFromDate, to: usageToDate })
+      const response = await fetch(`${API_BASE_URL}/admin/usage?${params.toString()}`, {
+        headers: { 'X-Internal-Admin': 'true' },
+      })
+
+      if (!response.ok) throw new Error(`Usage dashboard failed: ${response.status}`)
+      setUsageRows(await response.json())
     } catch (err) {
       setScopeError(err instanceof Error ? err.message : 'unknown error')
     }
@@ -773,6 +857,88 @@ export default function App() {
             <Stat label="Redemptions" value={performance.redemption_count} />
           </div>
         ) : null}
+      </section>
+
+      <section className="grid">
+        <form className="panel" onSubmit={createReminder}>
+          <div className="section-heading">
+            <span>Reminder campaigns</span>
+            <strong>{reminderCampaign ? `${reminderCampaign.estimated_recipient_count ?? 0} estimated` : 'Audience estimate'}</strong>
+          </div>
+          <label>
+            Reminder source campaign id
+            <input
+              value={reminderSourceCampaignId}
+              onChange={(event) => setReminderSourceCampaignId(event.target.value)}
+            />
+          </label>
+          <label>
+            Reminder audience rule
+            <select value={reminderAudienceRule} onChange={(event) => setReminderAudienceRule(event.target.value)}>
+              <option value="not_clicked">not_clicked</option>
+              <option value="clicked_not_redeemed">clicked_not_redeemed</option>
+            </select>
+          </label>
+          <label>
+            Reminder copy
+            <textarea value={reminderMessageBody} onChange={(event) => setReminderMessageBody(event.target.value)} />
+          </label>
+          <button>Create reminder</button>
+          <button className="secondary inline-action" type="button" onClick={() => void refreshReminders()}>
+            Refresh reminders
+          </button>
+          {reminderCampaign ? (
+            <div className="result-block">
+              <span>Reminder id: {reminderCampaign.id}</span>
+              <span>Estimated recipients: {reminderCampaign.estimated_recipient_count ?? 0}</span>
+            </div>
+          ) : null}
+          {reminderCampaigns.length ? (
+            <ul className="compact-list">
+              {reminderCampaigns.map((reminder) => (
+                <li key={reminder.id ?? `${reminder.source_campaign_id}-${reminder.audience_rule}`}>
+                  <strong>{reminder.id}</strong>
+                  <span>{reminder.audience_rule}</span>
+                  <span>Source: {reminder.source_campaign_id}</span>
+                  <span>Estimated recipients: {reminder.estimated_recipient_count ?? 0}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </form>
+
+        <form className="panel" onSubmit={loadUsage}>
+          <div className="section-heading">
+            <span>Internal admin</span>
+            <strong>{usageRows.length ? `${usageRows.length} tenants` : 'Usage dashboard'}</strong>
+          </div>
+          <label>
+            Usage from date
+            <input type="date" value={usageFromDate} onChange={(event) => setUsageFromDate(event.target.value)} />
+          </label>
+          <label>
+            Usage to date
+            <input type="date" value={usageToDate} onChange={(event) => setUsageToDate(event.target.value)} />
+          </label>
+          <button>Load usage</button>
+          {usageRows.length ? (
+            <ul className="compact-list usage-list">
+              {usageRows.map((row) => (
+                <li key={row.company_id}>
+                  <strong>{row.company_name}</strong>
+                  <span>{row.company_id}</span>
+                  <span>Campaigns: {row.campaign_count}</span>
+                  <span>Messages: {row.message_count}</span>
+                  <span>Media assets: {row.media_asset_count}</span>
+                  <span>Tracked links: {row.tracked_link_count}</span>
+                  <span>Clicks: {row.click_count}</span>
+                  <span>Redemptions: {row.redemption_count}</span>
+                  <span>Reminders: {row.reminder_count}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </form>
       </section>
 
       <section className="grid">

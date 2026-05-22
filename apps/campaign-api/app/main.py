@@ -5,7 +5,8 @@ import os
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Protocol
+from datetime import date
+from typing import Annotated, Any, Literal, Protocol
 from uuid import uuid4
 
 import asyncpg
@@ -15,7 +16,7 @@ from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints
 from campaign_common.tracing import get_tracer, inject_trace_context, instrument_fastapi_app
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 SERVICE_NAME = "campaign-api"
@@ -187,6 +188,35 @@ class CampaignPerformanceResponse(BaseModel):
     redemption_count: int
 
 
+class ReminderCampaignCreateRequest(BaseModel):
+    source_campaign_id: str = Field(min_length=1)
+    audience_rule: Literal["not_clicked", "clicked_not_redeemed"]
+    message_body: str = Field(min_length=1)
+
+
+class ReminderCampaignResponse(BaseModel):
+    id: str
+    company_id: str
+    source_campaign_id: str
+    audience_rule: str
+    message_body: str
+    status: str
+    estimated_recipient_count: int
+    created_at: Any | None = None
+
+
+class AdminUsageResponse(BaseModel):
+    company_id: str
+    company_name: str
+    campaign_count: int
+    message_count: int
+    media_asset_count: int
+    tracked_link_count: int
+    click_count: int
+    redemption_count: int
+    reminder_count: int
+
+
 class CampaignRepository(Protocol):
     async def create_campaign_with_messages(
         self,
@@ -266,6 +296,19 @@ class CampaignRepository(Protocol):
     async def redeem_link(self, *, token: str) -> dict[str, Any] | None: ...
 
     async def get_campaign_performance(self, *, company_id: str) -> dict[str, int]: ...
+
+    async def create_reminder_campaign(
+        self,
+        *,
+        company_id: str,
+        source_campaign_id: str,
+        audience_rule: str,
+        message_body: str,
+    ) -> dict[str, Any]: ...
+
+    async def list_reminder_campaigns(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
+    async def get_admin_usage(self, *, from_date: date, to_date: date) -> list[dict[str, Any]]: ...
 
 
 class MessagePublisher(Protocol):
@@ -468,6 +511,28 @@ class AsyncpgCampaignRepository:
 
     async def get_campaign_performance(self, *, company_id: str) -> dict[str, int]:
         return await db.get_campaign_performance(self._pool, company_id=company_id)
+
+    async def create_reminder_campaign(
+        self,
+        *,
+        company_id: str,
+        source_campaign_id: str,
+        audience_rule: str,
+        message_body: str,
+    ) -> dict[str, Any]:
+        return await db.create_reminder_campaign(
+            self._pool,
+            company_id=company_id,
+            source_campaign_id=source_campaign_id,
+            audience_rule=audience_rule,
+            message_body=message_body,
+        )
+
+    async def list_reminder_campaigns(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_reminder_campaigns(self._pool, company_id=company_id)
+
+    async def get_admin_usage(self, *, from_date: date, to_date: date) -> list[dict[str, Any]]:
+        return await db.get_admin_usage(self._pool, from_date=from_date, to_date=to_date)
 
 
 @asynccontextmanager
@@ -725,6 +790,50 @@ async def get_campaign_performance(
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, int]:
     return await repository.get_campaign_performance(company_id=company_id)
+
+
+@app.post(
+    "/companies/{company_id}/reminder-campaigns",
+    response_model=ReminderCampaignResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_reminder_campaign(
+    company_id: str,
+    request: ReminderCampaignCreateRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.create_reminder_campaign(
+        company_id=company_id,
+        source_campaign_id=request.source_campaign_id,
+        audience_rule=request.audience_rule,
+        message_body=request.message_body,
+    )
+
+
+@app.get(
+    "/companies/{company_id}/reminder-campaigns",
+    response_model=list[ReminderCampaignResponse],
+)
+async def list_reminder_campaigns(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_reminder_campaigns(company_id=company_id)
+
+
+@app.get("/admin/usage", response_model=list[AdminUsageResponse])
+async def get_admin_usage(
+    from_date: Annotated[date, Query(alias="from")],
+    to_date: Annotated[date, Query(alias="to")],
+    internal_admin: str | None = Header(None, alias="X-Internal-Admin"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    if internal_admin != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="internal admin access required",
+        )
+    return await repository.get_admin_usage(from_date=from_date, to_date=to_date)
 
 
 @app.get("/campaigns/{campaign_id}", response_model=CampaignStatusResponse)

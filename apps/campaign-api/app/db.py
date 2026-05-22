@@ -598,5 +598,181 @@ async def get_campaign_performance(pool: asyncpg.Pool, *, company_id: str) -> di
     return dict(row)
 
 
+async def create_reminder_campaign(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    source_campaign_id: str,
+    audience_rule: str,
+    message_body: str,
+) -> dict[str, Any]:
+    reminder_id = str(uuid4())
+    async with pool.acquire() as connection, connection.transaction():
+        estimated_recipient_count = await _estimate_reminder_recipients(
+            connection,
+            company_id=company_id,
+            source_campaign_id=source_campaign_id,
+            audience_rule=audience_rule,
+        )
+        row = await connection.fetchrow(
+            """
+            INSERT INTO reminder_campaigns (
+                id,
+                company_id,
+                source_campaign_id,
+                audience_rule,
+                message_body,
+                estimated_recipient_count
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING
+                id,
+                company_id,
+                source_campaign_id,
+                audience_rule,
+                message_body,
+                status,
+                estimated_recipient_count,
+                created_at
+            """,
+            reminder_id,
+            company_id,
+            source_campaign_id,
+            audience_rule,
+            message_body,
+            estimated_recipient_count,
+        )
+    return dict(row)
+
+
+async def list_reminder_campaigns(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT
+                id,
+                company_id,
+                source_campaign_id,
+                audience_rule,
+                message_body,
+                status,
+                estimated_recipient_count,
+                created_at
+            FROM reminder_campaigns
+            WHERE company_id = $1
+            ORDER BY created_at DESC
+            """,
+            company_id,
+        )
+    return [dict(row) for row in rows]
+
+
+async def get_admin_usage(
+    pool: asyncpg.Pool,
+    *,
+    from_date: str,
+    to_date: str,
+) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            WITH bounds AS (
+                SELECT $1::date AS start_date, ($2::date + INTERVAL '1 day') AS end_date
+            )
+            SELECT
+                c.id AS company_id,
+                c.name AS company_name,
+                (
+                    SELECT COUNT(*)::int
+                    FROM campaigns campaigns_for_company, bounds
+                    WHERE campaigns_for_company.company_id = c.id
+                      AND campaigns_for_company.created_at >= bounds.start_date
+                      AND campaigns_for_company.created_at < bounds.end_date
+                ) AS campaign_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM messages messages_for_company, bounds
+                    WHERE messages_for_company.company_id = c.id
+                      AND messages_for_company.created_at >= bounds.start_date
+                      AND messages_for_company.created_at < bounds.end_date
+                ) AS message_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM media_assets assets_for_company, bounds
+                    WHERE assets_for_company.company_id = c.id
+                      AND assets_for_company.created_at >= bounds.start_date
+                      AND assets_for_company.created_at < bounds.end_date
+                ) AS media_asset_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM campaign_links links_for_company, bounds
+                    WHERE links_for_company.company_id = c.id
+                      AND links_for_company.created_at >= bounds.start_date
+                      AND links_for_company.created_at < bounds.end_date
+                ) AS tracked_link_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM click_events click_events_for_company
+                    JOIN campaign_links clicked_links
+                      ON clicked_links.id = click_events_for_company.campaign_link_id,
+                    bounds
+                    WHERE clicked_links.company_id = c.id
+                      AND click_events_for_company.created_at >= bounds.start_date
+                      AND click_events_for_company.created_at < bounds.end_date
+                ) AS click_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM redemption_events redemption_events_for_company
+                    JOIN campaign_links redeemed_links
+                      ON redeemed_links.id = redemption_events_for_company.campaign_link_id,
+                    bounds
+                    WHERE redeemed_links.company_id = c.id
+                      AND redemption_events_for_company.created_at >= bounds.start_date
+                      AND redemption_events_for_company.created_at < bounds.end_date
+                ) AS redemption_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM reminder_campaigns reminders_for_company, bounds
+                    WHERE reminders_for_company.company_id = c.id
+                      AND reminders_for_company.created_at >= bounds.start_date
+                      AND reminders_for_company.created_at < bounds.end_date
+                ) AS reminder_count
+            FROM companies c
+            ORDER BY c.name
+            """,
+            from_date,
+            to_date,
+        )
+    return [dict(row) for row in rows]
+
+
+async def _estimate_reminder_recipients(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    source_campaign_id: str,
+    audience_rule: str,
+) -> int:
+    if audience_rule == "not_clicked":
+        where_clause = "click_count = 0"
+    else:
+        where_clause = "click_count > 0 AND redeemed_count = 0"
+    return await connection.fetchval(
+        f"""
+        SELECT COUNT(*)::int
+        FROM campaign_links
+        WHERE company_id = $1
+          AND campaign_id = $2
+          AND {where_clause}
+        """,
+        company_id,
+        source_campaign_id,
+    )
+
+
 def _link_with_public_url(row: dict[str, Any]) -> dict[str, Any]:
     return {**row, "public_url": f"/r/{row['token']}"}

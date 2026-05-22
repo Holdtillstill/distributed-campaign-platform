@@ -175,6 +175,56 @@ function mockFetch() {
       })
     }
 
+    if (url.endsWith('/companies/company-2/reminder-campaigns') && method === 'POST') {
+      return okJson({
+        id: 'reminder-1',
+        company_id: 'company-2',
+        source_campaign_id: 'campaign-1',
+        audience_rule: 'clicked_not_redeemed',
+        message_body: 'Still interested?',
+        status: 'draft',
+        estimated_recipient_count: 2,
+      })
+    }
+
+    if (url.endsWith('/companies/company-2/reminder-campaigns')) {
+      return okJson([
+        {
+          id: 'reminder-1',
+          company_id: 'company-2',
+          source_campaign_id: 'campaign-1',
+          audience_rule: 'clicked_not_redeemed',
+          message_body: 'Still interested?',
+          status: 'draft',
+          estimated_recipient_count: 2,
+        },
+      ])
+    }
+
+    if (url.endsWith('/admin/usage?from=2026-05-01&to=2026-05-21')) {
+      if ((init?.headers as Record<string, string> | undefined)?.['X-Internal-Admin'] !== 'true') {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          json: () => Promise.resolve({ detail: 'internal admin access required' }),
+        } as Response)
+      }
+      return okJson([
+        {
+          company_id: 'company-2',
+          company_name: 'Beta Co',
+          campaign_count: 3,
+          message_count: 12,
+          media_asset_count: 1,
+          tracked_link_count: 2,
+          click_count: 4,
+          redemption_count: 1,
+          reminder_count: 1,
+        },
+      ])
+    }
+
     return Promise.reject(new Error(`Unexpected request: ${method} ${url}`))
   })
 
@@ -428,5 +478,64 @@ describe('App', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/r/spring-token')
     expect(fetchMock).toHaveBeenCalledWith('/api/r/spring-token/redeem', expect.objectContaining({ method: 'POST' }))
     expect(fetchMock).toHaveBeenCalledWith('/api/companies/company-2/campaign-performance')
+  })
+
+  it('creates and lists reminder campaigns for the active company', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    render(<App />)
+
+    await user.clear(screen.getByLabelText(/active company id/i))
+    await user.type(screen.getByLabelText(/active company id/i), 'company-2')
+    await user.clear(screen.getByLabelText(/reminder source campaign id/i))
+    await user.type(screen.getByLabelText(/reminder source campaign id/i), 'campaign-1')
+    await user.selectOptions(screen.getByLabelText(/reminder audience rule/i), 'clicked_not_redeemed')
+    await user.clear(screen.getByLabelText(/reminder copy/i))
+    await user.type(screen.getByLabelText(/reminder copy/i), 'Still interested?')
+    await user.click(screen.getByRole('button', { name: /create reminder/i }))
+
+    await screen.findByText(/reminder-1/i)
+    expect(screen.getByText(/Estimated recipients: 2/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /refresh reminders/i }))
+    expect(await screen.findAllByText(/clicked_not_redeemed/i)).not.toHaveLength(0)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/companies/company-2/reminder-campaigns',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          source_campaign_id: 'campaign-1',
+          audience_rule: 'clicked_not_redeemed',
+          message_body: 'Still interested?',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/companies/company-2/reminder-campaigns')
+  })
+
+  it('loads the internal admin usage dashboard with the admin header', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    render(<App />)
+
+    await user.clear(screen.getByLabelText(/usage from date/i))
+    await user.type(screen.getByLabelText(/usage from date/i), '2026-05-01')
+    await user.clear(screen.getByLabelText(/usage to date/i))
+    await user.type(screen.getByLabelText(/usage to date/i), '2026-05-21')
+    await user.click(screen.getByRole('button', { name: /load usage/i }))
+
+    await screen.findByText(/Beta Co/i)
+    expect(screen.getByText(/Campaigns: 3/i)).toBeInTheDocument()
+    expect(screen.getByText(/Reminders: 1/i)).toBeInTheDocument()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/usage?from=2026-05-01&to=2026-05-21',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-Internal-Admin': 'true' }),
+      }),
+    )
   })
 })
