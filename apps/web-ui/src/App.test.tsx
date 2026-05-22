@@ -1,24 +1,26 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 
-const okJson = (body: unknown) =>
+const SESSION_KEY = 'campaign-platform-session'
+
+const okJson = (body: unknown, status = 200) =>
   Promise.resolve({
     ok: true,
-    status: 200,
+    status,
     statusText: 'OK',
     json: () => Promise.resolve(body),
   } as Response)
 
-const okText = (body = 'ok') =>
+const notFoundJson = (body: unknown) =>
   Promise.resolve({
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-    text: () => Promise.resolve(body),
+    ok: false,
+    status: 404,
+    statusText: 'Not Found',
+    json: () => Promise.resolve(body),
   } as Response)
 
 function mockFetch() {
@@ -26,194 +28,25 @@ function mockFetch() {
     const url = String(input)
     const method = init?.method ?? 'GET'
 
-    if (url.endsWith('/healthz') || url.endsWith('/readyz') || url.endsWith('/metrics')) {
-      return okText()
-    }
-
     if (url.endsWith('/admin/companies') && method === 'POST') {
-      return okJson({
-        company: { id: 'company-1', name: 'Acme Co', slug: 'acme' },
-        admin_user: { id: 'user-1', email: 'admin@acme.test' },
-      })
-    }
-
-    if (url.endsWith('/me/memberships')) {
-      return okJson({
-        memberships: [
-          { company_id: 'company-2', company_name: 'Beta Co', role: 'admin' },
-          { company_id: 'company-3', company_name: 'Gamma Co', role: 'member' },
-        ],
-      })
-    }
-
-    if (url.endsWith('/companies/company-2/subscriber-lists') && method === 'POST') {
-      return okJson({ id: 'list-1', company_id: 'company-2', name: 'VIP List' })
-    }
-
-    if (url.endsWith('/companies/company-2/subscribers') && method === 'POST') {
-      return okJson({
-        id: 'subscriber-1',
-        company_id: 'company-2',
-        phone_number: '+15550001010',
-        source: 'import',
-        list_id: 'list-1',
-        consent_status: 'company_provided',
-      })
-    }
-
-    if (url.endsWith('/public/opt-ins') && method === 'POST') {
-      return okJson({
-        token: 'opt-token-1',
-        company_id: 'company-2',
-        phone_number: '+15550001011',
-        status: 'pending',
-      })
-    }
-
-    if (url.endsWith('/public/opt-ins/opt-token-1/confirm') && method === 'POST') {
-      return okJson({ token: 'opt-token-1', status: 'confirmed' })
-    }
-
-    if (url.endsWith('/campaigns') && method === 'POST') {
-      return okJson({
-        id: 'campaign-1',
-        company_id: 'company-2',
-        name: 'Spring Launch',
-        message_count: 2,
-        status_counts: { queued: 2, sent: 0, failed: 0, retried: 0, dead_lettered: 0 },
-      })
-    }
-
-    if (url.endsWith('/campaigns/campaign-1')) {
-      return okJson({
-        id: 'campaign-1',
-        company_id: 'company-2',
-        name: 'Spring Launch',
-        message_count: 2,
-        status_counts: { queued: 0, sent: 2, failed: 0, retried: 0, dead_lettered: 0 },
-      })
-    }
-
-    if (url.endsWith('/companies/company-2/media-assets') && method === 'POST') {
-      return okJson({
-        id: 'media-1',
-        company_id: 'company-2',
-        filename: 'coupon.png',
-        content_type: 'image/png',
-        url: 'https://cdn.example/coupon.png',
-      })
-    }
-
-    if (url.endsWith('/companies/company-2/media-assets')) {
-      return okJson([
+      return okJson(
         {
-          id: 'media-1',
-          company_id: 'company-2',
-          filename: 'coupon.png',
-          content_type: 'image/png',
-          url: 'https://cdn.example/coupon.png',
+          id: 'company-1',
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          monthly_send_limit: 50000,
+          access_code: 'ACME-1234',
+          admin_user: { id: 'user-1', email: 'admin@acme.test', role: 'customer_admin' },
         },
-      ])
-    }
-
-    if (url.endsWith('/companies/company-2/campaign-links') && method === 'POST') {
-      return okJson({
-        id: 'link-1',
-        token: 'spring-token',
-        public_url: '/r/spring-token',
-        company_id: 'company-2',
-        campaign_id: 'campaign-1',
-        subscriber_id: 'subscriber-1',
-        media_asset_id: 'media-1',
-        destination_url: 'https://example.com/spring',
-        click_count: 0,
-        redeemed_count: 0,
-      })
-    }
-
-    if (url.endsWith('/companies/company-2/campaign-links')) {
-      return okJson([
-        {
-          id: 'link-1',
-          token: 'spring-token',
-          public_url: '/r/spring-token',
-          company_id: 'company-2',
-          campaign_id: 'campaign-1',
-          subscriber_id: 'subscriber-1',
-          media_asset_id: 'media-1',
-          destination_url: 'https://example.com/spring',
-          click_count: 1,
-          redeemed_count: 1,
-        },
-      ])
-    }
-
-    if (url.endsWith('/r/spring-token') && method === 'GET') {
-      return okJson({
-        token: 'spring-token',
-        destination_url: 'https://example.com/spring',
-        click_count: 1,
-        media_asset: {
-          id: 'media-1',
-          filename: 'coupon.png',
-          content_type: 'image/png',
-          url: 'https://cdn.example/coupon.png',
-        },
-      })
-    }
-
-    if (url.endsWith('/r/spring-token/redeem') && method === 'POST') {
-      return okJson({ token: 'spring-token', status: 'redeemed', redeemed_count: 1 })
-    }
-
-    if (url.endsWith('/companies/company-2/campaign-performance')) {
-      return okJson({
-        media_asset_count: 1,
-        tracked_link_count: 1,
-        click_count: 1,
-        redemption_count: 1,
-      })
-    }
-
-    if (url.endsWith('/companies/company-2/reminder-campaigns') && method === 'POST') {
-      return okJson({
-        id: 'reminder-1',
-        company_id: 'company-2',
-        source_campaign_id: 'campaign-1',
-        audience_rule: 'clicked_not_redeemed',
-        message_body: 'Still interested?',
-        status: 'draft',
-        estimated_recipient_count: 2,
-      })
-    }
-
-    if (url.endsWith('/companies/company-2/reminder-campaigns')) {
-      return okJson([
-        {
-          id: 'reminder-1',
-          company_id: 'company-2',
-          source_campaign_id: 'campaign-1',
-          audience_rule: 'clicked_not_redeemed',
-          message_body: 'Still interested?',
-          status: 'draft',
-          estimated_recipient_count: 2,
-        },
-      ])
+        201,
+      )
     }
 
     if (url.endsWith('/admin/usage?from=2026-05-01&to=2026-05-21')) {
-      if ((init?.headers as Record<string, string> | undefined)?.['X-Internal-Admin'] !== 'true') {
-        return Promise.resolve({
-          ok: false,
-          status: 403,
-          statusText: 'Forbidden',
-          json: () => Promise.resolve({ detail: 'internal admin access required' }),
-        } as Response)
-      }
       return okJson([
         {
-          company_id: 'company-2',
-          company_name: 'Beta Co',
+          company_id: 'company-1',
+          company_name: 'Acme Retail',
           campaign_count: 3,
           message_count: 12,
           media_asset_count: 1,
@@ -225,6 +58,185 @@ function mockFetch() {
       ])
     }
 
+    if (url.endsWith('/signup/access-code') && method === 'POST') {
+      return okJson(
+        {
+          role: 'company_user',
+          email: 'owner@acme.test',
+          company_id: 'company-1',
+          company_name: 'Acme Retail',
+          membership_role: 'customer_admin',
+        },
+        201,
+      )
+    }
+
+    if (url.endsWith('/me/memberships')) {
+      const email = (init?.headers as Record<string, string> | undefined)?.['X-User-Email']
+      if (email === 'missing@acme.test') return okJson([])
+      return okJson([
+        {
+          company_id: 'company-1',
+          company_name: 'Acme Retail',
+          company_slug: 'acme-retail',
+          role: 'customer_admin',
+        },
+      ])
+    }
+
+    if (url.endsWith('/companies/company-1/dashboard-summary')) {
+      return okJson({
+        company_id: 'company-1',
+        company_name: 'Acme Retail',
+        monthly_send_limit: 50000,
+        subscriber_count: 123,
+        campaign_count: 4,
+        message_count: 1000,
+        click_count: 123,
+        redemption_count: 45,
+      })
+    }
+
+    if (url.endsWith('/companies/company-1/campaign-performance')) {
+      return okJson({
+        media_asset_count: 1,
+        tracked_link_count: 1,
+        click_count: 123,
+        redemption_count: 45,
+      })
+    }
+
+    if (url.endsWith('/companies/company-1/media-assets') && method === 'POST') {
+      return okJson({
+        id: 'media-1',
+        company_id: 'company-1',
+        filename: 'coupon.png',
+        content_type: 'image/png',
+        url: 'https://cdn.example/coupon.png',
+      })
+    }
+
+    if (url.endsWith('/companies/company-1/media-assets')) {
+      return okJson([
+        {
+          id: 'media-1',
+          company_id: 'company-1',
+          filename: 'coupon.png',
+          content_type: 'image/png',
+          url: 'https://cdn.example/coupon.png',
+        },
+      ])
+    }
+
+    if (url.endsWith('/companies/company-1/campaign-links') && method === 'POST') {
+      return okJson({
+        id: 'link-1',
+        token: 'spring-token',
+        public_url: '/r/spring-token',
+        company_id: 'company-1',
+        campaign_id: 'campaign-1',
+        subscriber_id: 'subscriber-1',
+        media_asset_id: 'media-1',
+        destination_url: 'https://example.com/spring',
+        click_count: 0,
+        redeemed_count: 0,
+      })
+    }
+
+    if (url.endsWith('/companies/company-1/campaign-links')) {
+      return okJson([
+        {
+          id: 'link-1',
+          token: 'spring-token',
+          public_url: '/r/spring-token',
+          company_id: 'company-1',
+          campaign_id: 'campaign-1',
+          subscriber_id: 'subscriber-1',
+          media_asset_id: 'media-1',
+          destination_url: 'https://example.com/spring',
+          click_count: 1,
+          redeemed_count: 1,
+        },
+      ])
+    }
+
+    if (url.endsWith('/companies/company-1/subscriber-lists') && method === 'POST') {
+      return okJson({ id: 'list-1', company_id: 'company-1', name: 'VIP List' }, 201)
+    }
+
+    if (url.endsWith('/companies/company-1/subscribers') && method === 'POST') {
+      return okJson({
+        id: 'subscriber-1',
+        company_id: 'company-1',
+        phone_number: '+15550001010',
+        source: 'import',
+        list_id: 'list-1',
+        consent_status: 'company_provided',
+      })
+    }
+
+    if (url.endsWith('/public/opt-ins') && method === 'POST') {
+      return okJson({
+        subscriber_id: 'subscriber-2',
+        company_id: 'company-1',
+        phone_number: '+15550001011',
+        status: 'pending_confirmation',
+        confirmation_token: 'opt-token-1',
+      })
+    }
+
+    if (url.endsWith('/public/opt-ins/opt-token-1/confirm') && method === 'POST') {
+      return okJson({
+        subscriber_id: 'subscriber-2',
+        company_id: 'company-1',
+        phone_number: '+15550001011',
+        status: 'confirmed',
+      })
+    }
+
+    if (url.endsWith('/campaigns') && method === 'POST') {
+      return okJson(
+        {
+          id: 'campaign-1',
+          company_id: 'company-1',
+          name: 'Spring Launch',
+          message_count: 2,
+          status_counts: { queued: 2, sent: 0, failed: 0, retried: 0, dead_lettered: 0 },
+        },
+        201,
+      )
+    }
+
+    if (url.endsWith('/companies/company-1/reminder-campaigns') && method === 'POST') {
+      return okJson({
+        id: 'reminder-1',
+        company_id: 'company-1',
+        source_campaign_id: 'campaign-1',
+        audience_rule: 'clicked_not_redeemed',
+        message_body: 'Still interested?',
+        status: 'draft',
+        estimated_recipient_count: 2,
+      })
+    }
+
+    if (url.endsWith('/companies/company-1/reminder-campaigns')) {
+      return okJson([
+        {
+          id: 'reminder-1',
+          company_id: 'company-1',
+          source_campaign_id: 'campaign-1',
+          audience_rule: 'clicked_not_redeemed',
+          message_body: 'Still interested?',
+          status: 'draft',
+          estimated_recipient_count: 2,
+        },
+      ])
+    }
+
+    if (url.endsWith('/signup/access-code') && method === 'POST') {
+      return notFoundJson({ detail: 'access code not found' })
+    }
+
     return Promise.reject(new Error(`Unexpected request: ${method} ${url}`))
   })
 
@@ -232,151 +244,169 @@ function mockFetch() {
   return fetchMock
 }
 
-describe('App', () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-  })
+async function loginAsInternalAdmin(user: ReturnType<typeof userEvent.setup>) {
+  await user.clear(screen.getByLabelText(/admin email/i))
+  await user.type(screen.getByLabelText(/admin email/i), 'ops@example.test')
+  await user.click(screen.getByRole('button', { name: /login as internal admin/i }))
+}
 
+async function signupAsCompanyUser(user: ReturnType<typeof userEvent.setup>) {
+  await user.clear(screen.getByLabelText(/work email/i))
+  await user.type(screen.getByLabelText(/work email/i), 'owner@acme.test')
+  await user.clear(screen.getByLabelText(/full name/i))
+  await user.type(screen.getByLabelText(/full name/i), 'Acme Owner')
+  await user.clear(screen.getByLabelText(/access code/i))
+  await user.type(screen.getByLabelText(/access code/i), 'ACME-1234')
+  await user.click(screen.getByRole('button', { name: /sign up with access code/i }))
+}
+
+describe('App', () => {
   afterEach(() => {
-    vi.useRealTimers()
+    window.localStorage.clear()
     vi.unstubAllGlobals()
   })
 
-  it('keeps the existing campaign, status, docs, and system checks UI available', async () => {
+  it('shows local login and signup choices when unauthenticated', () => {
     mockFetch()
 
     render(<App />)
 
-    expect(screen.getByRole('link', { name: /api docs/i })).toHaveAttribute('href', '/api/docs')
-    expect(screen.getByRole('button', { name: /create campaign/i })).toBeInTheDocument()
-    expect(screen.getByText(/campaign status/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /refresh checks/i })).toBeInTheDocument()
-
-    await waitFor(() => expect(screen.getByText('/healthz responded 200')).toBeInTheDocument())
-    expect(screen.getByText('/readyz responded 200')).toBeInTheDocument()
-    expect(screen.getByText('/metrics responded 200')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /distributed campaign platform/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /login as internal admin/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /find my companies/i })).toBeInTheDocument()
   })
 
-  it('creates an internal company, displays the company and admin user, and selects it', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  it('lets internal admin log in and see admin nav only', async () => {
+    mockFetch()
+    const user = userEvent.setup()
 
     render(<App />)
+    await loginAsInternalAdmin(user)
 
+    expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /companies/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /usage/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /campaigns/i })).not.toBeInTheDocument()
+    expect(JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? '{}')).toMatchObject({
+      role: 'internal_admin',
+      email: 'ops@example.test',
+    })
+  })
+
+  it('lets internal admin create a company and displays quota plus access code', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup()
+
+    render(<App />)
+    await loginAsInternalAdmin(user)
+    await user.click(screen.getByRole('button', { name: /companies/i }))
     await user.clear(screen.getByLabelText(/company name/i))
-    await user.type(screen.getByLabelText(/company name/i), 'Acme Co')
+    await user.type(screen.getByLabelText(/company name/i), 'Acme Retail')
     await user.clear(screen.getByLabelText(/company slug/i))
-    await user.type(screen.getByLabelText(/company slug/i), 'acme')
-    await user.clear(screen.getByLabelText(/admin email/i))
-    await user.type(screen.getByLabelText(/admin email/i), 'admin@acme.test')
+    await user.type(screen.getByLabelText(/company slug/i), 'acme-retail')
+    await user.clear(screen.getByLabelText(/initial admin email/i))
+    await user.type(screen.getByLabelText(/initial admin email/i), 'admin@acme.test')
+    await user.clear(screen.getByLabelText(/monthly send limit/i))
+    await user.type(screen.getByLabelText(/monthly send limit/i), '50000')
     await user.click(screen.getByRole('button', { name: /create company/i }))
 
-    expect(await screen.findAllByText(/company-1/i)).not.toHaveLength(0)
-    expect(screen.getByText(/admin@acme\.test/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/active company id/i)).toHaveValue('company-1')
-
+    expect(await screen.findByText(/ACME-1234/i)).toBeInTheDocument()
+    expect(screen.getByText(/50,000/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/admin/companies',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          'X-Internal-Admin': 'true',
+        headers: expect.objectContaining({ 'X-Internal-Admin': 'true' }),
+        body: JSON.stringify({
+          name: 'Acme Retail',
+          slug: 'acme-retail',
+          admin_email: 'admin@acme.test',
+          monthly_send_limit: 50000,
         }),
-        body: JSON.stringify({ name: 'Acme Co', slug: 'acme', admin_email: 'admin@acme.test' }),
       }),
     )
   })
 
-  it('looks up memberships by email and lets a membership select the active company', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  it('signs up a company user with an access code and lands in the company app', async () => {
+    mockFetch()
+    const user = userEvent.setup()
 
     render(<App />)
+    await signupAsCompanyUser(user)
 
-    await user.clear(screen.getByLabelText(/user email/i))
-    await user.type(screen.getByLabelText(/user email/i), 'owner@beta.test')
-    await user.click(screen.getByRole('button', { name: /lookup memberships/i }))
-
-    const betaMembership = await screen.findByRole('listitem', { name: /beta co/i })
-    expect(betaMembership).toHaveTextContent('company-2')
-    await user.click(within(betaMembership).getByRole('button', { name: /select beta co/i }))
-
-    expect(screen.getByLabelText(/active company id/i)).toHaveValue('company-2')
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/me/memberships',
-      expect.objectContaining({
-        headers: expect.objectContaining({ 'X-User-Email': 'owner@beta.test' }),
-      }),
-    )
+    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Acme Retail/)).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /companies/i })).not.toBeInTheDocument()
+    expect(JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? '{}')).toMatchObject({
+      role: 'company_user',
+      email: 'owner@acme.test',
+      companyId: 'company-1',
+      companyName: 'Acme Retail',
+    })
   })
 
-  it('manages subscriber list, import, opt-in, and confirmation for the active company', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  it('logs company users in by email membership lookup', async () => {
+    mockFetch()
+    const user = userEvent.setup()
 
     render(<App />)
+    await user.clear(screen.getByLabelText(/login email/i))
+    await user.type(screen.getByLabelText(/login email/i), 'owner@acme.test')
+    await user.click(screen.getByRole('button', { name: /find my companies/i }))
+    const membership = await screen.findByRole('listitem', { name: /acme retail/i })
+    await user.click(within(membership).getByRole('button', { name: /open acme retail/i }))
 
-    await user.clear(screen.getByLabelText(/active company id/i))
-    await user.type(screen.getByLabelText(/active company id/i), 'company-2')
-
-    await user.clear(screen.getByLabelText(/subscriber list name/i))
-    await user.type(screen.getByLabelText(/subscriber list name/i), 'VIP List')
-    await user.click(screen.getByRole('button', { name: /create list/i }))
-    await screen.findByText(/list-1/i)
-
-    await user.clear(screen.getByLabelText(/^subscriber phone number$/i))
-    await user.type(screen.getByLabelText(/^subscriber phone number$/i), '+15550001010')
-    await user.clear(screen.getByLabelText(/subscriber source/i))
-    await user.type(screen.getByLabelText(/subscriber source/i), 'import')
-    await user.click(screen.getByRole('button', { name: /import subscriber/i }))
-    await screen.findByText(/company_provided/i)
-
-    await user.clear(screen.getByLabelText(/opt-in phone number/i))
-    await user.type(screen.getByLabelText(/opt-in phone number/i), '+15550001011')
-    await user.clear(screen.getByLabelText(/opt-in source/i))
-    await user.type(screen.getByLabelText(/opt-in source/i), 'landing-page')
-    await user.click(screen.getByRole('button', { name: /start opt-in/i }))
-    await screen.findByText(/opt-token-1/i)
-
-    await user.click(screen.getByRole('button', { name: /confirm opt-in/i }))
-    await screen.findByText(/confirmed/i)
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/companies/company-2/subscriber-lists',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ name: 'VIP List' }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/companies/company-2/subscribers',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ phone_number: '+15550001010', source: 'import', list_id: 'list-1' }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/public/opt-ins',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ company_id: 'company-2', phone_number: '+15550001011', source: 'landing-page' }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/public/opt-ins/opt-token-1/confirm',
-      expect.objectContaining({ method: 'POST' }),
-    )
+    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(screen.getByText(/owner@acme.test/)).toBeInTheDocument()
   })
 
-  it('sends the selected company id when creating a campaign and displays it in status', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  it('shows a helpful login message when no memberships exist', async () => {
+    mockFetch()
+    const user = userEvent.setup()
 
     render(<App />)
+    await user.clear(screen.getByLabelText(/login email/i))
+    await user.type(screen.getByLabelText(/login email/i), 'missing@acme.test')
+    await user.click(screen.getByRole('button', { name: /find my companies/i }))
 
-    await user.clear(screen.getByLabelText(/active company id/i))
-    await user.type(screen.getByLabelText(/active company id/i), 'company-2')
+    expect(await screen.findByText(/sign up with an access code/i)).toBeInTheDocument()
+  })
+
+  it('switches company user pages one at a time', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    render(<App />)
+    await signupAsCompanyUser(user)
+
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    expect(screen.getByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /subscribers/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /subscribers/i }))
+    expect(screen.getByRole('heading', { name: /subscribers/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /campaigns/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /content library/i }))
+    expect(screen.getByRole('heading', { name: /content library/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /subscribers/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /analytics/i }))
+    expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /reminders/i }))
+    expect(screen.getByRole('heading', { name: /reminders/i })).toBeInTheDocument()
+  })
+
+  it('keeps campaign creation scoped with X-Company-Id', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup()
+
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
     await user.clear(screen.getByLabelText(/campaign name/i))
     await user.type(screen.getByLabelText(/campaign name/i), 'Spring Launch')
     await user.clear(screen.getByLabelText(/message body/i))
@@ -385,157 +415,29 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/recipients/i), '+15550001012\n+15550001013')
     await user.click(screen.getByRole('button', { name: /create campaign/i }))
 
-    await screen.findByText('campaign-1')
-    expect(screen.getAllByText(/company-2/i)).not.toHaveLength(0)
-    expect(screen.getByText('campaign-1')).toBeInTheDocument()
-
+    expect(await screen.findByText(/campaign-1/i)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/campaigns',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
-          'X-Company-Id': 'company-2',
-        }),
-        body: JSON.stringify({
-          name: 'Spring Launch',
-          body: 'Launch copy',
-          recipients: ['+15550001012', '+15550001013'],
+          'X-Company-Id': 'company-1',
         }),
       }),
     )
   })
 
-  it('manages media assets, tracked links, click simulation, redemption, and reporting', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  it('clears the local session on logout', async () => {
+    mockFetch()
+    const user = userEvent.setup()
 
     render(<App />)
+    await signupAsCompanyUser(user)
+    await waitFor(() => expect(window.localStorage.getItem(SESSION_KEY)).not.toBeNull())
+    await user.click(screen.getByRole('button', { name: /logout/i }))
 
-    await user.clear(screen.getByLabelText(/active company id/i))
-    await user.type(screen.getByLabelText(/active company id/i), 'company-2')
-
-    await user.clear(screen.getByLabelText(/media filename/i))
-    await user.type(screen.getByLabelText(/media filename/i), 'coupon.png')
-    await user.clear(screen.getByLabelText(/media content type/i))
-    await user.type(screen.getByLabelText(/media content type/i), 'image/png')
-    await user.clear(screen.getByLabelText(/media url/i))
-    await user.type(screen.getByLabelText(/media url/i), 'https://cdn.example/coupon.png')
-    await user.click(screen.getByRole('button', { name: /add media asset/i }))
-    expect(await screen.findAllByText(/media-1/i)).not.toHaveLength(0)
-
-    await user.click(screen.getByRole('button', { name: /refresh media assets/i }))
-    expect(await screen.findAllByText(/coupon\.png/i)).not.toHaveLength(0)
-
-    await user.clear(screen.getByLabelText(/tracked campaign id/i))
-    await user.type(screen.getByLabelText(/tracked campaign id/i), 'campaign-1')
-    await user.clear(screen.getByLabelText(/tracked subscriber id/i))
-    await user.type(screen.getByLabelText(/tracked subscriber id/i), 'subscriber-1')
-    await user.clear(screen.getByLabelText(/tracked media asset id/i))
-    await user.type(screen.getByLabelText(/tracked media asset id/i), 'media-1')
-    await user.clear(screen.getByLabelText(/destination url/i))
-    await user.type(screen.getByLabelText(/destination url/i), 'https://example.com/spring')
-    await user.click(screen.getByRole('button', { name: /create tracked link/i }))
-    expect(await screen.findAllByText(/spring-token/i)).not.toHaveLength(0)
-
-    await user.click(screen.getByRole('button', { name: /refresh tracked links/i }))
-    await screen.findByText(/Clicks: 1/i)
-
-    await user.click(screen.getByRole('button', { name: /open tracked link/i }))
-    expect(await screen.findAllByText(/https:\/\/example\.com\/spring/i)).not.toHaveLength(0)
-
-    await user.click(screen.getByRole('button', { name: /redeem tracked link/i }))
-    expect(await screen.findAllByText(/redeemed/i)).not.toHaveLength(0)
-
-    await user.click(screen.getByRole('button', { name: /refresh performance/i }))
-    await screen.findByText(/Media assets/)
-    expect(screen.getByText(/Tracked links/)).toBeInTheDocument()
-    expect(screen.getByText(/Redemptions/)).toBeInTheDocument()
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/companies/company-2/media-assets',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          filename: 'coupon.png',
-          content_type: 'image/png',
-          url: 'https://cdn.example/coupon.png',
-        }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/companies/company-2/campaign-links',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          campaign_id: 'campaign-1',
-          subscriber_id: 'subscriber-1',
-          media_asset_id: 'media-1',
-          destination_url: 'https://example.com/spring',
-        }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith('/api/r/spring-token')
-    expect(fetchMock).toHaveBeenCalledWith('/api/r/spring-token/redeem', expect.objectContaining({ method: 'POST' }))
-    expect(fetchMock).toHaveBeenCalledWith('/api/companies/company-2/campaign-performance')
-  })
-
-  it('creates and lists reminder campaigns for the active company', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-
-    render(<App />)
-
-    await user.clear(screen.getByLabelText(/active company id/i))
-    await user.type(screen.getByLabelText(/active company id/i), 'company-2')
-    await user.clear(screen.getByLabelText(/reminder source campaign id/i))
-    await user.type(screen.getByLabelText(/reminder source campaign id/i), 'campaign-1')
-    await user.selectOptions(screen.getByLabelText(/reminder audience rule/i), 'clicked_not_redeemed')
-    await user.clear(screen.getByLabelText(/reminder copy/i))
-    await user.type(screen.getByLabelText(/reminder copy/i), 'Still interested?')
-    await user.click(screen.getByRole('button', { name: /create reminder/i }))
-
-    await screen.findByText(/reminder-1/i)
-    expect(screen.getByText(/Estimated recipients: 2/i)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: /refresh reminders/i }))
-    expect(await screen.findAllByText(/clicked_not_redeemed/i)).not.toHaveLength(0)
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/companies/company-2/reminder-campaigns',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          source_campaign_id: 'campaign-1',
-          audience_rule: 'clicked_not_redeemed',
-          message_body: 'Still interested?',
-        }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenCalledWith('/api/companies/company-2/reminder-campaigns')
-  })
-
-  it('loads the internal admin usage dashboard with the admin header', async () => {
-    const fetchMock = mockFetch()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-
-    render(<App />)
-
-    await user.clear(screen.getByLabelText(/usage from date/i))
-    await user.type(screen.getByLabelText(/usage from date/i), '2026-05-01')
-    await user.clear(screen.getByLabelText(/usage to date/i))
-    await user.type(screen.getByLabelText(/usage to date/i), '2026-05-21')
-    await user.click(screen.getByRole('button', { name: /load usage/i }))
-
-    await screen.findByText(/Beta Co/i)
-    expect(screen.getByText(/Campaigns: 3/i)).toBeInTheDocument()
-    expect(screen.getByText(/Reminders: 1/i)).toBeInTheDocument()
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/admin/usage?from=2026-05-01&to=2026-05-21',
-      expect.objectContaining({
-        headers: expect.objectContaining({ 'X-Internal-Admin': 'true' }),
-      }),
-    )
+    expect(window.localStorage.getItem(SESSION_KEY)).toBeNull()
+    expect(screen.getByRole('button', { name: /login as internal admin/i })).toBeInTheDocument()
   })
 })

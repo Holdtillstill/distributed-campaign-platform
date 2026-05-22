@@ -37,12 +37,20 @@ class FakeTenantRepository:
         name: str,
         slug: str,
         admin_email: str,
+        monthly_send_limit: int | None = None,
     ) -> dict[str, object]:
-        self.company_request = {"name": name, "slug": slug, "admin_email": admin_email}
+        self.company_request = {
+            "name": name,
+            "slug": slug,
+            "admin_email": admin_email,
+            "monthly_send_limit": monthly_send_limit,
+        }
         return {
             "id": "company-1",
             "name": name,
             "slug": slug,
+            "monthly_send_limit": monthly_send_limit,
+            "access_code": "ACME-1234",
             "admin_user": {
                 "id": "user-1",
                 "email": admin_email,
@@ -133,10 +141,13 @@ def test_schema_defines_tenant_user_rbac_and_audit_tables() -> None:
     assert "ALTER TABLE campaigns" in schema
     assert "ALTER TABLE messages" in schema
     assert "company_id TEXT" in schema
+    assert "monthly_send_limit INTEGER" in schema
+    assert "CREATE TABLE IF NOT EXISTS company_access_codes" in schema
+    assert "revoked_at TIMESTAMPTZ" in schema
     assert "idx_campaigns_company_id" in schema
 
 
-def test_internal_admin_can_create_customer_company_with_initial_admin(
+def test_internal_admin_can_create_customer_company_with_quota_and_access_code(
     campaign_module,
     fake_repo,
 ) -> None:
@@ -149,6 +160,7 @@ def test_internal_admin_can_create_customer_company_with_initial_admin(
             "name": "Acme Retail",
             "slug": "acme-retail",
             "admin_email": "admin@acme.example",
+            "monthly_send_limit": 50000,
         },
     )
 
@@ -157,6 +169,8 @@ def test_internal_admin_can_create_customer_company_with_initial_admin(
         "id": "company-1",
         "name": "Acme Retail",
         "slug": "acme-retail",
+        "monthly_send_limit": 50000,
+        "access_code": "ACME-1234",
         "admin_user": {
             "id": "user-1",
             "email": "admin@acme.example",
@@ -167,6 +181,7 @@ def test_internal_admin_can_create_customer_company_with_initial_admin(
         "name": "Acme Retail",
         "slug": "acme-retail",
         "admin_email": "admin@acme.example",
+        "monthly_send_limit": 50000,
     }
 
 

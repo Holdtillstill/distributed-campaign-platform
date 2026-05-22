@@ -63,6 +63,7 @@ class CompanyCreateRequest(BaseModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
     admin_email: str = Field(min_length=3)
+    monthly_send_limit: int | None = Field(default=None, ge=0)
 
 
 class AdminUserResponse(BaseModel):
@@ -75,6 +76,8 @@ class CompanyCreateResponse(BaseModel):
     id: str
     name: str
     slug: str
+    monthly_send_limit: int | None = None
+    access_code: str
     admin_user: AdminUserResponse
 
 
@@ -83,6 +86,37 @@ class MembershipResponse(BaseModel):
     company_name: str
     company_slug: str
     role: str
+
+
+class AccessCodeCreateResponse(BaseModel):
+    code: str
+    company_id: str
+    role: str
+
+
+class AccessCodeSignupRequest(BaseModel):
+    email: str = Field(min_length=3)
+    name: str = Field(min_length=1)
+    access_code: str = Field(min_length=3)
+
+
+class AccessCodeSignupResponse(BaseModel):
+    role: Literal["company_user"]
+    email: str
+    company_id: str
+    company_name: str
+    membership_role: str
+
+
+class CompanyDashboardSummaryResponse(BaseModel):
+    company_id: str
+    company_name: str
+    monthly_send_limit: int | None = None
+    subscriber_count: int
+    campaign_count: int
+    message_count: int
+    click_count: int
+    redemption_count: int
 
 
 class SubscriberListCreateRequest(BaseModel):
@@ -235,9 +269,31 @@ class CampaignRepository(Protocol):
         name: str,
         slug: str,
         admin_email: str,
+        monthly_send_limit: int | None,
     ) -> dict[str, Any]: ...
 
     async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]: ...
+
+    async def create_company_access_code(
+        self,
+        *,
+        company_id: str,
+        role_slug: str,
+    ) -> dict[str, Any] | None: ...
+
+    async def signup_with_access_code(
+        self,
+        *,
+        email: str,
+        name: str,
+        access_code: str,
+    ) -> dict[str, Any] | None: ...
+
+    async def get_company_dashboard_summary(
+        self,
+        *,
+        company_id: str,
+    ) -> dict[str, Any] | None: ...
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]: ...
 
@@ -401,16 +457,47 @@ class AsyncpgCampaignRepository:
         name: str,
         slug: str,
         admin_email: str,
+        monthly_send_limit: int | None = None,
     ) -> dict[str, Any]:
         return await db.create_company_with_admin(
             self._pool,
             name=name,
             slug=slug,
             admin_email=admin_email,
+            monthly_send_limit=monthly_send_limit,
         )
 
     async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]:
         return await db.list_user_memberships(self._pool, email=email)
+
+    async def create_company_access_code(
+        self,
+        *,
+        company_id: str,
+        role_slug: str = "customer_admin",
+    ) -> dict[str, Any] | None:
+        return await db.create_company_access_code(
+            self._pool,
+            company_id=company_id,
+            role_slug=role_slug,
+        )
+
+    async def signup_with_access_code(
+        self,
+        *,
+        email: str,
+        name: str,
+        access_code: str,
+    ) -> dict[str, Any] | None:
+        return await db.signup_with_access_code(
+            self._pool,
+            email=email,
+            name=name,
+            access_code=access_code,
+        )
+
+    async def get_company_dashboard_summary(self, *, company_id: str) -> dict[str, Any] | None:
+        return await db.get_company_dashboard_summary(self._pool, company_id=company_id)
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]:
         return await db.create_subscriber_list(self._pool, company_id=company_id, name=name)
@@ -620,7 +707,51 @@ async def create_customer_company(
         name=request.name,
         slug=request.slug,
         admin_email=request.admin_email,
+        monthly_send_limit=request.monthly_send_limit,
     )
+
+
+@app.post(
+    "/admin/companies/{company_id}/access-codes",
+    response_model=AccessCodeCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_company_access_code(
+    company_id: str,
+    internal_admin: str | None = Header(None, alias="X-Internal-Admin"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    if internal_admin != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="internal admin access required",
+        )
+    result = await repository.create_company_access_code(
+        company_id=company_id,
+        role_slug="customer_admin",
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="company not found")
+    return result
+
+
+@app.post(
+    "/signup/access-code",
+    response_model=AccessCodeSignupResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def signup_with_access_code(
+    request: AccessCodeSignupRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.signup_with_access_code(
+        email=request.email,
+        name=request.name,
+        access_code=request.access_code,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="access code not found")
+    return result
 
 
 @app.get("/me/memberships", response_model=list[MembershipResponse])
@@ -634,6 +765,20 @@ async def list_my_memberships(
             detail="X-User-Email header required",
         )
     return await repository.list_user_memberships(email=user_email)
+
+
+@app.get(
+    "/companies/{company_id}/dashboard-summary",
+    response_model=CompanyDashboardSummaryResponse,
+)
+async def get_company_dashboard_summary(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.get_company_dashboard_summary(company_id=company_id)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="company not found")
+    return result
 
 
 @app.post(

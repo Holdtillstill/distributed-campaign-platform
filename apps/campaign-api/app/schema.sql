@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS companies (
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
+    monthly_send_limit INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -50,6 +51,17 @@ ON CONFLICT (slug) DO NOTHING;
 INSERT INTO companies (id, name, slug)
 VALUES ('demo-company', 'Demo Company', 'demo-company')
 ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS monthly_send_limit INTEGER;
+
+CREATE TABLE IF NOT EXISTS company_access_codes (
+    code TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    role_slug TEXT NOT NULL DEFAULT 'customer_admin' REFERENCES roles(slug),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ
+);
 
 CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY,
@@ -198,3 +210,5 @@ CREATE INDEX IF NOT EXISTS idx_messages_campaign_id ON messages(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_messages_campaign_status ON messages(campaign_id, status);
 CREATE INDEX IF NOT EXISTS idx_company_memberships_user_id ON company_memberships(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_events_company_created ON audit_events(company_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_company_access_codes_company_id ON company_access_codes(company_id);
+CREATE INDEX IF NOT EXISTS idx_company_access_codes_active ON company_access_codes(code) WHERE revoked_at IS NULL;

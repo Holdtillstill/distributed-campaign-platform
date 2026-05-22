@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -122,6 +123,7 @@ async def create_company_with_admin(
     name: str,
     slug: str,
     admin_email: str,
+    monthly_send_limit: int | None = None,
 ) -> dict[str, Any]:
     company_id = str(uuid4())
     user_id = str(uuid4())
@@ -129,13 +131,14 @@ async def create_company_with_admin(
     async with pool.acquire() as connection, connection.transaction():
         company = await connection.fetchrow(
             """
-            INSERT INTO companies (id, name, slug)
-            VALUES ($1, $2, $3)
-            RETURNING id, name, slug
+            INSERT INTO companies (id, name, slug, monthly_send_limit)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, name, slug, monthly_send_limit
             """,
             company_id,
             name,
             slug,
+            monthly_send_limit,
         )
         user = await connection.fetchrow(
             """
@@ -166,11 +169,19 @@ async def create_company_with_admin(
             user["id"],
             admin_email,
         )
+        access_code = await _create_company_access_code(
+            connection,
+            company_id=company["id"],
+            company_slug=company["slug"],
+            role_slug="customer_admin",
+        )
 
     return {
         "id": company["id"],
         "name": company["name"],
         "slug": company["slug"],
+        "monthly_send_limit": company["monthly_send_limit"],
+        "access_code": access_code["code"],
         "admin_user": {
             "id": user["id"],
             "email": user["email"],
@@ -197,6 +208,122 @@ async def list_user_memberships(pool: asyncpg.Pool, *, email: str) -> list[dict[
             email,
         )
     return [dict(row) for row in rows]
+
+
+async def create_company_access_code(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    role_slug: str = "customer_admin",
+) -> dict[str, Any] | None:
+    async with pool.acquire() as connection:
+        company = await connection.fetchrow(
+            """
+            SELECT id, slug
+            FROM companies
+            WHERE id = $1
+            """,
+            company_id,
+        )
+        if company is None:
+            return None
+        return await _create_company_access_code(
+            connection,
+            company_id=company["id"],
+            company_slug=company["slug"],
+            role_slug=role_slug,
+        )
+
+
+async def signup_with_access_code(
+    pool: asyncpg.Pool,
+    *,
+    email: str,
+    name: str,
+    access_code: str,
+) -> dict[str, Any] | None:
+    user_id = str(uuid4())
+    normalized_code = access_code.strip().upper()
+    async with pool.acquire() as connection, connection.transaction():
+        code_row = await connection.fetchrow(
+            """
+            SELECT
+                ac.code,
+                ac.company_id,
+                ac.role_slug,
+                c.name AS company_name
+            FROM company_access_codes ac
+            JOIN companies c ON c.id = ac.company_id
+            WHERE ac.code = $1
+              AND ac.revoked_at IS NULL
+              AND c.status = 'active'
+            """,
+            normalized_code,
+        )
+        if code_row is None:
+            return None
+        user = await connection.fetchrow(
+            """
+            INSERT INTO users (id, email, display_name)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (email) DO UPDATE SET
+                display_name = COALESCE(EXCLUDED.display_name, users.display_name),
+                updated_at = NOW()
+            RETURNING id, email
+            """,
+            user_id,
+            email,
+            name,
+        )
+        await connection.execute(
+            """
+            INSERT INTO company_memberships (company_id, user_id, role_slug)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (company_id, user_id) DO UPDATE SET
+                role_slug = EXCLUDED.role_slug
+            """,
+            code_row["company_id"],
+            user["id"],
+            code_row["role_slug"],
+        )
+    return {
+        "role": "company_user",
+        "email": user["email"],
+        "company_id": code_row["company_id"],
+        "company_name": code_row["company_name"],
+        "membership_role": code_row["role_slug"],
+    }
+
+
+async def get_company_dashboard_summary(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+) -> dict[str, Any] | None:
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            SELECT
+                c.id AS company_id,
+                c.name AS company_name,
+                c.monthly_send_limit,
+                (SELECT COUNT(*)::int FROM subscribers WHERE company_id = c.id) AS subscriber_count,
+                (SELECT COUNT(*)::int FROM campaigns WHERE company_id = c.id) AS campaign_count,
+                (SELECT COUNT(*)::int FROM messages WHERE company_id = c.id) AS message_count,
+                COALESCE(
+                    (SELECT SUM(click_count)::int FROM campaign_links WHERE company_id = c.id),
+                    0
+                ) AS click_count,
+                COALESCE(
+                    (SELECT SUM(redeemed_count)::int FROM campaign_links WHERE company_id = c.id),
+                    0
+                ) AS redemption_count
+            FROM companies c
+            WHERE c.id = $1
+            """,
+            company_id,
+        )
+    return dict(row) if row is not None else None
 
 
 async def create_subscriber_list(
@@ -776,3 +903,35 @@ async def _estimate_reminder_recipients(
 
 def _link_with_public_url(row: dict[str, Any]) -> dict[str, Any]:
     return {**row, "public_url": f"/r/{row['token']}"}
+
+
+def _access_code_prefix(company_slug: str) -> str:
+    prefix = re.sub(r"[^A-Z0-9]", "", company_slug.upper())[:8]
+    return prefix or "COMPANY"
+
+
+async def _create_company_access_code(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    company_slug: str,
+    role_slug: str,
+) -> dict[str, Any]:
+    prefix = _access_code_prefix(company_slug)
+    for _ in range(5):
+        code = f"{prefix}-{uuid4().hex[:6].upper()}"
+        try:
+            row = await connection.fetchrow(
+                """
+                INSERT INTO company_access_codes (code, company_id, role_slug)
+                VALUES ($1, $2, $3)
+                RETURNING code, company_id, role_slug AS role, created_at, revoked_at
+                """,
+                code,
+                company_id,
+                role_slug,
+            )
+            return dict(row)
+        except asyncpg.UniqueViolationError:
+            continue
+    raise RuntimeError("could not generate unique company access code")
