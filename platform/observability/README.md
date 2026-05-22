@@ -34,3 +34,37 @@ helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
   --namespace observability \
   -f platform/observability/opentelemetry-collector-values.yaml
 ```
+
+## Local access after install
+
+```bash
+kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80
+kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+kubectl -n observability port-forward svc/kube-prometheus-stack-alertmanager 9093:9093
+kubectl -n observability port-forward svc/loki-gateway 3100:80
+kubectl -n observability port-forward svc/tempo 3200:3200
+```
+
+Open:
+
+- Grafana: <http://127.0.0.1:3000> (`admin` / `campaign-local` for local kind only)
+- Prometheus: <http://127.0.0.1:9090>
+- Alertmanager: <http://127.0.0.1:9093>
+- Loki API: <http://127.0.0.1:3100/loki/api/v1/status/buildinfo>
+- Tempo readiness: <http://127.0.0.1:3200/ready>
+
+After installing `kube-prometheus-stack`, re-enable the app ServiceMonitors:
+
+```bash
+helm upgrade --install campaign-platform deploy/helm/campaign-platform \
+  --namespace campaign-platform \
+  --set observability.serviceMonitor.enabled=true \
+  --set networkPolicy.enabled=false \
+  --set campaignApi.service.port=8080
+```
+
+Prometheus should then show the app targets as `up`:
+
+- `campaign-platform-campaign-api`
+- `campaign-platform-dispatcher`
+- `campaign-platform-provider-simulator`

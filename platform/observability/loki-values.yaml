@@ -13,11 +13,22 @@ loki:
         index:
           prefix: loki_index_
           period: 24h
+  storage:
+    type: filesystem
+    bucketNames:
+      chunks: chunks
+      ruler: ruler
+      admin: admin
   limits_config:
     retention_period: 72h
 
 singleBinary:
   replicas: 1
+
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
 
 read:
   replicas: 0

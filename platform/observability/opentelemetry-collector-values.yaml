@@ -18,13 +18,13 @@ config:
       limit_mib: 256
   exporters:
     otlp/tempo:
-      endpoint: tempo.observability.svc.cluster.local:4317
+      endpoint: tempo.observability.svc.cluster.local:55680
       tls:
         insecure: true
     prometheus:
       endpoint: 0.0.0.0:8889
-    loki:
-      endpoint: http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push
+    otlphttp/loki:
+      endpoint: http://loki-gateway.observability.svc.cluster.local/otlp
   service:
     pipelines:
       traces:
@@ -38,7 +38,7 @@ config:
       logs:
         receivers: [otlp]
         processors: [memory_limiter, batch]
-        exporters: [loki]
+        exporters: [otlphttp/loki]
 
 ports:
   otlp:
