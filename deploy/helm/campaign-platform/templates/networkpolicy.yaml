@@ -22,10 +22,7 @@ spec:
     matchExpressions:
       - key: app.kubernetes.io/component
         operator: In
-        values:
-          - campaign-api
-          - dispatcher
-          - provider-simulator
+        values: [campaign-api, dispatcher, provider-simulator, web-ui]
   policyTypes:
     - Ingress
     - Egress
@@ -54,6 +51,13 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/component: provider-simulator
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: campaign-api
       ports:
         - protocol: TCP
           port: 8080

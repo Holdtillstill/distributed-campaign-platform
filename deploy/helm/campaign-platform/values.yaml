@@ -73,6 +73,26 @@ dispatcher:
     enabled: true
     minAvailable: 1
 
+webUi:
+  image:
+    repository: web-ui
+    tag: local
+  replicas: 1
+  service:
+    port: 80
+  apiBaseUrl: ""
+  campaignApiUpstream: http://campaign-platform-campaign-api:8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 192Mi
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
 observability:
   serviceMonitor:
     enabled: true

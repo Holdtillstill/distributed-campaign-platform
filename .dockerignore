@@ -1,0 +1,8 @@
+.git
+.venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+apps/web-ui/dist
+.coverage
+.DS_Store

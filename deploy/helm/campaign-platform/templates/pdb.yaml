@@ -3,6 +3,7 @@
   (dict "component" "campaign-api" "values" .Values.campaignApi)
   (dict "component" "provider-simulator" "values" .Values.providerSimulator)
   (dict "component" "dispatcher" "values" .Values.dispatcher)
+  (dict "component" "web-ui" "values" .Values.webUi)
 }}
 {{- if $service.values.podDisruptionBudget.enabled }}
 apiVersion: policy/v1

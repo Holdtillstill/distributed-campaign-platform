@@ -3,10 +3,12 @@
 # app.kubernetes.io/component: campaign-api
 # app.kubernetes.io/component: dispatcher
 # app.kubernetes.io/component: provider-simulator
+# app.kubernetes.io/component: web-ui
 {{- range $service := list
   (dict "component" "campaign-api" "values" .Values.campaignApi "env" "api")
   (dict "component" "provider-simulator" "values" .Values.providerSimulator "env" "provider")
   (dict "component" "dispatcher" "values" .Values.dispatcher "env" "dispatcher")
+  (dict "component" "web-ui" "values" .Values.webUi "env" "web")
 }}
 apiVersion: apps/v1
 kind: Deployment
@@ -37,7 +39,7 @@ spec:
           imagePullPolicy: {{ $root.Values.global.imagePullPolicy }}
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: {{ ternary 80 8080 (eq $service.component "web-ui") }}
           envFrom:
             - configMapRef:
                 name: {{ include "campaign-platform.fullname" $root }}-app-config
@@ -47,18 +49,31 @@ spec:
             {{- if eq $service.component "dispatcher" }}
             - name: DISPATCHER_WORKER_ENABLED
               value: "true"
+            {{- else if eq $service.component "web-ui" }}
+            - name: CAMPAIGN_API_UPSTREAM
+              value: {{ $root.Values.webUi.campaignApiUpstream | quote }}
+            {{- else }}
+            []
             {{- end }}
           resources:
             {{- toYaml $service.values.resources | nindent 12 }}
           readinessProbe:
             httpGet:
+              {{- if eq $service.component "web-ui" }}
+              path: /
+              {{- else }}
               path: /readyz
+              {{- end }}
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             httpGet:
+              {{- if eq $service.component "web-ui" }}
+              path: /
+              {{- else }}
               path: /healthz
+              {{- end }}
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10

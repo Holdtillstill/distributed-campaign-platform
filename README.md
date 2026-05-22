@@ -2,7 +2,7 @@
 
 A production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
 
-> Status: Phase 3 observability, reliability, and Kubernetes hardening complete and verified locally.
+> Status: Phase 4 demo web UI complete and verified locally on kind.
 
 ## Goals
 
@@ -74,6 +74,7 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
 The local Compose stack runs PostgreSQL, Redis, NATS JetStream, Campaign API, Provider Simulator, and Dispatcher with host ports bound to loopback only:
 
 - Campaign API: <http://127.0.0.1:8081>
+- Web UI: <http://127.0.0.1:8080>
 - Provider Simulator: <http://127.0.0.1:8082>
 - Dispatcher health app: <http://127.0.0.1:8083>
 
@@ -91,6 +92,8 @@ scripts/local/e2e-smoke-test.sh
 ```
 
 The smoke test waits for the local dependencies and service health endpoints, creates a campaign through the Campaign API, then polls `GET /campaigns/{id}` until every message has left `queued` and reached a terminal status (`sent`, `failed`, or `dead_lettered`). Compose defaults the provider simulator to `PROVIDER_MODE=success`, so the deterministic expected result is `sent == message_count`.
+
+The browser demo UI is served by Nginx and proxies API calls under `/api/*` to the Campaign API, so `http://127.0.0.1:8080` can create campaigns and poll status without CORS configuration.
 
 Dispatcher reliability defaults:
 
@@ -131,7 +134,14 @@ Deploy to a local kind cluster:
 scripts/local/kind-deploy.sh
 ```
 
-The kind path builds local images, loads them into kind, installs the Helm chart, and waits for the three app deployments to roll out.
+The kind path builds local images, loads them into kind, installs the Helm chart, and waits for the four app deployments to roll out.
+
+Access the web UI in kind:
+
+```bash
+kubectl -n campaign-platform port-forward svc/campaign-platform-web-ui 18080:80
+open http://127.0.0.1:18080
+```
 
 ## Observability stack scaffolding
 
@@ -147,4 +157,4 @@ See [`platform/observability/README.md`](platform/observability/README.md) for i
 
 ## Current next step
 
-See [`docs/plans/0003-phase-3-observability-reliability-hardening.md`](docs/plans/0003-phase-3-observability-reliability-hardening.md) for the latest verified milestone. Recommended next phase: add CI gates, Grafana dashboards/alerts, and OpenTelemetry app instrumentation.
+See [`docs/plans/0004-phase-4-demo-web-ui.md`](docs/plans/0004-phase-4-demo-web-ui.md) for the latest verified milestone. Recommended next phase: add CI gates, Grafana dashboards/alerts, OpenTelemetry app instrumentation, and Playwright UI smoke tests.
