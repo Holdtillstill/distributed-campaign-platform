@@ -15,7 +15,7 @@ def test_web_ui_has_vite_react_application_scaffold() -> None:
     package_json = json.loads((WEB_UI_DIR / "package.json").read_text())
 
     assert package_json["scripts"]["build"] == "vite build"
-    assert package_json["scripts"]["test"] == "vitest run"
+    assert package_json["scripts"]["test"] == "NODE_ENV=development vitest run"
     assert "@vitejs/plugin-react" in package_json["devDependencies"]
     assert "vite" in package_json["devDependencies"]
     assert "react" in package_json["dependencies"]

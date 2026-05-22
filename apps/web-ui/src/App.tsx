@@ -10,9 +10,50 @@ type StatusCounts = {
 
 type Campaign = {
   id: string
+  company_id?: string
   name: string
   message_count?: number
   status_counts: StatusCounts
+}
+
+type CompanyResult = {
+  company?: {
+    id?: string
+    name?: string
+    slug?: string
+  }
+  admin_user?: {
+    id?: string
+    email?: string
+  }
+}
+
+type Membership = {
+  company_id: string
+  company_name?: string
+  role?: string
+}
+
+type SubscriberListResult = {
+  id?: string
+  company_id?: string
+  name?: string
+}
+
+type SubscriberResult = {
+  id?: string
+  company_id?: string
+  phone_number?: string
+  source?: string
+  list_id?: string
+  consent_status?: string
+}
+
+type OptInResult = {
+  token?: string
+  company_id?: string
+  phone_number?: string
+  status?: string
 }
 
 type SystemCheck = {
@@ -34,6 +75,23 @@ function terminalTotal(counts: StatusCounts): number {
 }
 
 export default function App() {
+  const [activeCompanyId, setActiveCompanyId] = useState('')
+  const [companyName, setCompanyName] = useState('Acme Co')
+  const [companySlug, setCompanySlug] = useState('acme')
+  const [adminEmail, setAdminEmail] = useState('admin@example.com')
+  const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null)
+  const [membershipEmail, setMembershipEmail] = useState('admin@example.com')
+  const [memberships, setMemberships] = useState<Membership[]>([])
+  const [listName, setListName] = useState('Primary list')
+  const [subscriberList, setSubscriberList] = useState<SubscriberListResult | null>(null)
+  const [subscriberPhone, setSubscriberPhone] = useState('+15550001010')
+  const [subscriberSource, setSubscriberSource] = useState('import')
+  const [subscriber, setSubscriber] = useState<SubscriberResult | null>(null)
+  const [optInPhone, setOptInPhone] = useState('+15550001011')
+  const [optInSource, setOptInSource] = useState('landing-page')
+  const [optIn, setOptIn] = useState<OptInResult | null>(null)
+  const [confirmToken, setConfirmToken] = useState('')
+  const [confirmResult, setConfirmResult] = useState<OptInResult | null>(null)
   const [campaignName, setCampaignName] = useState('Portfolio demo campaign')
   const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
   const [recipients, setRecipients] = useState(DEMO_RECIPIENTS.join('\n'))
@@ -45,6 +103,7 @@ export default function App() {
   ])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [scopeError, setScopeError] = useState<string | null>(null)
 
   const progress = useMemo(() => {
     if (!campaign) return 0
@@ -75,6 +134,128 @@ export default function App() {
     setCampaign(await response.json())
   }
 
+  async function createCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/companies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Admin': 'true' },
+        body: JSON.stringify({ name: companyName, slug: companySlug, admin_email: adminEmail }),
+      })
+
+      if (!response.ok) throw new Error(`Create company failed: ${response.status}`)
+      const result = (await response.json()) as CompanyResult
+      setCompanyResult(result)
+      if (result.company?.id) setActiveCompanyId(result.company.id)
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function lookupMemberships(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/me/memberships`, {
+        headers: { 'X-User-Email': membershipEmail },
+      })
+
+      if (!response.ok) throw new Error(`Membership lookup failed: ${response.status}`)
+      const result = (await response.json()) as { memberships?: Membership[] }
+      setMemberships(result.memberships ?? [])
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function createSubscriberList(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyId.trim()
+      if (!companyId) throw new Error('Select an active company before creating a list')
+
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: listName }),
+      })
+
+      if (!response.ok) throw new Error(`Create list failed: ${response.status}`)
+      setSubscriberList(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function importSubscriber(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyId.trim()
+      if (!companyId) throw new Error('Select an active company before importing a subscriber')
+
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone_number: subscriberPhone,
+          source: subscriberSource,
+          list_id: subscriberList?.id ?? '',
+        }),
+      })
+
+      if (!response.ok) throw new Error(`Import subscriber failed: ${response.status}`)
+      setSubscriber(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function startOptIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyId.trim()
+      if (!companyId) throw new Error('Select an active company before starting opt-in')
+
+      const response = await fetch(`${API_BASE_URL}/public/opt-ins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_id: companyId, phone_number: optInPhone, source: optInSource }),
+      })
+
+      if (!response.ok) throw new Error(`Start opt-in failed: ${response.status}`)
+      const result = (await response.json()) as OptInResult
+      setOptIn(result)
+      if (result.token) setConfirmToken(result.token)
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function confirmOptIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/public/opt-ins/${confirmToken}/confirm`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) throw new Error(`Confirm opt-in failed: ${response.status}`)
+      setConfirmResult(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
@@ -86,9 +267,12 @@ export default function App() {
       .filter(Boolean)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (activeCompanyId.trim()) headers['X-Company-Id'] = activeCompanyId.trim()
+
       const response = await fetch(`${API_BASE_URL}/campaigns`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ name: campaignName, body: messageBody, recipients: recipientList }),
       })
 
@@ -127,6 +311,162 @@ export default function App() {
         </a>
       </section>
 
+      <section className="panel">
+        <div className="section-heading">
+          <span>Company scope</span>
+          <strong>{activeCompanyId ? `Active ${activeCompanyId}` : 'No company selected'}</strong>
+        </div>
+        <label>
+          Active company id
+          <input value={activeCompanyId} onChange={(event) => setActiveCompanyId(event.target.value)} />
+        </label>
+        {scopeError ? <p className="error">{scopeError}</p> : null}
+      </section>
+
+      <section className="grid">
+        <form className="panel" onSubmit={createCompany}>
+          <div className="section-heading">
+            <span>Internal admin</span>
+            <strong>Create company</strong>
+          </div>
+          <label>
+            Company name
+            <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} />
+          </label>
+          <label>
+            Company slug
+            <input value={companySlug} onChange={(event) => setCompanySlug(event.target.value)} />
+          </label>
+          <label>
+            Admin email
+            <input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} />
+          </label>
+          <button>Create company</button>
+          {companyResult ? (
+            <div className="result-block">
+              <span>Company id: {companyResult.company?.id ?? 'unknown'}</span>
+              <span>Admin user: {companyResult.admin_user?.id ?? 'unknown'}</span>
+              <span>Admin email: {companyResult.admin_user?.email ?? adminEmail}</span>
+            </div>
+          ) : null}
+        </form>
+
+        <form className="panel" onSubmit={lookupMemberships}>
+          <div className="section-heading">
+            <span>Membership lookup</span>
+            <strong>{memberships.length ? `${memberships.length} found` : 'By user email'}</strong>
+          </div>
+          <label>
+            User email
+            <input type="email" value={membershipEmail} onChange={(event) => setMembershipEmail(event.target.value)} />
+          </label>
+          <button>Lookup memberships</button>
+          {memberships.length ? (
+            <ul className="membership-list">
+              {memberships.map((membership) => {
+                const companyLabel = membership.company_name ?? membership.company_id
+                return (
+                  <li aria-label={companyLabel} key={`${membership.company_id}-${membership.role ?? 'member'}`}>
+                    <div>
+                      <strong>{companyLabel}</strong>
+                      <span>{membership.company_id}</span>
+                      {membership.role ? <span>{membership.role}</span> : null}
+                    </div>
+                    <button
+                      className="secondary"
+                      type="button"
+                      onClick={() => setActiveCompanyId(membership.company_id)}
+                    >
+                      Select {companyLabel}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+        </form>
+      </section>
+
+      <section className="grid three-column">
+        <form className="panel" onSubmit={createSubscriberList}>
+          <div className="section-heading">
+            <span>Subscriber list</span>
+            <strong>Create</strong>
+          </div>
+          <label>
+            Subscriber list name
+            <input value={listName} onChange={(event) => setListName(event.target.value)} />
+          </label>
+          <button>Create list</button>
+          {subscriberList ? (
+            <div className="result-block">
+              <span>List id: {subscriberList.id}</span>
+              <span>{subscriberList.name}</span>
+            </div>
+          ) : null}
+        </form>
+
+        <form className="panel" onSubmit={importSubscriber}>
+          <div className="section-heading">
+            <span>Subscriber import</span>
+            <strong>Company provided</strong>
+          </div>
+          <label>
+            Subscriber phone number
+            <input value={subscriberPhone} onChange={(event) => setSubscriberPhone(event.target.value)} />
+          </label>
+          <label>
+            Subscriber source
+            <input value={subscriberSource} onChange={(event) => setSubscriberSource(event.target.value)} />
+          </label>
+          <button>Import subscriber</button>
+          {subscriber ? (
+            <div className="result-block">
+              <span>Subscriber id: {subscriber.id}</span>
+              <span>{subscriber.phone_number}</span>
+              <span>{subscriber.consent_status}</span>
+            </div>
+          ) : null}
+        </form>
+
+        <div className="panel">
+          <form onSubmit={startOptIn}>
+            <div className="section-heading">
+              <span>Double opt-in</span>
+              <strong>Public flow</strong>
+            </div>
+            <label>
+              Opt-in phone number
+              <input value={optInPhone} onChange={(event) => setOptInPhone(event.target.value)} />
+            </label>
+            <label>
+              Opt-in source
+              <input value={optInSource} onChange={(event) => setOptInSource(event.target.value)} />
+            </label>
+            <button>Start opt-in</button>
+          </form>
+          {optIn ? (
+            <div className="result-block">
+              <span>Token: {optIn.token}</span>
+              <span>Status: {optIn.status}</span>
+            </div>
+          ) : null}
+          <form className="stacked-form" onSubmit={confirmOptIn}>
+            <label>
+              Confirmation token
+              <input value={confirmToken} onChange={(event) => setConfirmToken(event.target.value)} />
+            </label>
+            <button>Confirm opt-in</button>
+          </form>
+          {confirmResult ? (
+            <div className="result-block">
+              <span>Token: {confirmResult.token}</span>
+              <span>Status: {confirmResult.status}</span>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
       <section className="grid">
         <form className="panel" onSubmit={createCampaign}>
           <div className="section-heading">
@@ -158,6 +498,7 @@ export default function App() {
             <>
               <h2>{campaign.name}</h2>
               <p className="campaign-id">{campaign.id}</p>
+              {campaign.company_id ? <p className="campaign-id">Company: {campaign.company_id}</p> : null}
               <div className="progress"><span style={{ width: `${progress}%` }} /></div>
               <div className="stats">
                 <Stat label="Queued" value={campaign.status_counts.queued} />
