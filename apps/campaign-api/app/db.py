@@ -53,11 +53,13 @@ async def create_campaign_with_messages(
     message_type: str,
     actor_email: str | None,
     messages: list[dict[str, Any]],
+    media_asset_id: str | None = None,
     scheduled_at: str | None = None,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     unit_cost = MESSAGE_CREDIT_COSTS[message_type]
     credit_cost = unit_cost * len(messages)
     campaign_status = "scheduled" if scheduled_at else "queued"
+    scheduled_at_value = _parse_timestamp(scheduled_at)
     async with pool.acquire() as connection, connection.transaction():
         company = await connection.fetchrow(
             """
@@ -142,7 +144,7 @@ async def create_campaign_with_messages(
             body,
             message_type,
             campaign_status,
-            scheduled_at,
+            scheduled_at_value,
             credit_cost,
         )
         await connection.executemany(
@@ -173,11 +175,51 @@ async def create_campaign_with_messages(
                 for message in messages
             ],
         )
+        tracked_links = []
+        if message_type == "smart" and media_asset_id:
+            for message in messages:
+                if not message.get("subscriber_id"):
+                    continue
+                link_id = str(uuid4())
+                token = uuid4().hex
+                link = await connection.fetchrow(
+                    """
+                    INSERT INTO campaign_links (
+                        id,
+                        token,
+                        company_id,
+                        campaign_id,
+                        subscriber_id,
+                        media_asset_id,
+                        destination_url
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, NULL)
+                    RETURNING
+                        id,
+                        token,
+                        company_id,
+                        campaign_id,
+                        subscriber_id,
+                        media_asset_id,
+                        destination_url,
+                        click_count,
+                        redeemed_count,
+                        created_at
+                    """,
+                    link_id,
+                    token,
+                    company_id,
+                    campaign_id,
+                    message["subscriber_id"],
+                    media_asset_id,
+                )
+                tracked_links.append(_link_with_public_url(dict(link)))
     return {
         "credit_cost": credit_cost,
         "remaining_credits": remaining_credits,
         "status": campaign_status,
         "audience_count": len(messages),
+        "tracked_links": tracked_links,
     }
 
 
@@ -930,6 +972,7 @@ async def register_click(
             RETURNING
                 id,
                 token,
+                campaign_id,
                 destination_url,
                 click_count,
                 media_asset_id
@@ -938,6 +981,14 @@ async def register_click(
         )
         if link is None:
             return None
+        campaign = await connection.fetchrow(
+            """
+            SELECT name, body
+            FROM campaigns
+            WHERE id = $1
+            """,
+            link["campaign_id"],
+        )
         await connection.execute(
             """
             INSERT INTO click_events (id, campaign_link_id, ip_address, user_agent)
@@ -964,6 +1015,8 @@ async def register_click(
         "token": link["token"],
         "destination_url": link["destination_url"],
         "click_count": link["click_count"],
+        "campaign_name": campaign["name"] if campaign else None,
+        "message_body": campaign["body"] if campaign else None,
         "media_asset": media_asset,
     }
 
@@ -1244,6 +1297,12 @@ async def _estimate_reminder_recipients(
 
 def _link_with_public_url(row: dict[str, Any]) -> dict[str, Any]:
     return {**row, "public_url": f"/r/{row['token']}"}
+
+
+def _parse_timestamp(value: str | datetime | None) -> datetime | None:
+    if value is None or isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _access_code_prefix(company_slug: str) -> str:

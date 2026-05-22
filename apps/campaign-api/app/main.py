@@ -36,6 +36,7 @@ class CampaignCreateRequest(BaseModel):
     recipients: list[str] | None = None
     subscriber_ids: list[str] = Field(default_factory=list)
     subscriber_list_ids: list[str] = Field(default_factory=list)
+    media_asset_id: str | None = None
     scheduled_at: str | None = None
 
 
@@ -60,6 +61,7 @@ class CampaignCreateResponse(BaseModel):
     message_count: int
     credit_cost: int
     remaining_credits: int
+    tracked_links: list[dict[str, Any]] = Field(default_factory=list)
     status_counts: dict[str, int]
 
 
@@ -264,6 +266,8 @@ class LandingPayloadResponse(BaseModel):
     token: str
     destination_url: str | None = None
     click_count: int
+    campaign_name: str | None = None
+    message_body: str | None = None
     media_asset: MediaAssetResponse | None = None
 
 
@@ -320,6 +324,7 @@ class CampaignRepository(Protocol):
         subscriber_ids: list[str],
         subscriber_list_ids: list[str],
         message_type: str,
+        media_asset_id: str | None,
         actor_email: str | None,
         scheduled_at: str | None,
     ) -> dict[str, Any]: ...
@@ -511,6 +516,7 @@ class AsyncpgCampaignRepository:
         message_type: str,
         actor_email: str | None,
         scheduled_at: str | None,
+        media_asset_id: str | None,
     ) -> dict[str, Any]:
         campaign_id = str(uuid4())
         audience_rows: list[dict[str, str]]
@@ -540,6 +546,7 @@ class AsyncpgCampaignRepository:
             body=body,
             messages=[row.model_dump() for row in message_rows],
             message_type=message_type,
+            media_asset_id=media_asset_id,
             actor_email=actor_email,
             scheduled_at=scheduled_at,
         )
@@ -562,6 +569,7 @@ class AsyncpgCampaignRepository:
             "message_count": len(message_rows),
             "credit_cost": credit_result["credit_cost"],
             "remaining_credits": credit_result["remaining_credits"],
+            "tracked_links": credit_result["tracked_links"],
             "status_counts": aggregate_status_counts(message_rows),
         }
 
@@ -830,12 +838,18 @@ async def create_campaign(
         recipients = default_recipients()
     if recipients is not None:
         ensure_unique_recipients(recipients)
+    if request.message_type == "smart" and not request.media_asset_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="smart campaigns require a media_asset_id",
+        )
     try:
         result = await repository.create_campaign_with_messages(
             company_id=company_id,
             name=request.name,
             body=request.body,
             message_type=request.message_type,
+            media_asset_id=request.media_asset_id,
             actor_email=user_email,
             recipients=recipients,
             subscriber_ids=request.subscriber_ids,
@@ -864,6 +878,7 @@ async def create_campaign(
         "message_count": result["message_count"],
         "credit_cost": result["credit_cost"],
         "remaining_credits": result["remaining_credits"],
+        "tracked_links": result.get("tracked_links", []),
         "status_counts": result["status_counts"],
     }
 

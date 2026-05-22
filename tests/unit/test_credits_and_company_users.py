@@ -43,6 +43,7 @@ class FakeCreditRepository:
         subscriber_ids: list[str] | None = None,
         subscriber_list_ids: list[str] | None = None,
         message_type: str,
+        media_asset_id: str | None = None,
         actor_email: str | None,
         scheduled_at: str | None = None,
     ) -> dict[str, object]:
@@ -59,6 +60,7 @@ class FakeCreditRepository:
             "body": body,
             "recipients": resolved_recipients,
             "message_type": message_type,
+            "media_asset_id": media_asset_id,
             "actor_email": actor_email,
             "scheduled_at": scheduled_at,
         }
@@ -78,6 +80,7 @@ class FakeCreditRepository:
             "message_count": len(resolved_recipients),
             "credit_cost": credit_cost,
             "remaining_credits": 96,
+            "tracked_links": [],
             "status_counts": {
                 "queued": len(resolved_recipients),
                 "sent": 0,
@@ -172,6 +175,7 @@ def test_smart_campaign_charges_credits_and_tracks_actor_email(campaign_module, 
             "name": "Smart launch",
             "body": "Track this",
             "message_type": "smart",
+            "media_asset_id": "media-1",
             "recipients": ["+15550001001", "+15550001002"],
         },
     )
@@ -186,6 +190,7 @@ def test_smart_campaign_charges_credits_and_tracks_actor_email(campaign_module, 
         "body": "Track this",
         "recipients": ["+15550001001", "+15550001002"],
         "message_type": "smart",
+        "media_asset_id": "media-1",
         "actor_email": "owner@acme.test",
         "scheduled_at": None,
     }
@@ -200,6 +205,7 @@ def test_campaign_creation_blocks_when_credits_are_exhausted(campaign_module, fa
         json={
             "name": "Too big",
             "message_type": "smart",
+            "media_asset_id": "media-1",
             "recipients": ["+15550001001", "+15550001002", "+15550001003"],
         },
     )
@@ -212,6 +218,23 @@ def test_campaign_creation_blocks_when_credits_are_exhausted(campaign_module, fa
             "available_credits": 4,
         }
     }
+
+
+def test_smart_campaign_requires_media_asset(campaign_module, fake_repo) -> None:
+    client = TestClient(campaign_module.app)
+
+    response = client.post(
+        "/campaigns",
+        headers={"X-Company-Id": "company-1"},
+        json={
+            "name": "Missing media",
+            "message_type": "smart",
+            "recipients": ["+15550001001"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "smart campaigns require a media_asset_id"
 
 
 def test_company_admin_can_create_role_scoped_access_code(campaign_module, fake_repo) -> None:

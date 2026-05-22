@@ -83,6 +83,7 @@ class FakeTenantRepository:
         subscriber_ids: list[str] | None = None,
         subscriber_list_ids: list[str] | None = None,
         message_type: str = "regular",
+        media_asset_id: str | None = None,
         actor_email: str | None = None,
         scheduled_at: str | None = None,
     ) -> dict[str, object]:
@@ -93,6 +94,7 @@ class FakeTenantRepository:
             "body": body,
             "recipients": resolved_recipients,
             "message_type": message_type,
+            "media_asset_id": media_asset_id,
             "actor_email": actor_email,
             "scheduled_at": scheduled_at,
         }
@@ -107,6 +109,7 @@ class FakeTenantRepository:
             "message_count": len(resolved_recipients),
             "credit_cost": len(resolved_recipients),
             "remaining_credits": 999,
+            "tracked_links": [],
             "status_counts": {
                 "queued": len(resolved_recipients),
                 "sent": 0,
@@ -259,6 +262,7 @@ def test_campaign_creation_is_scoped_to_company_header(campaign_module, fake_rep
         "body": "hello",
         "recipients": ["+155****1001"],
         "message_type": "regular",
+        "media_asset_id": None,
         "actor_email": None,
         "scheduled_at": None,
     }

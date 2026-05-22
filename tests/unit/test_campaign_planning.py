@@ -78,6 +78,7 @@ class FakePlanningRepository:
         subscriber_ids: list[str],
         subscriber_list_ids: list[str],
         message_type: str,
+        media_asset_id: str | None,
         actor_email: str | None,
         scheduled_at: str | None,
     ) -> dict[str, object]:
@@ -89,6 +90,7 @@ class FakePlanningRepository:
             "subscriber_ids": subscriber_ids,
             "subscriber_list_ids": subscriber_list_ids,
             "message_type": message_type,
+            "media_asset_id": media_asset_id,
             "actor_email": actor_email,
             "scheduled_at": scheduled_at,
         }
@@ -103,6 +105,20 @@ class FakePlanningRepository:
             "message_count": 3,
             "credit_cost": 6,
             "remaining_credits": 994,
+            "tracked_links": [
+                {
+                    "subscriber_id": "subscriber-1",
+                    "media_asset_id": media_asset_id,
+                    "public_url": "/r/spring-token-1",
+                },
+                {
+                    "subscriber_id": "subscriber-2",
+                    "media_asset_id": media_asset_id,
+                    "public_url": "/r/spring-token-2",
+                },
+            ]
+            if message_type == "smart" and media_asset_id
+            else [],
             "status_counts": {
                 "queued": 3,
                 "sent": 0,
@@ -215,6 +231,7 @@ def test_campaign_can_be_scheduled_for_existing_subscriber_segments(
             "name": "Memorial Day Promo",
             "body": "Early access starts now",
             "message_type": "smart",
+            "media_asset_id": "media-1",
             "subscriber_list_ids": ["list-vip"],
             "subscriber_ids": ["subscriber-2"],
             "scheduled_at": "2026-05-25T16:00:00Z",
@@ -225,6 +242,18 @@ def test_campaign_can_be_scheduled_for_existing_subscriber_segments(
     assert response.json()["status"] == "scheduled"
     assert response.json()["scheduled_at"] == "2026-05-25T16:00:00Z"
     assert response.json()["audience_count"] == 3
+    assert response.json()["tracked_links"] == [
+        {
+            "subscriber_id": "subscriber-1",
+            "media_asset_id": "media-1",
+            "public_url": "/r/spring-token-1",
+        },
+        {
+            "subscriber_id": "subscriber-2",
+            "media_asset_id": "media-1",
+            "public_url": "/r/spring-token-2",
+        },
+    ]
     assert fake_repo.created_campaign == {
         "company_id": "company-1",
         "name": "Memorial Day Promo",
@@ -233,6 +262,7 @@ def test_campaign_can_be_scheduled_for_existing_subscriber_segments(
         "subscriber_ids": ["subscriber-2"],
         "subscriber_list_ids": ["list-vip"],
         "message_type": "smart",
+        "media_asset_id": "media-1",
         "actor_email": "owner@acme.test",
         "scheduled_at": "2026-05-25T16:00:00Z",
     }

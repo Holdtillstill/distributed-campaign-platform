@@ -42,6 +42,7 @@ class FakeRepository:
         subscriber_ids: list[str] | None = None,
         subscriber_list_ids: list[str] | None = None,
         message_type: str = "regular",
+        media_asset_id: str | None = None,
         actor_email: str | None = None,
         scheduled_at: str | None = None,
     ) -> dict[str, object]:
@@ -52,6 +53,7 @@ class FakeRepository:
             "name": name,
             "body": body,
             "message_type": message_type,
+            "media_asset_id": media_asset_id,
             "actor_email": actor_email,
             "scheduled_at": scheduled_at,
         }
@@ -79,6 +81,7 @@ class FakeRepository:
             "message_count": len(self.created_messages),
             "credit_cost": len(self.created_messages),
             "remaining_credits": 997,
+            "tracked_links": [],
             "status_counts": self.status_counts,
         }
 
@@ -132,6 +135,7 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "message_count": 3,
         "credit_cost": 3,
         "remaining_credits": 997,
+        "tracked_links": [],
         "status_counts": {
             "queued": 3,
             "sent": 0,
@@ -146,6 +150,7 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "name": "launch",
         "body": "hello",
         "message_type": "regular",
+        "media_asset_id": None,
         "actor_email": None,
         "scheduled_at": None,
     }

@@ -42,6 +42,13 @@ def test_web_ui_dockerfile_serves_static_build_with_nginx() -> None:
     assert "COPY --from=build /app/dist" in dockerfile
 
 
+def test_nginx_proxies_public_tracking_links_to_api() -> None:
+    nginx_template = (WEB_UI_DIR / "nginx.conf.template").read_text()
+
+    assert "location /r/" in nginx_template
+    assert "proxy_pass ${CAMPAIGN_API_UPSTREAM}/r/" in nginx_template
+
+
 def test_compose_exposes_web_ui_on_localhost_8080() -> None:
     compose = yaml.safe_load((REPO_ROOT / "compose.yaml").read_text())
     web_ui = compose["services"]["web-ui"]

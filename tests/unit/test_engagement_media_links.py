@@ -111,6 +111,8 @@ class FakeEngagementRepository:
             "token": token,
             "destination_url": "https://example.com/spring",
             "click_count": 1,
+            "campaign_name": "Spring Launch",
+            "message_body": "Show this offer at checkout",
             "media_asset": self.media_assets[0],
         }
 
@@ -219,6 +221,8 @@ def test_public_redirect_token_registers_click_and_returns_landing_payload(
         "token": "spring-token",
         "destination_url": "https://example.com/spring",
         "click_count": 1,
+        "campaign_name": "Spring Launch",
+        "message_body": "Show this offer at checkout",
         "media_asset": {
             "id": "media-1",
             "company_id": "company-1",

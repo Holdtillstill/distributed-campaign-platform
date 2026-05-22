@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 
 type Session =
   | {
@@ -89,6 +89,7 @@ type Campaign = {
   message_count: number
   credit_cost: number
   remaining_credits: number
+  tracked_links?: Pick<CampaignLink, 'subscriber_id' | 'media_asset_id' | 'public_url'>[]
   status_counts: StatusCounts
 }
 
@@ -182,6 +183,8 @@ type CampaignListItem = {
   credit_cost: number
   reminder_count: number
 }
+
+type CampaignSubpage = 'list' | 'create'
 
 type SystemCheck = {
   path: string
@@ -796,7 +799,9 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   const [campaignName, setCampaignName] = useState('Spring Launch')
   const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
   const [messageType, setMessageType] = useState<'regular' | 'smart'>('regular')
+  const [campaignSubpage, setCampaignSubpage] = useState<CampaignSubpage>('list')
   const [scheduledAt, setScheduledAt] = useState('2026-05-25T16:00')
+  const [smartMediaAssetId, setSmartMediaAssetId] = useState('')
   const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
   const [subscribers, setSubscribers] = useState<SubscriberResult[]>([])
   const [selectedListIds, setSelectedListIds] = useState<string[]>([])
@@ -857,14 +862,16 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
 
   useEffect(() => {
     async function loadCampaignPlanningData() {
-      const [listsResponse, subscribersResponse, campaignsResponse] = await Promise.all([
+      const [listsResponse, subscribersResponse, campaignsResponse, mediaResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
         fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`),
         fetch(`${API_BASE_URL}/companies/${companyId}/campaigns`),
+        fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`),
       ])
       if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
       if (subscribersResponse.ok) setSubscribers(await subscribersResponse.json())
       if (campaignsResponse.ok) setCampaigns(await campaignsResponse.json())
+      if (mediaResponse.ok) setMediaAssets(await mediaResponse.json())
     }
     void loadCampaignPlanningData()
   }, [companyId])
@@ -883,6 +890,7 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
         name: campaignName,
         body: messageBody,
         message_type: messageType,
+        media_asset_id: messageType === 'smart' && smartMediaAssetId ? smartMediaAssetId : null,
         subscriber_list_ids: selectedListIds,
         subscriber_ids: selectedSubscriberIds,
         scheduled_at: scheduledAt,
@@ -985,6 +993,13 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   async function refreshMediaAssets() {
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`)
     if (response.ok) setMediaAssets(await response.json())
+  }
+
+  function stageUploadedMedia(file: File | undefined) {
+    if (!file) return
+    setMediaFilename(file.name)
+    setMediaContentType(file.type || 'application/octet-stream')
+    setMediaUrl(`local-upload://${file.name}`)
   }
 
   async function createTrackedLink(event: FormEvent<HTMLFormElement>) {
@@ -1091,129 +1106,170 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
         <PageHeader
           title="Campaigns"
           description="Schedule SMS campaigns from opted-in subscribers, lists, and recent campaign follow-ups."
+          action={
+            campaignSubpage === 'list' ? (
+              <button onClick={() => setCampaignSubpage('create')}>Create campaign</button>
+            ) : (
+              <button className="secondary" onClick={() => setCampaignSubpage('list')}>
+                Back to campaigns
+              </button>
+            )
+          }
         />
-        <form className="form-grid" onSubmit={createCampaign}>
-          <label>
-            Campaign name
-            <input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} />
-          </label>
-          <label>
-            Message type
-            <select value={messageType} onChange={(event) => setMessageType(event.target.value as 'regular' | 'smart')}>
-              <option value="regular">Regular SMS - 1 credit</option>
-              <option value="smart">Smart SMS - 2 credits</option>
-            </select>
-          </label>
-          <label className="wide">
-            Message body
-            <textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
-          </label>
-          <label>
-            Schedule date and time
-            <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
-          </label>
-          <div className="audience-picker wide">
-            <div>
-              <h2>Segments</h2>
-              {subscriberLists.length ? (
-                subscriberLists.map((list) => (
-                  <label className="check-row" key={list.id}>
-                    <input
-                      type="checkbox"
-                      checked={selectedListIds.includes(list.id)}
-                      onChange={() => setSelectedListIds((current) => toggleValue(current, list.id))}
-                    />
-                    {list.name} ({formatNumber(list.subscriber_count)})
-                  </label>
-                ))
-              ) : (
-                <p className="muted">Create subscriber lists before scheduling broad campaigns.</p>
-              )}
+        {campaignSubpage === 'create' ? (
+          <>
+            <form className="form-grid" onSubmit={createCampaign}>
+              <label>
+                Campaign name
+                <input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} />
+              </label>
+              <label>
+                Message type
+                <select
+                  value={messageType}
+                  onChange={(event) => setMessageType(event.target.value as 'regular' | 'smart')}
+                >
+                  <option value="regular">Regular SMS - 1 credit</option>
+                  <option value="smart">Smart SMS - 2 credits</option>
+                </select>
+              </label>
+              <label className="wide">
+                Message body
+                <textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
+              </label>
+              <label>
+                Schedule date and time
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(event) => setScheduledAt(event.target.value)}
+                />
+              </label>
+              {messageType === 'smart' ? (
+                <label>
+                  Smart SMS media
+                  <select
+                    value={smartMediaAssetId}
+                    onChange={(event) => setSmartMediaAssetId(event.target.value)}
+                    required
+                  >
+                    <option value="">Choose media</option>
+                    {mediaAssets.map((asset) => (
+                      <option value={asset.id} key={asset.id}>
+                        {asset.filename}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <div className="audience-picker wide">
+                <div>
+                  <h2>Segments</h2>
+                  {subscriberLists.length ? (
+                    subscriberLists.map((list) => (
+                      <label className="check-row" key={list.id}>
+                        <input
+                          type="checkbox"
+                          checked={selectedListIds.includes(list.id)}
+                          onChange={() => setSelectedListIds((current) => toggleValue(current, list.id))}
+                        />
+                        {list.name} ({formatNumber(list.subscriber_count)})
+                      </label>
+                    ))
+                  ) : (
+                    <p className="muted">Create subscriber lists before scheduling broad campaigns.</p>
+                  )}
+                </div>
+                <div>
+                  <h2>Audience members</h2>
+                  {subscribers.length ? (
+                    subscribers.map((subscriber) => (
+                      <label className="check-row" key={subscriber.id}>
+                        <input
+                          type="checkbox"
+                          checked={selectedSubscriberIds.includes(subscriber.id)}
+                          onChange={() => setSelectedSubscriberIds((current) => toggleValue(current, subscriber.id))}
+                        />
+                        {subscriber.phone_number} ({subscriber.consent_status})
+                      </label>
+                    ))
+                  ) : (
+                    <p className="muted">Import or confirm subscribers first.</p>
+                  )}
+                </div>
+              </div>
+              <p className="estimate">
+                Estimated cost: {formatNumber(selectedAudienceCount * (messageType === 'smart' ? 2 : 1))} credits
+              </p>
+              <button>Schedule campaign</button>
+            </form>
+            {campaign ? (
+              <div className="result-strip">
+                <strong>Campaign status</strong>
+                <strong>{campaign.id}</strong>
+                <span>{campaign.company_id}</span>
+                <span>{campaign.message_type}</span>
+                <span>{campaign.status}</span>
+                <span>Scheduled: {campaign.scheduled_at ?? 'Now'}</span>
+                <span>Messages: {campaign.message_count}</span>
+                <span>Credits spent: {campaign.credit_cost}</span>
+                <span>Remaining: {formatNumber(campaign.remaining_credits)}</span>
+                <span>Tracked links: {formatNumber(campaign.tracked_links?.length ?? 0)}</span>
+                <span>Queued: {campaign.status_counts.queued}</span>
+                <span>Sent: {campaign.status_counts.sent}</span>
+                <span>Retried: {campaign.status_counts.retried}</span>
+                <span>Dead-lettered: {campaign.status_counts.dead_lettered}</span>
+              </div>
+            ) : null}
+            {error ? <p className="error">{error}</p> : null}
+          </>
+        ) : (
+          <>
+            <div className="campaign-board">
+              <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns} onEdit={() => setCampaignSubpage('create')} />
+              <CampaignColumn title="Past" campaigns={pastCampaigns} onEdit={() => setCampaignSubpage('create')} />
             </div>
-            <div>
-              <h2>Audience members</h2>
-              {subscribers.length ? (
-                subscribers.map((subscriber) => (
-                  <label className="check-row" key={subscriber.id}>
-                    <input
-                      type="checkbox"
-                      checked={selectedSubscriberIds.includes(subscriber.id)}
-                      onChange={() => setSelectedSubscriberIds((current) => toggleValue(current, subscriber.id))}
-                    />
-                    {subscriber.phone_number} ({subscriber.consent_status})
-                  </label>
-                ))
-              ) : (
-                <p className="muted">Import or confirm subscribers first.</p>
-              )}
-            </div>
-          </div>
-          <p className="estimate">
-            Estimated cost: {formatNumber(selectedAudienceCount * (messageType === 'smart' ? 2 : 1))} credits
-          </p>
-          <button>Schedule campaign</button>
-        </form>
-        {campaign ? (
-          <div className="result-strip">
-            <strong>Campaign status</strong>
-            <strong>{campaign.id}</strong>
-            <span>{campaign.company_id}</span>
-            <span>{campaign.message_type}</span>
-            <span>{campaign.status}</span>
-            <span>Scheduled: {campaign.scheduled_at ?? 'Now'}</span>
-            <span>Messages: {campaign.message_count}</span>
-            <span>Credits spent: {campaign.credit_cost}</span>
-            <span>Remaining: {formatNumber(campaign.remaining_credits)}</span>
-            <span>Queued: {campaign.status_counts.queued}</span>
-            <span>Sent: {campaign.status_counts.sent}</span>
-            <span>Retried: {campaign.status_counts.retried}</span>
-            <span>Dead-lettered: {campaign.status_counts.dead_lettered}</span>
-          </div>
-        ) : null}
-        {error ? <p className="error">{error}</p> : null}
-        <div className="campaign-board">
-          <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns} />
-          <CampaignColumn title="Past" campaigns={pastCampaigns} />
-        </div>
-        <form className="form-grid follow-up-panel" onSubmit={createReminder}>
-          <div className="section-heading wide">
-            <span>Follow-up</span>
-            <strong>Reminder from recent campaign</strong>
-          </div>
-          <label>
-            Follow-up source campaign
-            <select
-              value={reminderSourceCampaignId}
-              onChange={(event) => setReminderSourceCampaignId(event.target.value)}
-            >
-              <option value="">Choose a campaign</option>
-              {pastCampaigns.concat(upcomingCampaigns).map((item) => (
-                <option value={item.id} key={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Follow-up audience rule
-            <select value={reminderAudienceRule} onChange={(event) => setReminderAudienceRule(event.target.value)}>
-              <option value="not_clicked">Not clicked</option>
-              <option value="clicked_not_redeemed">Clicked not redeemed</option>
-            </select>
-          </label>
-          <label className="wide">
-            Follow-up copy
-            <textarea value={reminderMessageBody} onChange={(event) => setReminderMessageBody(event.target.value)} />
-          </label>
-          <button>Create follow-up reminder</button>
-        </form>
-        {reminderCampaign ? (
-          <div className="result-strip">
-            <strong>{reminderCampaign.id}</strong>
-            <span>{reminderCampaign.audience_rule}</span>
-            <span>Estimated recipients: {reminderCampaign.estimated_recipient_count}</span>
-          </div>
-        ) : null}
+            <form className="form-grid follow-up-panel" onSubmit={createReminder}>
+              <div className="section-heading wide">
+                <span>Follow-up</span>
+                <strong>Reminder from recent campaign</strong>
+              </div>
+              <label>
+                Follow-up source campaign
+                <select
+                  value={reminderSourceCampaignId}
+                  onChange={(event) => setReminderSourceCampaignId(event.target.value)}
+                >
+                  <option value="">Choose a campaign</option>
+                  {pastCampaigns.concat(upcomingCampaigns).map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Follow-up audience rule
+                <select value={reminderAudienceRule} onChange={(event) => setReminderAudienceRule(event.target.value)}>
+                  <option value="not_clicked">Not clicked</option>
+                  <option value="clicked_not_redeemed">Clicked not redeemed</option>
+                </select>
+              </label>
+              <label className="wide">
+                Follow-up copy
+                <textarea value={reminderMessageBody} onChange={(event) => setReminderMessageBody(event.target.value)} />
+              </label>
+              <button>Create follow-up reminder</button>
+            </form>
+            {reminderCampaign ? (
+              <div className="result-strip">
+                <strong>{reminderCampaign.id}</strong>
+                <span>{reminderCampaign.audience_rule}</span>
+                <span>Estimated recipients: {reminderCampaign.estimated_recipient_count}</span>
+              </div>
+            ) : null}
+          </>
+        )}
       </>
     )
   }
@@ -1285,13 +1341,21 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   if (page === 'content') {
     return (
       <>
-        <PageHeader title="Content Library" description="Store media references and create tracked campaign links." />
+        <PageHeader title="Content Library" description="Store media for Smart SMS campaigns." />
         <div className="split-layout two-column">
           <form className="panel" onSubmit={addMediaAsset}>
             <div className="section-heading">
               <span>Media</span>
-              <strong>Asset</strong>
+              <strong>Add content</strong>
             </div>
+            <label>
+              Upload media file
+              <input
+                type="file"
+                accept="image/*,video/*,application/pdf"
+                onChange={(event) => stageUploadedMedia(event.target.files?.[0])}
+              />
+            </label>
             <label>
               Media filename
               <input value={mediaFilename} onChange={(event) => setMediaFilename(event.target.value)} />
@@ -1304,16 +1368,36 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
               Media url
               <input value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} />
             </label>
-            <button>Add media asset</button>
+            <button>Add URL media</button>
             <button className="secondary inline-action" type="button" onClick={() => void refreshMediaAssets()}>
               Refresh media assets
             </button>
           </form>
-          <form className="panel" onSubmit={createTrackedLink}>
+          <section className="panel">
             <div className="section-heading">
-              <span>Links</span>
-              <strong>Tracking</strong>
+              <span>Library</span>
+              <strong>Existing media</strong>
             </div>
+            {mediaAssets.length ? (
+              <ul className="compact-list embedded-list">
+                {mediaAssets.map((asset) => (
+                  <li key={asset.id}>
+                    <strong>{asset.filename}</strong>
+                    <span>{asset.content_type}</span>
+                    <span>{asset.url}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No media has been added yet.</p>
+            )}
+          </section>
+        </div>
+        <form className="form-grid follow-up-panel" onSubmit={createTrackedLink}>
+          <div className="section-heading wide">
+            <span>Links</span>
+            <strong>Manual tracking link</strong>
+          </div>
             <label>
               Tracked campaign id
               <input value={trackedCampaignId} onChange={(event) => setTrackedCampaignId(event.target.value)} />
@@ -1334,16 +1418,9 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
             <button className="secondary inline-action" type="button" onClick={() => void refreshCampaignLinks()}>
               Refresh tracked links
             </button>
-          </form>
-        </div>
-        {mediaAssets.length || campaignLinks.length || campaignLink ? (
+        </form>
+        {campaignLinks.length || campaignLink ? (
           <ul className="compact-list">
-            {mediaAssets.map((asset) => (
-              <li key={asset.id}>
-                <strong>{asset.filename}</strong>
-                <span>{asset.id}</span>
-              </li>
-            ))}
             {campaignLink ? (
               <li>
                 <strong>{campaignLink.token}</strong>
@@ -1464,22 +1541,40 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   )
 }
 
-function PageHeader({ title, description }: { title: string; description: string }) {
+function PageHeader({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description: string
+  action?: ReactNode
+}) {
   return (
     <div className="page-header">
       <div>
-        <p className="eyebrow">Workspace</p>
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      <a className="docs-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
-        API docs
-      </a>
+      <div className="page-actions">
+        {action}
+        <a className="docs-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
+          API docs
+        </a>
+      </div>
     </div>
   )
 }
 
-function CampaignColumn({ title, campaigns }: { title: string; campaigns: CampaignListItem[] }) {
+function CampaignColumn({
+  title,
+  campaigns,
+  onEdit,
+}: {
+  title: string
+  campaigns: CampaignListItem[]
+  onEdit?: (campaign: CampaignListItem) => void
+}) {
   return (
     <section className="campaign-column">
       <h2>{title}</h2>
@@ -1494,6 +1589,11 @@ function CampaignColumn({ title, campaigns }: { title: string; campaigns: Campai
               <span>Messages: {formatNumber(campaign.message_count)}</span>
               <span>Credits: {formatNumber(campaign.credit_cost)}</span>
               <span>Follow-ups: {formatNumber(campaign.reminder_count)}</span>
+              {onEdit ? (
+                <button className="secondary inline-action" type="button" onClick={() => onEdit(campaign)}>
+                  Modify campaign
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

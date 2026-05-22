@@ -279,6 +279,18 @@ function mockFetch() {
           message_count: 2,
           credit_cost: 4,
           remaining_credits: 41996,
+          tracked_links: [
+            {
+              subscriber_id: 'subscriber-1',
+              media_asset_id: 'media-1',
+              public_url: '/r/spring-token-1',
+            },
+            {
+              subscriber_id: 'subscriber-2',
+              media_asset_id: 'media-1',
+              public_url: '/r/spring-token-2',
+            },
+          ],
           status_counts: { queued: 2, sent: 0, failed: 0, retried: 0, dead_lettered: 0 },
         },
         201,
@@ -561,6 +573,9 @@ describe('App', () => {
     render(<App />)
     await signupAsCompanyUser(user)
     await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    expect(await screen.findByRole('heading', { name: /upcoming/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/campaign name/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /create campaign/i }))
     expect(await screen.findByText(/VIP Customers/)).toBeInTheDocument()
     expect(await screen.findByText(/\+15550001001/)).toBeInTheDocument()
     await user.clear(screen.getByLabelText(/campaign name/i))
@@ -568,6 +583,7 @@ describe('App', () => {
     await user.clear(screen.getByLabelText(/message body/i))
     await user.type(screen.getByLabelText(/message body/i), 'Launch copy')
     await user.selectOptions(screen.getByLabelText(/message type/i), 'smart')
+    await user.selectOptions(screen.getByLabelText(/smart sms media/i), 'media-1')
     await user.click(screen.getByLabelText(/VIP Customers/i))
     await user.click(screen.getByLabelText(/\+15550001002/i))
     await user.clear(screen.getByLabelText(/schedule date and time/i))
@@ -588,6 +604,7 @@ describe('App', () => {
           name: 'Memorial Day Promo',
           body: 'Launch copy',
           message_type: 'smart',
+          media_asset_id: 'media-1',
           subscriber_list_ids: ['list-vip'],
           subscriber_ids: ['subscriber-2'],
           scheduled_at: '2026-05-25T16:00',
@@ -611,6 +628,36 @@ describe('App', () => {
     expect(screen.getAllByText(/Spring Launch/i)).not.toHaveLength(0)
     expect(screen.getByLabelText(/follow-up source campaign/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /reminders/i })).not.toBeInTheDocument()
+  })
+
+  it('lists media assets and supports url plus upload-style content entry', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /content library/i }))
+
+    expect(await screen.findAllByText(/coupon.png/i)).not.toHaveLength(0)
+    await user.clear(screen.getByLabelText(/media filename/i))
+    await user.type(screen.getByLabelText(/media filename/i), 'menu.png')
+    await user.clear(screen.getByLabelText(/media url/i))
+    await user.type(screen.getByLabelText(/media url/i), 'https://cdn.example/menu.png')
+    await user.click(screen.getByRole('button', { name: /add url media/i }))
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/companies/company-1/media-assets',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          filename: 'menu.png',
+          content_type: 'image/png',
+          url: 'https://cdn.example/menu.png',
+        }),
+      }),
+    )
+    expect(screen.getByLabelText(/upload media file/i)).toBeInTheDocument()
   })
 
   it('lets company admins create access codes and adjust team budgets', async () => {
