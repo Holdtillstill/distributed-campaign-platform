@@ -35,12 +35,18 @@ class FakeRepository:
     async def create_campaign_with_messages(
         self,
         *,
+        company_id: str,
         name: str,
         body: str,
         recipients: list[str],
     ) -> dict[str, object]:
         campaign_id = "campaign-test-1"
-        self.created_campaign = {"id": campaign_id, "name": name, "body": body}
+        self.created_campaign = {
+            "id": campaign_id,
+            "company_id": company_id,
+            "name": name,
+            "body": body,
+        }
         self.created_messages = [
             row.model_dump() if hasattr(row, "model_dump") else dict(row)
             for row in self._campaign_module.build_message_rows(campaign_id, recipients, body)
@@ -50,6 +56,7 @@ class FakeRepository:
         )
         return {
             "id": campaign_id,
+            "company_id": company_id,
             "name": name,
             "body": body,
             "message_count": len(self.created_messages),
@@ -61,6 +68,7 @@ class FakeRepository:
             return None
         return {
             "id": self.created_campaign["id"],
+            "company_id": self.created_campaign["company_id"],
             "name": self.created_campaign["name"],
             "status_counts": self.status_counts,
         }
@@ -96,6 +104,7 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
     assert response.status_code == 201
     assert response.json() == {
         "id": "campaign-test-1",
+        "company_id": "demo-company",
         "name": "launch",
         "message_count": 3,
         "status_counts": {
@@ -108,6 +117,7 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
     }
     assert fake_repo.created_campaign == {
         "id": "campaign-test-1",
+        "company_id": "demo-company",
         "name": "launch",
         "body": "hello",
     }
@@ -140,6 +150,7 @@ def test_get_campaign_status_returns_aggregate_counts(campaign_module, fake_repo
     assert response.status_code == 200
     assert response.json() == {
         "id": "campaign-test-1",
+        "company_id": "demo-company",
         "name": "launch",
         "status_counts": {
             "queued": 1,

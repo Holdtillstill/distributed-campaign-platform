@@ -15,11 +15,12 @@ from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints
 from campaign_common.tracing import get_tracer, inject_trace_context, instrument_fastapi_app
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 SERVICE_NAME = "campaign-api"
 DEFAULT_BODY = "Hello from distributed campaign platform"
+DEFAULT_COMPANY_ID = "demo-company"
 STATUS_VALUES = tuple(status_value.value for status_value in MessageStatus)
 
 configure_logging(SERVICE_NAME)
@@ -44,6 +45,7 @@ class MessageRow(BaseModel):
 
 class CampaignCreateResponse(BaseModel):
     id: str
+    company_id: str
     name: str
     message_count: int
     status_counts: dict[str, int]
@@ -51,20 +53,58 @@ class CampaignCreateResponse(BaseModel):
 
 class CampaignStatusResponse(BaseModel):
     id: str
+    company_id: str
     name: str
     status_counts: dict[str, int]
+
+
+class CompanyCreateRequest(BaseModel):
+    name: str = Field(min_length=1)
+    slug: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
+    admin_email: str = Field(min_length=3)
+
+
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    role: str
+
+
+class CompanyCreateResponse(BaseModel):
+    id: str
+    name: str
+    slug: str
+    admin_user: AdminUserResponse
+
+
+class MembershipResponse(BaseModel):
+    company_id: str
+    company_name: str
+    company_slug: str
+    role: str
 
 
 class CampaignRepository(Protocol):
     async def create_campaign_with_messages(
         self,
         *,
+        company_id: str,
         name: str,
         body: str,
         recipients: list[str],
     ) -> dict[str, Any]: ...
 
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None: ...
+
+    async def create_company_with_admin(
+        self,
+        *,
+        name: str,
+        slug: str,
+        admin_email: str,
+    ) -> dict[str, Any]: ...
+
+    async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]: ...
 
 
 class MessagePublisher(Protocol):
@@ -118,6 +158,7 @@ class AsyncpgCampaignRepository:
     async def create_campaign_with_messages(
         self,
         *,
+        company_id: str,
         name: str,
         body: str,
         recipients: list[str],
@@ -126,6 +167,7 @@ class AsyncpgCampaignRepository:
         message_rows = build_message_rows(campaign_id, recipients, body)
         await db.create_campaign_with_messages(
             self._pool,
+            company_id=company_id,
             campaign_id=campaign_id,
             name=name,
             body=body,
@@ -140,6 +182,7 @@ class AsyncpgCampaignRepository:
         )
         return {
             "id": campaign_id,
+            "company_id": company_id,
             "name": name,
             "message_count": len(message_rows),
             "status_counts": aggregate_status_counts(message_rows),
@@ -147,6 +190,23 @@ class AsyncpgCampaignRepository:
 
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None:
         return await db.get_campaign_status(self._pool, campaign_id)
+
+    async def create_company_with_admin(
+        self,
+        *,
+        name: str,
+        slug: str,
+        admin_email: str,
+    ) -> dict[str, Any]:
+        return await db.create_company_with_admin(
+            self._pool,
+            name=name,
+            slug=slug,
+            admin_email=admin_email,
+        )
+
+    async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]:
+        return await db.list_user_memberships(self._pool, email=email)
 
 
 @asynccontextmanager
@@ -195,21 +255,59 @@ def ensure_unique_recipients(recipients: Sequence[str]) -> None:
 @app.post("/campaigns", response_model=CampaignCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_campaign(
     request: CampaignCreateRequest,
+    company_id: str = Header(DEFAULT_COMPANY_ID, alias="X-Company-Id"),
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, Any]:
     recipients = request.recipients if request.recipients is not None else default_recipients()
     ensure_unique_recipients(recipients)
     result = await repository.create_campaign_with_messages(
+        company_id=company_id,
         name=request.name,
         body=request.body,
         recipients=recipients,
     )
     return {
         "id": result["id"],
+        "company_id": result["company_id"],
         "name": result["name"],
         "message_count": result["message_count"],
         "status_counts": result["status_counts"],
     }
+
+
+@app.post(
+    "/admin/companies",
+    response_model=CompanyCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_customer_company(
+    request: CompanyCreateRequest,
+    internal_admin: str | None = Header(None, alias="X-Internal-Admin"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    if internal_admin != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="internal admin access required",
+        )
+    return await repository.create_company_with_admin(
+        name=request.name,
+        slug=request.slug,
+        admin_email=request.admin_email,
+    )
+
+
+@app.get("/me/memberships", response_model=list[MembershipResponse])
+async def list_my_memberships(
+    user_email: str | None = Header(None, alias="X-User-Email"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    if not user_email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="X-User-Email header required",
+        )
+    return await repository.list_user_memberships(email=user_email)
 
 
 @app.get("/campaigns/{campaign_id}", response_model=CampaignStatusResponse)
