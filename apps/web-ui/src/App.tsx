@@ -63,6 +63,13 @@ type DashboardSummary = {
   redemption_count: number
 }
 
+type AdminDashboardSummary = {
+  company_count: number
+  active_company_count: number
+  total_credit_balance: number
+  active_access_code_count: number
+}
+
 type StatusCounts = {
   queued: number
   sent: number
@@ -76,6 +83,9 @@ type Campaign = {
   company_id: string
   name: string
   message_type: 'regular' | 'smart'
+  status: string
+  scheduled_at?: string | null
+  audience_count: number
   message_count: number
   credit_cost: number
   remaining_credits: number
@@ -99,15 +109,17 @@ type AccessCodeResult = {
 }
 
 type SubscriberListResult = {
-  id?: string
+  id: string
   company_id?: string
-  name?: string
+  name: string
+  subscriber_count?: number
 }
 
 type SubscriberResult = {
-  id?: string
+  id: string
   company_id?: string
-  phone_number?: string
+  phone_number: string
+  marketing_status?: string
   list_id?: string
   consent_status?: string
 }
@@ -158,6 +170,19 @@ type ReminderCampaign = {
   estimated_recipient_count?: number
 }
 
+type CampaignListItem = {
+  id: string
+  company_id: string
+  name: string
+  message_type: 'regular' | 'smart'
+  status: string
+  scheduled_at?: string | null
+  created_at?: string | null
+  message_count: number
+  credit_cost: number
+  reminder_count: number
+}
+
 type SystemCheck = {
   path: string
   label: string
@@ -173,13 +198,10 @@ type CompanyPage =
   | 'subscribers'
   | 'content'
   | 'analytics'
-  | 'reminders'
   | 'settings'
 
 const API_BASE_URL = window.__APP_CONFIG__?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL ?? '/api'
 const SESSION_KEY = 'campaign-platform-session'
-const DEMO_RECIPIENTS = ['+15550001001', '+15550001002', '+15550001003']
-
 const adminNav: { id: AdminPage; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'companies', label: 'Companies' },
@@ -192,7 +214,6 @@ const companyNav: { id: CompanyPage; label: string }[] = [
   { id: 'subscribers', label: 'Subscribers' },
   { id: 'content', label: 'Content Library' },
   { id: 'analytics', label: 'Analytics' },
-  { id: 'reminders', label: 'Reminders' },
   { id: 'settings', label: 'Settings' },
 ]
 
@@ -580,6 +601,7 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
   const [monthlySendLimit, setMonthlySendLimit] = useState('50000')
   const [creditBalance, setCreditBalance] = useState('50000')
   const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null)
+  const [adminSummary, setAdminSummary] = useState<AdminDashboardSummary | null>(null)
   const [usageFromDate, setUsageFromDate] = useState('2026-05-01')
   const [usageToDate, setUsageToDate] = useState('2026-05-21')
   const [usageRows, setUsageRows] = useState<UsageRow[]>([])
@@ -589,6 +611,16 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
     { path: '/readyz', label: 'Campaign API readiness', state: 'checking', detail: 'Not checked yet' },
     { path: '/metrics', label: 'Prometheus metrics', state: 'checking', detail: 'Not checked yet' },
   ])
+
+  useEffect(() => {
+    async function loadAdminSummary() {
+      const response = await fetch(`${API_BASE_URL}/admin/dashboard-summary`, {
+        headers: { 'X-Internal-Admin': 'true' },
+      })
+      if (response.ok) setAdminSummary(await response.json())
+    }
+    void loadAdminSummary()
+  }, [companyResult])
 
   function toSystemCheck(response: Response, path: string, label: string): SystemCheck {
     if (!response.ok) {
@@ -648,7 +680,10 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
       <>
         <PageHeader title="Admin dashboard" description="Monitor tenant onboarding, quota setup, and platform usage." />
         <div className="metric-grid">
-          <Metric label="Companies created" value={companyResult ? '1' : '0'} />
+          <Metric label="Companies created" value={formatNumber(adminSummary?.company_count)} />
+          <Metric label="Active companies" value={formatNumber(adminSummary?.active_company_count)} />
+          <Metric label="Total credits" value={formatNumber(adminSummary?.total_credit_balance)} />
+          <Metric label="Active access codes" value={formatNumber(adminSummary?.active_access_code_count)} />
           <Metric label="Latest access code" value={companyResult?.access_code ?? 'None yet'} />
           <Metric label="Usage rows loaded" value={String(usageRows.length)} />
         </div>
@@ -761,7 +796,12 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   const [campaignName, setCampaignName] = useState('Spring Launch')
   const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
   const [messageType, setMessageType] = useState<'regular' | 'smart'>('regular')
-  const [recipients, setRecipients] = useState(DEMO_RECIPIENTS.join('\n'))
+  const [scheduledAt, setScheduledAt] = useState('2026-05-25T16:00')
+  const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
+  const [subscribers, setSubscribers] = useState<SubscriberResult[]>([])
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([])
+  const [selectedSubscriberIds, setSelectedSubscriberIds] = useState<string[]>([])
+  const [campaigns, setCampaigns] = useState<CampaignListItem[]>([])
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [listName, setListName] = useState('VIP List')
   const [subscriberList, setSubscriberList] = useState<SubscriberListResult | null>(null)
@@ -787,7 +827,6 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   const [reminderSourceCampaignId, setReminderSourceCampaignId] = useState('')
   const [reminderAudienceRule, setReminderAudienceRule] = useState('not_clicked')
   const [reminderMessageBody, setReminderMessageBody] = useState('Still interested?')
-  const [reminderCampaigns, setReminderCampaigns] = useState<ReminderCampaign[]>([])
   const [reminderCampaign, setReminderCampaign] = useState<ReminderCampaign | null>(null)
   const [teamUsers, setTeamUsers] = useState<CompanyUser[]>([])
   const [inviteRole, setInviteRole] = useState('campaign_manager')
@@ -798,14 +837,15 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   const [editCreditLimit, setEditCreditLimit] = useState('2000')
   const [error, setError] = useState<string | null>(null)
 
-  const recipientList = useMemo(
-    () =>
-      recipients
-        .split(/\n|,/)
-        .map((recipient) => recipient.trim())
-        .filter(Boolean),
-    [recipients],
-  )
+  const selectedAudienceCount = useMemo(() => {
+    const listSubscriberCount = subscriberLists
+      .filter((list) => selectedListIds.includes(list.id))
+      .reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
+    return listSubscriberCount + selectedSubscriberIds.length
+  }, [selectedListIds, selectedSubscriberIds.length, subscriberLists])
+
+  const upcomingCampaigns = campaigns.filter((item) => item.status === 'scheduled')
+  const pastCampaigns = campaigns.filter((item) => item.status !== 'scheduled')
 
   useEffect(() => {
     async function loadDashboardSummary() {
@@ -815,13 +855,38 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     void loadDashboardSummary()
   }, [companyId])
 
+  useEffect(() => {
+    async function loadCampaignPlanningData() {
+      const [listsResponse, subscribersResponse, campaignsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
+        fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`),
+        fetch(`${API_BASE_URL}/companies/${companyId}/campaigns`),
+      ])
+      if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
+      if (subscribersResponse.ok) setSubscribers(await subscribersResponse.json())
+      if (campaignsResponse.ok) setCampaigns(await campaignsResponse.json())
+    }
+    void loadCampaignPlanningData()
+  }, [companyId])
+
+  function toggleValue(current: string[], value: string): string[] {
+    return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
+  }
+
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     const response = await fetch(`${API_BASE_URL}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Company-Id': companyId, 'X-User-Email': session.email },
-      body: JSON.stringify({ name: campaignName, body: messageBody, message_type: messageType, recipients: recipientList }),
+      body: JSON.stringify({
+        name: campaignName,
+        body: messageBody,
+        message_type: messageType,
+        subscriber_list_ids: selectedListIds,
+        subscriber_ids: selectedSubscriberIds,
+        scheduled_at: scheduledAt,
+      }),
     })
     if (!response.ok) {
       setError(`Create campaign failed: ${response.status}`)
@@ -829,6 +894,21 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     }
     const result = (await response.json()) as Campaign
     setCampaign(result)
+    setCampaigns((current) => [
+      {
+        id: result.id,
+        company_id: result.company_id,
+        name: result.name,
+        message_type: result.message_type,
+        status: result.status,
+        scheduled_at: result.scheduled_at,
+        created_at: new Date().toISOString(),
+        message_count: result.message_count,
+        credit_cost: result.credit_cost,
+        reminder_count: 0,
+      },
+      ...current.filter((item) => item.id !== result.id),
+    ])
     setDashboardSummary((current) =>
       current
         ? {
@@ -950,11 +1030,6 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     if (response.ok) setReminderCampaign(await response.json())
   }
 
-  async function refreshReminders() {
-    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`)
-    if (response.ok) setReminderCampaigns(await response.json())
-  }
-
   async function createTeamAccessCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/access-codes`, {
@@ -1013,7 +1088,10 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   if (page === 'campaigns') {
     return (
       <>
-        <PageHeader title="Campaigns" description="Create SMS campaigns against the active company scope." />
+        <PageHeader
+          title="Campaigns"
+          description="Schedule SMS campaigns from opted-in subscribers, lists, and recent campaign follow-ups."
+        />
         <form className="form-grid" onSubmit={createCampaign}>
           <label>
             Campaign name
@@ -1030,14 +1108,50 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
             Message body
             <textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
           </label>
-          <label className="wide">
-            Recipients
-            <textarea value={recipients} onChange={(event) => setRecipients(event.target.value)} />
+          <label>
+            Schedule date and time
+            <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
           </label>
+          <div className="audience-picker wide">
+            <div>
+              <h2>Segments</h2>
+              {subscriberLists.length ? (
+                subscriberLists.map((list) => (
+                  <label className="check-row" key={list.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedListIds.includes(list.id)}
+                      onChange={() => setSelectedListIds((current) => toggleValue(current, list.id))}
+                    />
+                    {list.name} ({formatNumber(list.subscriber_count)})
+                  </label>
+                ))
+              ) : (
+                <p className="muted">Create subscriber lists before scheduling broad campaigns.</p>
+              )}
+            </div>
+            <div>
+              <h2>Audience members</h2>
+              {subscribers.length ? (
+                subscribers.map((subscriber) => (
+                  <label className="check-row" key={subscriber.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSubscriberIds.includes(subscriber.id)}
+                      onChange={() => setSelectedSubscriberIds((current) => toggleValue(current, subscriber.id))}
+                    />
+                    {subscriber.phone_number} ({subscriber.consent_status})
+                  </label>
+                ))
+              ) : (
+                <p className="muted">Import or confirm subscribers first.</p>
+              )}
+            </div>
+          </div>
           <p className="estimate">
-            Estimated cost: {formatNumber(recipientList.length * (messageType === 'smart' ? 2 : 1))} credits
+            Estimated cost: {formatNumber(selectedAudienceCount * (messageType === 'smart' ? 2 : 1))} credits
           </p>
-          <button>Create campaign</button>
+          <button>Schedule campaign</button>
         </form>
         {campaign ? (
           <div className="result-strip">
@@ -1045,6 +1159,8 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
             <strong>{campaign.id}</strong>
             <span>{campaign.company_id}</span>
             <span>{campaign.message_type}</span>
+            <span>{campaign.status}</span>
+            <span>Scheduled: {campaign.scheduled_at ?? 'Now'}</span>
             <span>Messages: {campaign.message_count}</span>
             <span>Credits spent: {campaign.credit_cost}</span>
             <span>Remaining: {formatNumber(campaign.remaining_credits)}</span>
@@ -1055,6 +1171,49 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
           </div>
         ) : null}
         {error ? <p className="error">{error}</p> : null}
+        <div className="campaign-board">
+          <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns} />
+          <CampaignColumn title="Past" campaigns={pastCampaigns} />
+        </div>
+        <form className="form-grid follow-up-panel" onSubmit={createReminder}>
+          <div className="section-heading wide">
+            <span>Follow-up</span>
+            <strong>Reminder from recent campaign</strong>
+          </div>
+          <label>
+            Follow-up source campaign
+            <select
+              value={reminderSourceCampaignId}
+              onChange={(event) => setReminderSourceCampaignId(event.target.value)}
+            >
+              <option value="">Choose a campaign</option>
+              {pastCampaigns.concat(upcomingCampaigns).map((item) => (
+                <option value={item.id} key={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Follow-up audience rule
+            <select value={reminderAudienceRule} onChange={(event) => setReminderAudienceRule(event.target.value)}>
+              <option value="not_clicked">Not clicked</option>
+              <option value="clicked_not_redeemed">Clicked not redeemed</option>
+            </select>
+          </label>
+          <label className="wide">
+            Follow-up copy
+            <textarea value={reminderMessageBody} onChange={(event) => setReminderMessageBody(event.target.value)} />
+          </label>
+          <button>Create follow-up reminder</button>
+        </form>
+        {reminderCampaign ? (
+          <div className="result-strip">
+            <strong>{reminderCampaign.id}</strong>
+            <span>{reminderCampaign.audience_rule}</span>
+            <span>Estimated recipients: {reminderCampaign.estimated_recipient_count}</span>
+          </div>
+        ) : null}
       </>
     )
   }
@@ -1221,55 +1380,6 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     )
   }
 
-  if (page === 'reminders') {
-    return (
-      <>
-        <PageHeader title="Reminders" description="Estimate follow-up audiences from tracked campaign engagement." />
-        <form className="form-grid" onSubmit={createReminder}>
-          <label>
-            Reminder source campaign id
-            <input
-              value={reminderSourceCampaignId}
-              onChange={(event) => setReminderSourceCampaignId(event.target.value)}
-            />
-          </label>
-          <label>
-            Reminder audience rule
-            <select value={reminderAudienceRule} onChange={(event) => setReminderAudienceRule(event.target.value)}>
-              <option value="not_clicked">Not clicked</option>
-              <option value="clicked_not_redeemed">Clicked not redeemed</option>
-            </select>
-          </label>
-          <label className="wide">
-            Reminder copy
-            <textarea value={reminderMessageBody} onChange={(event) => setReminderMessageBody(event.target.value)} />
-          </label>
-          <button>Create reminder</button>
-          <button className="secondary" type="button" onClick={() => void refreshReminders()}>
-            Refresh reminders
-          </button>
-        </form>
-        {reminderCampaign ? (
-          <div className="result-strip">
-            <strong>{reminderCampaign.id}</strong>
-            <span>{reminderCampaign.audience_rule}</span>
-            <span>Estimated recipients: {reminderCampaign.estimated_recipient_count}</span>
-          </div>
-        ) : null}
-        {reminderCampaigns.length ? (
-          <ul className="compact-list">
-            {reminderCampaigns.map((reminder) => (
-              <li key={reminder.id}>
-                <strong>{reminder.id}</strong>
-                <span>{reminder.audience_rule}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </>
-    )
-  }
-
   return (
     <>
       <PageHeader title="Settings" description="Manage tenant identity, team access, roles, and regional credit budgets." />
@@ -1366,6 +1476,31 @@ function PageHeader({ title, description }: { title: string; description: string
         API docs
       </a>
     </div>
+  )
+}
+
+function CampaignColumn({ title, campaigns }: { title: string; campaigns: CampaignListItem[] }) {
+  return (
+    <section className="campaign-column">
+      <h2>{title}</h2>
+      {campaigns.length ? (
+        <ul className="compact-list">
+          {campaigns.map((campaign) => (
+            <li key={campaign.id}>
+              <strong>{campaign.name}</strong>
+              <span>{campaign.id}</span>
+              <span>{campaign.status}</span>
+              <span>Scheduled: {campaign.scheduled_at ?? 'Immediate'}</span>
+              <span>Messages: {formatNumber(campaign.message_count)}</span>
+              <span>Credits: {formatNumber(campaign.credit_cost)}</span>
+              <span>Follow-ups: {formatNumber(campaign.reminder_count)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No campaigns yet.</p>
+      )}
+    </section>
   )
 }
 

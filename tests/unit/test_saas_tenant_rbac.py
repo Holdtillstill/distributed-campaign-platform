@@ -79,28 +79,36 @@ class FakeTenantRepository:
         company_id: str,
         name: str,
         body: str,
-        recipients: list[str],
+        recipients: list[str] | None,
+        subscriber_ids: list[str] | None = None,
+        subscriber_list_ids: list[str] | None = None,
         message_type: str = "regular",
         actor_email: str | None = None,
+        scheduled_at: str | None = None,
     ) -> dict[str, object]:
+        resolved_recipients = recipients or []
         self.campaign_request = {
             "company_id": company_id,
             "name": name,
             "body": body,
-            "recipients": recipients,
+            "recipients": resolved_recipients,
             "message_type": message_type,
             "actor_email": actor_email,
+            "scheduled_at": scheduled_at,
         }
         return {
             "id": "campaign-1",
             "company_id": company_id,
             "name": name,
             "message_type": message_type,
-            "message_count": len(recipients),
-            "credit_cost": len(recipients),
+            "status": "queued",
+            "scheduled_at": scheduled_at,
+            "audience_count": len(resolved_recipients),
+            "message_count": len(resolved_recipients),
+            "credit_cost": len(resolved_recipients),
             "remaining_credits": 999,
             "status_counts": {
-                "queued": len(recipients),
+                "queued": len(resolved_recipients),
                 "sent": 0,
                 "failed": 0,
                 "retried": 0,
@@ -252,4 +260,5 @@ def test_campaign_creation_is_scoped_to_company_header(campaign_module, fake_rep
         "recipients": ["+155****1001"],
         "message_type": "regular",
         "actor_email": None,
+        "scheduled_at": None,
     }

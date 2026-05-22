@@ -39,11 +39,15 @@ class FakeCreditRepository:
         company_id: str,
         name: str,
         body: str,
-        recipients: list[str],
+        recipients: list[str] | None,
+        subscriber_ids: list[str] | None = None,
+        subscriber_list_ids: list[str] | None = None,
         message_type: str,
         actor_email: str | None,
+        scheduled_at: str | None = None,
     ) -> dict[str, object]:
-        if message_type == "smart" and len(recipients) > 2:
+        resolved_recipients = recipients or []
+        if message_type == "smart" and len(resolved_recipients) > 2:
             raise self._campaign_module.db.InsufficientCreditsError(
                 "company credits exhausted",
                 required_credits=6,
@@ -53,20 +57,29 @@ class FakeCreditRepository:
             "company_id": company_id,
             "name": name,
             "body": body,
-            "recipients": recipients,
+            "recipients": resolved_recipients,
             "message_type": message_type,
             "actor_email": actor_email,
+            "scheduled_at": scheduled_at,
         }
+        credit_cost = (
+            2 * len(resolved_recipients)
+            if message_type == "smart"
+            else len(resolved_recipients)
+        )
         return {
             "id": "campaign-1",
             "company_id": company_id,
             "name": name,
             "message_type": message_type,
-            "message_count": len(recipients),
-            "credit_cost": 2 * len(recipients) if message_type == "smart" else len(recipients),
+            "status": "queued",
+            "scheduled_at": scheduled_at,
+            "audience_count": len(resolved_recipients),
+            "message_count": len(resolved_recipients),
+            "credit_cost": credit_cost,
             "remaining_credits": 96,
             "status_counts": {
-                "queued": len(recipients),
+                "queued": len(resolved_recipients),
                 "sent": 0,
                 "failed": 0,
                 "retried": 0,
@@ -174,6 +187,7 @@ def test_smart_campaign_charges_credits_and_tracks_actor_email(campaign_module, 
         "recipients": ["+15550001001", "+15550001002"],
         "message_type": "smart",
         "actor_email": "owner@acme.test",
+        "scheduled_at": None,
     }
 
 

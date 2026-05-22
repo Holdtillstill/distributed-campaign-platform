@@ -22,6 +22,14 @@ class InsufficientCreditsError(Exception):
         self.available_credits = available_credits
 
 
+class AudienceSelectionError(Exception):
+    pass
+
+
+class ReminderEligibilityError(Exception):
+    pass
+
+
 def database_url_from_env() -> str:
     return os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
@@ -45,9 +53,11 @@ async def create_campaign_with_messages(
     message_type: str,
     actor_email: str | None,
     messages: list[dict[str, Any]],
+    scheduled_at: str | None = None,
 ) -> dict[str, int]:
     unit_cost = MESSAGE_CREDIT_COSTS[message_type]
     credit_cost = unit_cost * len(messages)
+    campaign_status = "scheduled" if scheduled_at else "queued"
     async with pool.acquire() as connection, connection.transaction():
         company = await connection.fetchrow(
             """
@@ -114,14 +124,25 @@ async def create_campaign_with_messages(
         )
         await connection.execute(
             """
-                INSERT INTO campaigns (id, company_id, name, body, message_type, credit_cost)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO campaigns (
+                    id,
+                    company_id,
+                    name,
+                    body,
+                    message_type,
+                    status,
+                    scheduled_at,
+                    credit_cost
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8)
                 """,
             campaign_id,
             company_id,
             name,
             body,
             message_type,
+            campaign_status,
+            scheduled_at,
             credit_cost,
         )
         await connection.executemany(
@@ -131,11 +152,12 @@ async def create_campaign_with_messages(
                     company_id,
                     campaign_id,
                     recipient,
+                    subscriber_id,
                     body,
                     status,
                     idempotency_key
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
             [
                 (
@@ -143,6 +165,7 @@ async def create_campaign_with_messages(
                     company_id,
                     message["campaign_id"],
                     message["recipient"],
+                    message.get("subscriber_id"),
                     message["body"],
                     message["status"],
                     message["idempotency_key"],
@@ -150,7 +173,51 @@ async def create_campaign_with_messages(
                 for message in messages
             ],
         )
-    return {"credit_cost": credit_cost, "remaining_credits": remaining_credits}
+    return {
+        "credit_cost": credit_cost,
+        "remaining_credits": remaining_credits,
+        "status": campaign_status,
+        "audience_count": len(messages),
+    }
+
+
+async def resolve_campaign_audience(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    subscriber_ids: list[str],
+    subscriber_list_ids: list[str],
+) -> list[dict[str, str]]:
+    if not subscriber_ids and not subscriber_list_ids:
+        raise AudienceSelectionError("choose at least one subscriber or list")
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            WITH selected_subscribers AS (
+                SELECT s.id, s.phone_number
+                FROM subscribers s
+                WHERE s.company_id = $1
+                  AND s.id = ANY($2::text[])
+                UNION
+                SELECT s.id, s.phone_number
+                FROM subscriber_list_memberships slm
+                JOIN subscribers s ON s.id = slm.subscriber_id
+                WHERE s.company_id = $1
+                  AND slm.subscriber_list_id = ANY($3::text[])
+            )
+            SELECT DISTINCT ON (id)
+                id AS subscriber_id,
+                phone_number
+            FROM selected_subscribers
+            ORDER BY id
+            """,
+            company_id,
+            subscriber_ids,
+            subscriber_list_ids,
+        )
+    if not rows:
+        raise AudienceSelectionError("selected audience has no eligible subscribers")
+    return [dict(row) for row in rows]
 
 
 async def get_campaign_status(pool: asyncpg.Pool, campaign_id: str) -> dict[str, Any] | None:
@@ -422,6 +489,31 @@ async def get_company_dashboard_summary(
     return dict(row) if row is not None else None
 
 
+async def get_admin_dashboard_summary(pool: asyncpg.Pool) -> dict[str, int]:
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            SELECT
+                (SELECT COUNT(*)::int FROM companies) AS company_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM companies
+                    WHERE status = 'active'
+                ) AS active_company_count,
+                COALESCE(
+                    (SELECT SUM(credit_balance)::int FROM companies),
+                    0
+                ) AS total_credit_balance,
+                (
+                    SELECT COUNT(*)::int
+                    FROM company_access_codes
+                    WHERE revoked_at IS NULL
+                ) AS active_access_code_count
+            """
+        )
+    return dict(row)
+
+
 async def list_company_users(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
     async with pool.acquire() as connection:
         rows = await connection.fetch(
@@ -496,6 +588,54 @@ async def create_subscriber_list(
             name,
         )
     return {**dict(row), "subscriber_count": 0}
+
+
+async def list_subscriber_lists(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT
+                sl.id,
+                sl.company_id,
+                sl.name,
+                COUNT(slm.subscriber_id)::int AS subscriber_count
+            FROM subscriber_lists sl
+            LEFT JOIN subscriber_list_memberships slm ON slm.subscriber_list_id = sl.id
+            WHERE sl.company_id = $1
+            GROUP BY sl.id, sl.company_id, sl.name
+            ORDER BY sl.name
+            """,
+            company_id,
+        )
+    return [dict(row) for row in rows]
+
+
+async def list_subscribers(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT
+                s.id,
+                s.company_id,
+                s.phone_number,
+                s.marketing_status,
+                s.consent_status,
+                (
+                    SELECT slm.subscriber_list_id
+                    FROM subscriber_list_memberships slm
+                    WHERE slm.subscriber_id = s.id
+                    ORDER BY slm.created_at DESC
+                    LIMIT 1
+                ) AS list_id
+            FROM subscribers s
+            WHERE s.company_id = $1
+              AND s.marketing_status <> 'opted_out'
+              AND s.consent_status IN ('company_provided', 'double_opt_in_confirmed')
+            ORDER BY s.created_at DESC
+            """,
+            company_id,
+        )
+    return [dict(row) for row in rows]
 
 
 async def import_subscriber(
@@ -886,6 +1026,21 @@ async def create_reminder_campaign(
 ) -> dict[str, Any]:
     reminder_id = str(uuid4())
     async with pool.acquire() as connection, connection.transaction():
+        source_campaign = await connection.fetchrow(
+            """
+            SELECT id
+            FROM campaigns
+            WHERE id = $1
+              AND company_id = $2
+              AND COALESCE(scheduled_at, created_at) >= NOW() - INTERVAL '7 days'
+            """,
+            source_campaign_id,
+            company_id,
+        )
+        if source_campaign is None:
+            raise ReminderEligibilityError(
+                "reminders can only target campaigns from the last 7 days"
+            )
         estimated_recipient_count = await _estimate_reminder_recipients(
             connection,
             company_id=company_id,
@@ -943,6 +1098,41 @@ async def list_reminder_campaigns(
             FROM reminder_campaigns
             WHERE company_id = $1
             ORDER BY created_at DESC
+            """,
+            company_id,
+        )
+    return [dict(row) for row in rows]
+
+
+async def list_campaigns(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT
+                c.id,
+                c.company_id,
+                c.name,
+                c.message_type,
+                c.status,
+                c.scheduled_at,
+                c.created_at,
+                COUNT(DISTINCT m.id)::int AS message_count,
+                c.credit_cost,
+                COUNT(DISTINCT rc.id)::int AS reminder_count
+            FROM campaigns c
+            LEFT JOIN messages m ON m.campaign_id = c.id
+            LEFT JOIN reminder_campaigns rc ON rc.source_campaign_id = c.id
+            WHERE c.company_id = $1
+            GROUP BY
+                c.id,
+                c.company_id,
+                c.name,
+                c.message_type,
+                c.status,
+                c.scheduled_at,
+                c.created_at,
+                c.credit_cost
+            ORDER BY COALESCE(c.scheduled_at, c.created_at) DESC
             """,
             company_id,
         )

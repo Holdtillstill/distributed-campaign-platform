@@ -490,6 +490,56 @@ textarea {
   font-weight: 750;
 }
 
+.audience-picker,
+.campaign-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.audience-picker {
+  align-items: start;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.audience-picker h2,
+.campaign-column h2 {
+  margin: 0 0 12px;
+  color: #111827;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #334155;
+}
+
+.check-row input {
+  width: auto;
+}
+
+.campaign-board {
+  margin-top: 24px;
+  align-items: start;
+}
+
+.campaign-column {
+  min-width: 0;
+}
+
+.follow-up-panel {
+  margin-top: 24px;
+  border-top: 1px solid #d9e2ef;
+  padding-top: 20px;
+}
+
 .settings-grid {
   margin-top: 20px;
 }
@@ -539,6 +589,8 @@ textarea {
   .workspace,
   .split-layout,
   .two-column,
+  .audience-picker,
+  .campaign-board,
   .form-grid,
   .toolbar-form {
     grid-template-columns: 1fr;

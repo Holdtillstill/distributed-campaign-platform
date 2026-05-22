@@ -59,6 +59,15 @@ function mockFetch() {
       ])
     }
 
+    if (url.endsWith('/admin/dashboard-summary')) {
+      return okJson({
+        company_count: 10,
+        active_company_count: 9,
+        total_credit_balance: 92000,
+        active_access_code_count: 6,
+      })
+    }
+
     if (url.endsWith('/signup/access-code') && method === 'POST') {
       return okJson(
         {
@@ -134,6 +143,35 @@ function mockFetch() {
       ])
     }
 
+    if (url.endsWith('/companies/company-1/campaigns')) {
+      return okJson([
+        {
+          id: 'campaign-upcoming',
+          company_id: 'company-1',
+          name: 'Memorial Day Promo',
+          message_type: 'smart',
+          status: 'scheduled',
+          scheduled_at: '2026-05-25T16:00:00Z',
+          created_at: '2026-05-22T05:00:00Z',
+          message_count: 2,
+          credit_cost: 4,
+          reminder_count: 0,
+        },
+        {
+          id: 'campaign-past',
+          company_id: 'company-1',
+          name: 'Spring Launch',
+          message_type: 'regular',
+          status: 'sent',
+          scheduled_at: '2026-05-20T16:00:00Z',
+          created_at: '2026-05-20T15:00:00Z',
+          message_count: 10,
+          credit_cost: 10,
+          reminder_count: 1,
+        },
+      ])
+    }
+
     if (url.endsWith('/companies/company-1/campaign-links') && method === 'POST') {
       return okJson({
         id: 'link-1',
@@ -170,6 +208,13 @@ function mockFetch() {
       return okJson({ id: 'list-1', company_id: 'company-1', name: 'VIP List' }, 201)
     }
 
+    if (url.endsWith('/companies/company-1/subscriber-lists') && method === 'GET') {
+      return okJson([
+        { id: 'list-vip', company_id: 'company-1', name: 'VIP Customers', subscriber_count: 2 },
+        { id: 'list-west', company_id: 'company-1', name: 'West Region', subscriber_count: 1 },
+      ])
+    }
+
     if (url.endsWith('/companies/company-1/subscribers') && method === 'POST') {
       return okJson({
         id: 'subscriber-1',
@@ -179,6 +224,27 @@ function mockFetch() {
         list_id: 'list-1',
         consent_status: 'company_provided',
       })
+    }
+
+    if (url.endsWith('/companies/company-1/subscribers') && method === 'GET') {
+      return okJson([
+        {
+          id: 'subscriber-1',
+          company_id: 'company-1',
+          phone_number: '+15550001001',
+          marketing_status: 'confirmed',
+          consent_status: 'double_opt_in_confirmed',
+          list_id: 'list-vip',
+        },
+        {
+          id: 'subscriber-2',
+          company_id: 'company-1',
+          phone_number: '+15550001002',
+          marketing_status: 'imported',
+          consent_status: 'company_provided',
+          list_id: 'list-west',
+        },
+      ])
     }
 
     if (url.endsWith('/public/opt-ins') && method === 'POST') {
@@ -205,8 +271,11 @@ function mockFetch() {
         {
           id: 'campaign-1',
           company_id: 'company-1',
-          name: 'Spring Launch',
+          name: 'Memorial Day Promo',
           message_type: 'smart',
+          status: 'scheduled',
+          scheduled_at: '2026-05-25T16:00:00Z',
+          audience_count: 3,
           message_count: 2,
           credit_cost: 4,
           remaining_credits: 41996,
@@ -358,6 +427,19 @@ describe('App', () => {
     })
   })
 
+  it('loads actual admin dashboard company totals from the backend', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+    await loginAsInternalAdmin(user)
+
+    expect(await screen.findByText(/companies created/i)).toBeInTheDocument()
+    expect(screen.getByText('10')).toBeInTheDocument()
+    expect(screen.getByText('92,000')).toBeInTheDocument()
+  })
+
   it('lets internal admin create a company and displays quota plus access code', async () => {
     const fetchMock = mockFetch()
     const user = userEvent.setup()
@@ -468,11 +550,10 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /analytics/i }))
     expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /reminders/i }))
-    expect(screen.getByRole('heading', { name: /reminders/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reminders/i })).not.toBeInTheDocument()
   })
 
-  it('keeps campaign creation scoped with X-Company-Id', async () => {
+  it('schedules campaigns from subscriber segments instead of raw phone numbers', async () => {
     const fetchMock = mockFetch()
     const user = userEvent.setup()
 
@@ -480,16 +561,20 @@ describe('App', () => {
     render(<App />)
     await signupAsCompanyUser(user)
     await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    expect(await screen.findByText(/VIP Customers/)).toBeInTheDocument()
+    expect(await screen.findByText(/\+15550001001/)).toBeInTheDocument()
     await user.clear(screen.getByLabelText(/campaign name/i))
-    await user.type(screen.getByLabelText(/campaign name/i), 'Spring Launch')
+    await user.type(screen.getByLabelText(/campaign name/i), 'Memorial Day Promo')
     await user.clear(screen.getByLabelText(/message body/i))
     await user.type(screen.getByLabelText(/message body/i), 'Launch copy')
     await user.selectOptions(screen.getByLabelText(/message type/i), 'smart')
-    await user.clear(screen.getByLabelText(/recipients/i))
-    await user.type(screen.getByLabelText(/recipients/i), '+15550001012\n+15550001013')
-    await user.click(screen.getByRole('button', { name: /create campaign/i }))
+    await user.click(screen.getByLabelText(/VIP Customers/i))
+    await user.click(screen.getByLabelText(/\+15550001002/i))
+    await user.clear(screen.getByLabelText(/schedule date and time/i))
+    await user.type(screen.getByLabelText(/schedule date and time/i), '2026-05-25T16:00')
+    await user.click(screen.getByRole('button', { name: /schedule campaign/i }))
 
-    expect(await screen.findByText(/campaign-1/i)).toBeInTheDocument()
+    expect(await screen.findAllByText(/campaign-1/i)).not.toHaveLength(0)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/campaigns',
       expect.objectContaining({
@@ -500,13 +585,32 @@ describe('App', () => {
           'X-User-Email': 'owner@acme.test',
         }),
         body: JSON.stringify({
-          name: 'Spring Launch',
+          name: 'Memorial Day Promo',
           body: 'Launch copy',
           message_type: 'smart',
-          recipients: ['+15550001012', '+15550001013'],
+          subscriber_list_ids: ['list-vip'],
+          subscriber_ids: ['subscriber-2'],
+          scheduled_at: '2026-05-25T16:00',
         }),
       }),
     )
+  })
+
+  it('shows upcoming and past campaigns with follow-up reminders inside Campaigns', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+
+    expect(await screen.findByRole('heading', { name: /upcoming/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
+    expect(screen.getByRole('heading', { name: /past/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Spring Launch/i)).not.toHaveLength(0)
+    expect(screen.getByLabelText(/follow-up source campaign/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reminders/i })).not.toBeInTheDocument()
   })
 
   it('lets company admins create access codes and adjust team budgets', async () => {

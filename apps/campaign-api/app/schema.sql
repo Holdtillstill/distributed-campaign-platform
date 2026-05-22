@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
     name TEXT NOT NULL,
     body TEXT NOT NULL,
     message_type TEXT NOT NULL DEFAULT 'regular' CHECK (message_type IN ('regular', 'smart')),
+    status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'scheduled', 'sent', 'cancelled')),
+    scheduled_at TIMESTAMPTZ,
     credit_cost INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -112,6 +114,13 @@ ALTER TABLE campaigns
 
 ALTER TABLE campaigns
     ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued', 'scheduled', 'sent', 'cancelled'));
+
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
 
 ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS company_id TEXT NOT NULL DEFAULT 'demo-company' REFERENCES companies(id) ON DELETE RESTRICT;
@@ -143,6 +152,9 @@ CREATE TABLE IF NOT EXISTS subscriber_list_memberships (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (subscriber_list_id, subscriber_id)
 );
+
+ALTER TABLE messages
+    ADD COLUMN IF NOT EXISTS subscriber_id TEXT REFERENCES subscribers(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS consent_events (
     id TEXT PRIMARY KEY,
@@ -231,6 +243,7 @@ CREATE INDEX IF NOT EXISTS idx_reminder_campaigns_company_id ON reminder_campaig
 CREATE INDEX IF NOT EXISTS idx_reminder_campaigns_source_campaign_id ON reminder_campaigns(source_campaign_id);
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_company_id ON campaigns(company_id);
+CREATE INDEX IF NOT EXISTS idx_campaigns_company_scheduled ON campaigns(company_id, scheduled_at DESC NULLS LAST, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_company_id ON messages(company_id);
 CREATE INDEX IF NOT EXISTS idx_messages_campaign_id ON messages(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_messages_campaign_status ON messages(campaign_id, status);

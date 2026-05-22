@@ -34,12 +34,16 @@ class CampaignCreateRequest(BaseModel):
     body: str = DEFAULT_BODY
     message_type: Literal["regular", "smart"] = "regular"
     recipients: list[str] | None = None
+    subscriber_ids: list[str] = Field(default_factory=list)
+    subscriber_list_ids: list[str] = Field(default_factory=list)
+    scheduled_at: str | None = None
 
 
 class MessageRow(BaseModel):
     message_id: str
     campaign_id: str
     recipient: str
+    subscriber_id: str | None = None
     body: str
     status: str
     idempotency_key: str
@@ -50,6 +54,9 @@ class CampaignCreateResponse(BaseModel):
     company_id: str
     name: str
     message_type: str
+    status: str
+    scheduled_at: str | None = None
+    audience_count: int
     message_count: int
     credit_cost: int
     remaining_credits: int
@@ -136,6 +143,13 @@ class CompanyDashboardSummaryResponse(BaseModel):
     redemption_count: int
 
 
+class AdminDashboardSummaryResponse(BaseModel):
+    company_count: int
+    active_company_count: int
+    total_credit_balance: int
+    active_access_code_count: int
+
+
 class CompanyUserResponse(BaseModel):
     user_id: str
     email: str
@@ -174,6 +188,19 @@ class SubscriberResponse(BaseModel):
     marketing_status: str
     consent_status: str
     list_id: str | None = None
+
+
+class CampaignListItemResponse(BaseModel):
+    id: str
+    company_id: str
+    name: str
+    message_type: str
+    status: str
+    scheduled_at: Any | None = None
+    created_at: Any | None = None
+    message_count: int
+    credit_cost: int
+    reminder_count: int
 
 
 class DoubleOptInStartRequest(BaseModel):
@@ -289,9 +316,12 @@ class CampaignRepository(Protocol):
         company_id: str,
         name: str,
         body: str,
-        recipients: list[str],
+        recipients: list[str] | None,
+        subscriber_ids: list[str],
+        subscriber_list_ids: list[str],
         message_type: str,
         actor_email: str | None,
+        scheduled_at: str | None,
     ) -> dict[str, Any]: ...
 
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None: ...
@@ -330,6 +360,8 @@ class CampaignRepository(Protocol):
         company_id: str,
     ) -> dict[str, Any] | None: ...
 
+    async def get_admin_dashboard_summary(self) -> dict[str, Any]: ...
+
     async def list_company_users(self, *, company_id: str) -> list[dict[str, Any]]: ...
 
     async def update_company_user(
@@ -342,6 +374,10 @@ class CampaignRepository(Protocol):
     ) -> dict[str, Any] | None: ...
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]: ...
+
+    async def list_subscriber_lists(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
+    async def list_subscribers(self, *, company_id: str) -> list[dict[str, Any]]: ...
 
     async def import_subscriber(
         self,
@@ -410,6 +446,8 @@ class CampaignRepository(Protocol):
 
     async def list_reminder_campaigns(self, *, company_id: str) -> list[dict[str, Any]]: ...
 
+    async def list_campaigns(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
     async def get_admin_usage(self, *, from_date: date, to_date: date) -> list[dict[str, Any]]: ...
 
 
@@ -467,12 +505,33 @@ class AsyncpgCampaignRepository:
         company_id: str,
         name: str,
         body: str,
-        recipients: list[str],
+        recipients: list[str] | None,
+        subscriber_ids: list[str],
+        subscriber_list_ids: list[str],
         message_type: str,
         actor_email: str | None,
+        scheduled_at: str | None,
     ) -> dict[str, Any]:
         campaign_id = str(uuid4())
-        message_rows = build_message_rows(campaign_id, recipients, body)
+        audience_rows: list[dict[str, str]]
+        if recipients is None:
+            audience_rows = await db.resolve_campaign_audience(
+                self._pool,
+                company_id=company_id,
+                subscriber_ids=subscriber_ids,
+                subscriber_list_ids=subscriber_list_ids,
+            )
+            resolved_recipients = [row["phone_number"] for row in audience_rows]
+            resolved_subscriber_ids = [row["subscriber_id"] for row in audience_rows]
+        else:
+            resolved_recipients = recipients
+            resolved_subscriber_ids = [None] * len(recipients)
+        message_rows = build_message_rows(
+            campaign_id,
+            resolved_recipients,
+            body,
+            subscriber_ids=resolved_subscriber_ids,
+        )
         credit_result = await db.create_campaign_with_messages(
             self._pool,
             company_id=company_id,
@@ -482,9 +541,11 @@ class AsyncpgCampaignRepository:
             messages=[row.model_dump() for row in message_rows],
             message_type=message_type,
             actor_email=actor_email,
+            scheduled_at=scheduled_at,
         )
-        with tracer.start_as_current_span("nats.publish.messages.dispatch"):
-            await self._publisher.publish(message_rows)
+        if credit_result["status"] != "scheduled":
+            with tracer.start_as_current_span("nats.publish.messages.dispatch"):
+                await self._publisher.publish(message_rows)
         logger.info(
             "campaign_created",
             campaign_id=campaign_id,
@@ -495,6 +556,9 @@ class AsyncpgCampaignRepository:
             "company_id": company_id,
             "name": name,
             "message_type": message_type,
+            "status": credit_result["status"],
+            "scheduled_at": scheduled_at,
+            "audience_count": credit_result["audience_count"],
             "message_count": len(message_rows),
             "credit_cost": credit_result["credit_cost"],
             "remaining_credits": credit_result["remaining_credits"],
@@ -556,6 +620,9 @@ class AsyncpgCampaignRepository:
     async def get_company_dashboard_summary(self, *, company_id: str) -> dict[str, Any] | None:
         return await db.get_company_dashboard_summary(self._pool, company_id=company_id)
 
+    async def get_admin_dashboard_summary(self) -> dict[str, Any]:
+        return await db.get_admin_dashboard_summary(self._pool)
+
     async def list_company_users(self, *, company_id: str) -> list[dict[str, Any]]:
         return await db.list_company_users(self._pool, company_id=company_id)
 
@@ -577,6 +644,12 @@ class AsyncpgCampaignRepository:
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]:
         return await db.create_subscriber_list(self._pool, company_id=company_id, name=name)
+
+    async def list_subscriber_lists(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_subscriber_lists(self._pool, company_id=company_id)
+
+    async def list_subscribers(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_subscribers(self._pool, company_id=company_id)
 
     async def import_subscriber(
         self,
@@ -694,6 +767,9 @@ class AsyncpgCampaignRepository:
     async def list_reminder_campaigns(self, *, company_id: str) -> list[dict[str, Any]]:
         return await db.list_reminder_campaigns(self._pool, company_id=company_id)
 
+    async def list_campaigns(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_campaigns(self._pool, company_id=company_id)
+
     async def get_admin_usage(self, *, from_date: date, to_date: date) -> list[dict[str, Any]]:
         return await db.get_admin_usage(self._pool, from_date=from_date, to_date=to_date)
 
@@ -748,8 +824,12 @@ async def create_campaign(
     user_email: str | None = Header(None, alias="X-User-Email"),
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, Any]:
-    recipients = request.recipients if request.recipients is not None else default_recipients()
-    ensure_unique_recipients(recipients)
+    has_selected_audience = bool(request.subscriber_ids or request.subscriber_list_ids)
+    recipients = request.recipients if request.recipients is not None else None
+    if recipients is None and not has_selected_audience:
+        recipients = default_recipients()
+    if recipients is not None:
+        ensure_unique_recipients(recipients)
     try:
         result = await repository.create_campaign_with_messages(
             company_id=company_id,
@@ -758,6 +838,9 @@ async def create_campaign(
             message_type=request.message_type,
             actor_email=user_email,
             recipients=recipients,
+            subscriber_ids=request.subscriber_ids,
+            subscriber_list_ids=request.subscriber_list_ids,
+            scheduled_at=request.scheduled_at,
         )
     except db.InsufficientCreditsError as exc:
         raise HTTPException(
@@ -768,16 +851,37 @@ async def create_campaign(
                 "available_credits": exc.available_credits,
             },
         ) from exc
+    except db.AudienceSelectionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return {
         "id": result["id"],
         "company_id": result["company_id"],
         "name": result["name"],
         "message_type": result["message_type"],
+        "status": result.get("status", "queued"),
+        "scheduled_at": result.get("scheduled_at"),
+        "audience_count": result.get("audience_count", result["message_count"]),
         "message_count": result["message_count"],
         "credit_cost": result["credit_cost"],
         "remaining_credits": result["remaining_credits"],
         "status_counts": result["status_counts"],
     }
+
+
+@app.get(
+    "/admin/dashboard-summary",
+    response_model=AdminDashboardSummaryResponse,
+)
+async def get_admin_dashboard_summary(
+    internal_admin: str | None = Header(None, alias="X-Internal-Admin"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    if internal_admin != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="internal admin access required",
+        )
+    return await repository.get_admin_dashboard_summary()
 
 
 @app.post(
@@ -936,6 +1040,14 @@ async def create_subscriber_list(
     return await repository.create_subscriber_list(company_id=company_id, name=request.name)
 
 
+@app.get("/companies/{company_id}/subscriber-lists", response_model=list[SubscriberListResponse])
+async def list_subscriber_lists(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_subscriber_lists(company_id=company_id)
+
+
 @app.post(
     "/companies/{company_id}/subscribers",
     response_model=SubscriberResponse,
@@ -952,6 +1064,14 @@ async def import_subscriber(
         source=request.source,
         list_id=request.list_id,
     )
+
+
+@app.get("/companies/{company_id}/subscribers", response_model=list[SubscriberResponse])
+async def list_subscribers(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_subscribers(company_id=company_id)
 
 
 @app.post(
@@ -1089,12 +1209,15 @@ async def create_reminder_campaign(
     request: ReminderCampaignCreateRequest,
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, Any]:
-    return await repository.create_reminder_campaign(
-        company_id=company_id,
-        source_campaign_id=request.source_campaign_id,
-        audience_rule=request.audience_rule,
-        message_body=request.message_body,
-    )
+    try:
+        return await repository.create_reminder_campaign(
+            company_id=company_id,
+            source_campaign_id=request.source_campaign_id,
+            audience_rule=request.audience_rule,
+            message_body=request.message_body,
+        )
+    except db.ReminderEligibilityError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @app.get(
@@ -1106,6 +1229,14 @@ async def list_reminder_campaigns(
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> list[dict[str, Any]]:
     return await repository.list_reminder_campaigns(company_id=company_id)
+
+
+@app.get("/companies/{company_id}/campaigns", response_model=list[CampaignListItemResponse])
+async def list_campaigns(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_campaigns(company_id=company_id)
 
 
 @app.get("/admin/usage", response_model=list[AdminUsageResponse])
@@ -1138,9 +1269,16 @@ def default_recipients() -> list[str]:
     return ["+15550001001", "+15550001002", "+15550001003"]
 
 
-def build_message_rows(campaign_id: str, recipients: Sequence[str], body: str) -> list[MessageRow]:
+def build_message_rows(
+    campaign_id: str,
+    recipients: Sequence[str],
+    body: str,
+    *,
+    subscriber_ids: Sequence[str | None] | None = None,
+) -> list[MessageRow]:
     rows: list[MessageRow] = []
-    for recipient in recipients:
+    subscriber_values = subscriber_ids if subscriber_ids is not None else [None] * len(recipients)
+    for recipient, subscriber_id in zip(recipients, subscriber_values, strict=True):
         idempotency_key = generate_idempotency_key(campaign_id, recipient, body)
         message_id = generate_idempotency_key("message", idempotency_key)[:32]
         rows.append(
@@ -1148,6 +1286,7 @@ def build_message_rows(campaign_id: str, recipients: Sequence[str], body: str) -
                 message_id=message_id,
                 campaign_id=campaign_id,
                 recipient=recipient,
+                subscriber_id=subscriber_id,
                 body=body,
                 status=MessageStatus.QUEUED.value,
                 idempotency_key=idempotency_key,

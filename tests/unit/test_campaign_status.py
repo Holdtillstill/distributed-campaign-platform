@@ -38,9 +38,12 @@ class FakeRepository:
         company_id: str,
         name: str,
         body: str,
-        recipients: list[str],
+        recipients: list[str] | None,
+        subscriber_ids: list[str] | None = None,
+        subscriber_list_ids: list[str] | None = None,
         message_type: str = "regular",
         actor_email: str | None = None,
+        scheduled_at: str | None = None,
     ) -> dict[str, object]:
         campaign_id = "campaign-test-1"
         self.created_campaign = {
@@ -50,10 +53,16 @@ class FakeRepository:
             "body": body,
             "message_type": message_type,
             "actor_email": actor_email,
+            "scheduled_at": scheduled_at,
         }
+        resolved_recipients = recipients or []
         self.created_messages = [
             row.model_dump() if hasattr(row, "model_dump") else dict(row)
-            for row in self._campaign_module.build_message_rows(campaign_id, recipients, body)
+            for row in self._campaign_module.build_message_rows(
+                campaign_id,
+                resolved_recipients,
+                body,
+            )
         ]
         self.status_counts = self._campaign_module.aggregate_status_counts(
             self.created_messages
@@ -64,6 +73,9 @@ class FakeRepository:
             "name": name,
             "body": body,
             "message_type": message_type,
+            "status": "queued",
+            "scheduled_at": scheduled_at,
+            "audience_count": len(self.created_messages),
             "message_count": len(self.created_messages),
             "credit_cost": len(self.created_messages),
             "remaining_credits": 997,
@@ -114,6 +126,9 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "company_id": "demo-company",
         "name": "launch",
         "message_type": "regular",
+        "status": "queued",
+        "scheduled_at": None,
+        "audience_count": 3,
         "message_count": 3,
         "credit_cost": 3,
         "remaining_credits": 997,
@@ -132,6 +147,7 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "body": "hello",
         "message_type": "regular",
         "actor_email": None,
+        "scheduled_at": None,
     }
     assert [row["recipient"] for row in fake_repo.created_messages] == [
         "+15550001001",
