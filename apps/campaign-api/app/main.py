@@ -190,6 +190,8 @@ class SubscriberResponse(BaseModel):
     marketing_status: str
     consent_status: str
     list_id: str | None = None
+    source: str | None = None
+    created_at: Any | None = None
 
 
 class CampaignListItemResponse(BaseModel):
@@ -311,6 +313,18 @@ class AdminUsageResponse(BaseModel):
     click_count: int
     redemption_count: int
     reminder_count: int
+
+
+class AdminCompanyHealthResponse(BaseModel):
+    company_id: str
+    company_name: str
+    subscriber_count: int
+    campaign_count: int
+    scheduled_reach: int
+    credits_remaining: int
+    monthly_send_limit: int | None = None
+    quota_usage: float
+    active_access_code: str | None = None
 
 
 class CampaignRepository(Protocol):
@@ -454,6 +468,13 @@ class CampaignRepository(Protocol):
     async def list_campaigns(self, *, company_id: str) -> list[dict[str, Any]]: ...
 
     async def get_admin_usage(self, *, from_date: date, to_date: date) -> list[dict[str, Any]]: ...
+
+    async def get_admin_company_health(
+        self,
+        *,
+        from_date: date,
+        to_date: date,
+    ) -> list[dict[str, Any]]: ...
 
 
 class MessagePublisher(Protocol):
@@ -780,6 +801,14 @@ class AsyncpgCampaignRepository:
 
     async def get_admin_usage(self, *, from_date: date, to_date: date) -> list[dict[str, Any]]:
         return await db.get_admin_usage(self._pool, from_date=from_date, to_date=to_date)
+
+    async def get_admin_company_health(
+        self,
+        *,
+        from_date: date,
+        to_date: date,
+    ) -> list[dict[str, Any]]:
+        return await db.get_admin_company_health(self._pool, from_date=from_date, to_date=to_date)
 
 
 @asynccontextmanager
@@ -1267,6 +1296,21 @@ async def get_admin_usage(
             detail="internal admin access required",
         )
     return await repository.get_admin_usage(from_date=from_date, to_date=to_date)
+
+
+@app.get("/admin/company-health", response_model=list[AdminCompanyHealthResponse])
+async def get_admin_company_health(
+    from_date: Annotated[date, Query(alias="from")],
+    to_date: Annotated[date, Query(alias="to")],
+    internal_admin: str | None = Header(None, alias="X-Internal-Admin"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    if internal_admin != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="internal admin access required",
+        )
+    return await repository.get_admin_company_health(from_date=from_date, to_date=to_date)
 
 
 @app.get("/campaigns/{campaign_id}", response_model=CampaignStatusResponse)

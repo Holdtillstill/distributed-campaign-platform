@@ -3,13 +3,14 @@ import type { FormEvent } from 'react'
 import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { PageHeader } from '../../components/PageHeader'
-import type { UsageRow } from '../../types'
+import type { CompanyHealthRow, UsageRow } from '../../types'
 import { formatNumber } from '../../utils'
 
 export function UsagePage({
   usageFromDate,
   usageToDate,
   usageRows,
+  companyHealthRows,
   error,
   onUsageFromDate,
   onUsageToDate,
@@ -18,6 +19,7 @@ export function UsagePage({
   usageFromDate: string
   usageToDate: string
   usageRows: UsageRow[]
+  companyHealthRows: CompanyHealthRow[]
   error: string | null
   onUsageFromDate: (value: string) => void
   onUsageToDate: (value: string) => void
@@ -51,6 +53,26 @@ export function UsagePage({
             { key: 'links', header: 'Tracked links', render: (row) => formatNumber(row.tracked_link_count) },
             { key: 'clicks', header: 'Clicks', render: (row) => formatNumber(row.click_count) },
             { key: 'reminders', header: 'Reminders', render: (row) => formatNumber(row.reminder_count) },
+          ]}
+        />
+      </section>
+      <section className="panel table-panel">
+        <div className="section-heading">
+          <span>Health</span>
+          <strong>Company breakdown</strong>
+        </div>
+        <DataTable
+          ariaLabel="Usage company health"
+          rows={companyHealthRows}
+          getRowKey={(row) => row.company_id}
+          empty={<EmptyState title="No company health loaded" description="Open the admin dashboard to load tenant health." />}
+          columns={[
+            { key: 'company', header: 'Company', render: (row) => row.company_name },
+            { key: 'subscribers', header: 'Subscribers', render: (row) => formatNumber(row.subscriber_count) },
+            { key: 'reach', header: 'Scheduled reach', render: (row) => formatNumber(row.scheduled_reach) },
+            { key: 'credits', header: 'Credits remaining', render: (row) => formatNumber(row.credits_remaining) },
+            { key: 'limit', header: 'Monthly send limit', render: (row) => formatNumber(row.monthly_send_limit) },
+            { key: 'access', header: 'Active access code', render: (row) => row.active_access_code ?? 'Not configured' },
           ]}
         />
       </section>

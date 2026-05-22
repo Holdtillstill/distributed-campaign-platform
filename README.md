@@ -119,6 +119,17 @@ To stop the local stack:
 docker compose down
 ```
 
+## Demo Retail Co seed data
+
+After the local database is running, seed a richer SMS SaaS demo tenant:
+
+```bash
+. .venv/bin/activate
+python scripts/local/seed-demo-data.py
+```
+
+The script is rerunnable and prints the Demo Retail Co customer email, access code, and company id. It populates regional lists, 12 subscribers, realistic media assets, and scheduled campaigns.
+
 ## Local kind + Helm validation
 
 Render and lint the Kubernetes chart without touching AWS:

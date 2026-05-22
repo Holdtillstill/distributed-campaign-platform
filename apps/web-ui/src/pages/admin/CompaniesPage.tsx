@@ -3,7 +3,8 @@ import type { FormEvent } from 'react'
 import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { PageHeader } from '../../components/PageHeader'
-import type { CompanyResult, UsageRow } from '../../types'
+
+import type { CompanyHealthRow, CompanyResult, UsageRow } from '../../types'
 import { formatNumber } from '../../utils'
 
 export function CompaniesPage({
@@ -14,6 +15,7 @@ export function CompaniesPage({
   creditBalance,
   companyResult,
   companies,
+  companyHealthRows,
   error,
   onCompanyName,
   onCompanySlug,
@@ -21,6 +23,7 @@ export function CompaniesPage({
   onMonthlySendLimit,
   onCreditBalance,
   onCreateCompany,
+  onRefreshCompanyHealth,
 }: {
   companyName: string
   companySlug: string
@@ -29,6 +32,7 @@ export function CompaniesPage({
   creditBalance: string
   companyResult: CompanyResult | null
   companies: UsageRow[]
+  companyHealthRows: CompanyHealthRow[]
   error: string | null
   onCompanyName: (value: string) => void
   onCompanySlug: (value: string) => void
@@ -36,23 +40,24 @@ export function CompaniesPage({
   onMonthlySendLimit: (value: string) => void
   onCreditBalance: (value: string) => void
   onCreateCompany: (event: FormEvent<HTMLFormElement>) => void
+  onRefreshCompanyHealth: () => void
 }) {
-  const companyRows = companyResult
+  const companyRows = companyResult && !companyHealthRows.some((row) => row.company_id === companyResult.id)
     ? [
         {
           company_id: companyResult.id,
           company_name: companyResult.name,
+          subscriber_count: 0,
           campaign_count: 0,
-          message_count: companyResult.monthly_send_limit ?? 0,
-          media_asset_count: 0,
-          tracked_link_count: companyResult.credit_balance,
-          click_count: 0,
-          redemption_count: 0,
-          reminder_count: 0,
+          scheduled_reach: 0,
+          credits_remaining: companyResult.credit_balance,
+          monthly_send_limit: companyResult.monthly_send_limit,
+          quota_usage: 0,
+          active_access_code: companyResult.access_code,
         },
-        ...companies.filter((row) => row.company_id !== companyResult.id),
+        ...companyHealthRows,
       ]
-    : companies
+    : companyHealthRows
 
   return (
     <>
@@ -124,6 +129,9 @@ export function CompaniesPage({
           <span>Manage</span>
           <strong>Existing companies</strong>
         </div>
+        <button className="secondary inline-action" onClick={onRefreshCompanyHealth}>
+          Refresh company health
+        </button>
         <DataTable
           ariaLabel="Existing companies"
           rows={companyRows}
@@ -136,10 +144,25 @@ export function CompaniesPage({
           }
           columns={[
             { key: 'company', header: 'Company', render: (row) => row.company_name },
-            { key: 'subscribers', header: 'Subscribers', render: () => 'No data yet' },
-            { key: 'credits', header: 'Credits', render: (row) => formatNumber(row.tracked_link_count) },
-            { key: 'limit', header: 'Monthly limit', render: (row) => formatNumber(row.message_count) },
-            { key: 'access', header: 'Access code', render: (row) => (row.company_id === companyResult?.id ? companyResult.access_code : 'Not configured') },
+            { key: 'subscribers', header: 'Subscribers', render: (row) => formatNumber(row.subscriber_count) },
+            { key: 'campaigns', header: 'Campaigns', render: (row) => formatNumber(row.campaign_count) },
+            { key: 'reach', header: 'Scheduled reach', render: (row) => formatNumber(row.scheduled_reach) },
+            { key: 'credits', header: 'Credits', render: (row) => formatNumber(row.credits_remaining) },
+            { key: 'limit', header: 'Monthly limit', render: (row) => formatNumber(row.monthly_send_limit) },
+            {
+              key: 'quota',
+              header: 'Quota usage',
+              render: (row) => {
+                const pct = Math.round(row.quota_usage * 100)
+                return (
+                  <div className="health-quota" aria-label={`${row.company_name} quota usage ${pct}%`}>
+                    <span className="health-quota-label">{row.monthly_send_limit ? `${pct}% used` : 'Not configured'}</span>
+                    <span className="health-quota-track"><span style={{ width: `${Math.min(pct, 100)}%` }} /></span>
+                  </div>
+                )
+              },
+            },
+            { key: 'access', header: 'Access code', render: (row) => <span className="code-chip">{row.active_access_code ?? 'Not configured'}</span> },
             { key: 'status', header: 'Status', render: () => <span className="status-pill">Active</span> },
             { key: 'actions', header: 'Actions', render: () => <button className="secondary inline-action">Review</button> },
           ]}

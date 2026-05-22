@@ -50,6 +50,18 @@ export type UsageRow = {
   reminder_count: number
 }
 
+export type CompanyHealthRow = {
+  company_id: string
+  company_name: string
+  subscriber_count: number
+  campaign_count: number
+  scheduled_reach: number
+  credits_remaining: number
+  monthly_send_limit?: number | null
+  quota_usage: number
+  active_access_code?: string | null
+}
+
 export type DashboardSummary = {
   company_id: string
   company_name: string
@@ -123,6 +135,9 @@ export type SubscriberResult = {
   marketing_status?: string
   list_id?: string
   consent_status?: string
+  source?: string
+  region?: string
+  created_at?: string | null
 }
 
 export type OptInResult = {
@@ -184,7 +199,7 @@ export type CampaignListItem = {
   reminder_count: number
 }
 
-export type CampaignSubpage = 'list' | 'create'
+export type CampaignSubpage = 'overview' | 'scheduled' | 'past' | 'create' | 'followups'
 
 export type SystemCheck = {
   path: string

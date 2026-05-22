@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../../api/client'
-import type { AdminDashboardSummary, AdminPage, CompanyResult, SystemCheck, UsageRow } from '../../types'
+import type { AdminDashboardSummary, AdminPage, CompanyHealthRow, CompanyResult, SystemCheck, UsageRow } from '../../types'
 import { AdminDashboard } from './AdminDashboard'
 import { CompaniesPage } from './CompaniesPage'
 import { UsagePage } from './UsagePage'
@@ -17,6 +17,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
   const [usageFromDate, setUsageFromDate] = useState('2026-05-01')
   const [usageToDate, setUsageToDate] = useState('2026-05-21')
   const [usageRows, setUsageRows] = useState<UsageRow[]>([])
+  const [companyHealthRows, setCompanyHealthRows] = useState<CompanyHealthRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [systemChecks, setSystemChecks] = useState<SystemCheck[]>([
     { path: '/healthz', label: 'Campaign API liveness', state: 'checking', detail: 'Not checked yet' },
@@ -26,13 +27,26 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
 
   useEffect(() => {
     async function loadAdminSummary() {
-      const response = await fetch(`${API_BASE_URL}/admin/dashboard-summary`, {
-        headers: { 'X-Internal-Admin': 'true' },
-      })
-      if (response.ok) setAdminSummary(await response.json())
+      const [summaryResponse, healthResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/admin/dashboard-summary`, {
+          headers: { 'X-Internal-Admin': 'true' },
+        }),
+        fetch(`${API_BASE_URL}/admin/company-health?from=2026-05-22&to=2026-06-21`, {
+          headers: { 'X-Internal-Admin': 'true' },
+        }),
+      ])
+      if (summaryResponse.ok) setAdminSummary(await summaryResponse.json())
+      if (healthResponse.ok) setCompanyHealthRows(await healthResponse.json())
     }
     void loadAdminSummary()
   }, [companyResult])
+
+  async function refreshCompanyHealth() {
+    const response = await fetch(`${API_BASE_URL}/admin/company-health?from=2026-05-22&to=2026-06-21`, {
+      headers: { 'X-Internal-Admin': 'true' },
+    })
+    if (response.ok) setCompanyHealthRows(await response.json())
+  }
 
   function toSystemCheck(response: Response, path: string, label: string): SystemCheck {
     if (!response.ok) {
@@ -97,6 +111,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
         creditBalance={creditBalance}
         companyResult={companyResult}
         companies={usageRows}
+        companyHealthRows={companyHealthRows}
         error={error}
         onCompanyName={setCompanyName}
         onCompanySlug={setCompanySlug}
@@ -104,6 +119,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
         onMonthlySendLimit={setMonthlySendLimit}
         onCreditBalance={setCreditBalance}
         onCreateCompany={createCompany}
+        onRefreshCompanyHealth={() => void refreshCompanyHealth()}
       />
     )
   }
@@ -114,6 +130,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
         usageFromDate={usageFromDate}
         usageToDate={usageToDate}
         usageRows={usageRows}
+        companyHealthRows={companyHealthRows}
         error={error}
         onUsageFromDate={setUsageFromDate}
         onUsageToDate={setUsageToDate}
@@ -127,6 +144,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
       adminSummary={adminSummary}
       companyResult={companyResult}
       usageRows={usageRows}
+      companyHealthRows={companyHealthRows}
       systemChecks={systemChecks}
       onRefreshSystemStatus={() => void refreshSystemStatus()}
     />

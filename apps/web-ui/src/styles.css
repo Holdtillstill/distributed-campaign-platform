@@ -507,6 +507,46 @@ textarea {
   color: #b45309;
 }
 
+.segmented-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px;
+}
+
+.segmented-control button,
+.segment-card {
+  background: #f8fafc;
+  color: #334155;
+  box-shadow: none;
+}
+
+.segmented-control button.active,
+.segment-card.active {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.segment-card {
+  display: grid;
+  min-height: 124px;
+  text-align: left;
+}
+
+.segment-card span,
+.segment-card small {
+  color: inherit;
+  opacity: 0.82;
+}
+
+.segment-card strong {
+  margin-top: 10px;
+  font-size: 1.65rem;
+}
+
 .dashboard-grid,
 .analytics-grid {
   display: grid;
@@ -646,13 +686,21 @@ textarea {
 .asset-thumb {
   display: grid;
   place-items: center;
-  min-height: 92px;
+  min-height: 118px;
+  overflow: hidden;
   border: 1px solid #d9e2ef;
   border-radius: 8px;
   background: #f1f5f9;
   color: #475569;
   font-weight: 850;
   margin-bottom: 12px;
+}
+
+.asset-thumb img {
+  width: 100%;
+  height: 118px;
+  object-fit: cover;
+  display: block;
 }
 
 .membership-list li {
@@ -720,6 +768,10 @@ textarea {
   align-items: start;
 }
 
+.campaign-board.single {
+  grid-template-columns: 1fr;
+}
+
 .campaign-column {
   min-width: 0;
 }
@@ -734,6 +786,47 @@ textarea {
 .status-section,
 .table-panel {
   margin-top: 20px;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.template-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.template-card p {
+  margin: 8px 0 0;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.template-preview {
+  display: grid;
+  min-height: 128px;
+  align-content: space-between;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f766e, #155e75 62%, #9a3412);
+  color: #ffffff;
+  padding: 14px;
+}
+
+.template-preview span {
+  font-size: 0.75rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.template-preview strong {
+  font-size: 1.7rem;
 }
 
 .compact-list li.ok {
@@ -776,7 +869,7 @@ textarea {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 780px;
+  min-width: 920px;
 }
 
 .data-table th,
@@ -792,6 +885,52 @@ textarea {
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.data-table td {
+  overflow-wrap: normal;
+}
+
+.health-quota {
+  display: grid;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.health-quota-label {
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.health-quota-track {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.health-quota-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f766e;
+}
+
+.code-chip {
+  display: inline-flex;
+  max-width: 160px;
+  border: 1px solid #d9e2ef;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 4px 8px;
+  white-space: nowrap;
 }
 
 .status-pill {

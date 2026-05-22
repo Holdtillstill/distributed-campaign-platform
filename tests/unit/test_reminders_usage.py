@@ -31,6 +31,7 @@ class FakeReminderUsageRepository:
     def __init__(self) -> None:
         self.created_reminder: dict[str, object] | None = None
         self.usage_range: tuple[date, date] | None = None
+        self.health_range: tuple[date, date] | None = None
 
     async def create_reminder_campaign(
         self,
@@ -84,6 +85,27 @@ class FakeReminderUsageRepository:
                 "click_count": 9,
                 "redemption_count": 5,
                 "reminder_count": 1,
+            }
+        ]
+
+    async def get_admin_company_health(
+        self,
+        *,
+        from_date: date,
+        to_date: date,
+    ) -> list[dict[str, object]]:
+        self.health_range = (from_date, to_date)
+        return [
+            {
+                "company_id": "company-1",
+                "company_name": "Acme Retail",
+                "subscriber_count": 1200,
+                "campaign_count": 14,
+                "scheduled_reach": 850,
+                "credits_remaining": 9200,
+                "monthly_send_limit": 10000,
+                "quota_usage": 0.85,
+                "active_access_code": "ACME-1234",
             }
         ]
 
@@ -179,6 +201,40 @@ def test_admin_usage_requires_internal_admin_header(campaign_module, fake_repo) 
     client = TestClient(campaign_module.app)
 
     response = client.get("/admin/usage?from=2026-05-01&to=2026-05-21")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "internal admin access required"}
+
+
+def test_internal_admin_can_load_company_health_breakdown(campaign_module, fake_repo) -> None:
+    client = TestClient(campaign_module.app)
+
+    response = client.get(
+        "/admin/company-health?from=2026-05-22&to=2026-06-21",
+        headers={"X-Internal-Admin": "true"},
+    )
+
+    assert response.status_code == 200
+    assert fake_repo.health_range == (date(2026, 5, 22), date(2026, 6, 21))
+    assert response.json() == [
+        {
+            "company_id": "company-1",
+            "company_name": "Acme Retail",
+            "subscriber_count": 1200,
+            "campaign_count": 14,
+            "scheduled_reach": 850,
+            "credits_remaining": 9200,
+            "monthly_send_limit": 10000,
+            "quota_usage": 0.85,
+            "active_access_code": "ACME-1234",
+        }
+    ]
+
+
+def test_admin_company_health_requires_internal_admin_header(campaign_module, fake_repo) -> None:
+    client = TestClient(campaign_module.app)
+
+    response = client.get("/admin/company-health?from=2026-05-22&to=2026-06-21")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "internal admin access required"}

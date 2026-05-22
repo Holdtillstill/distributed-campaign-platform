@@ -662,6 +662,8 @@ async def list_subscribers(pool: asyncpg.Pool, *, company_id: str) -> list[dict[
                 s.phone_number,
                 s.marketing_status,
                 s.consent_status,
+                s.source,
+                s.created_at,
                 (
                     SELECT slm.subscriber_list_id
                     FROM subscriber_list_memberships slm
@@ -729,7 +731,7 @@ async def import_subscriber(
             subscriber["id"],
             source,
         )
-    return {**dict(subscriber), "list_id": list_id}
+    return {**dict(subscriber), "list_id": list_id, "source": source}
 
 
 async def start_double_opt_in(
@@ -1264,6 +1266,81 @@ async def get_admin_usage(
                 ) AS reminder_count
             FROM companies c
             ORDER BY c.name
+            """,
+            from_date,
+            to_date,
+        )
+    return [dict(row) for row in rows]
+
+
+async def get_admin_company_health(
+    pool: asyncpg.Pool,
+    *,
+    from_date: str,
+    to_date: str,
+) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            WITH bounds AS (
+                SELECT $1::date AS start_date, ($2::date + INTERVAL '1 day') AS end_date
+            ),
+            company_rollups AS (
+                SELECT
+                    c.id AS company_id,
+                    c.name AS company_name,
+                    c.credit_balance AS credits_remaining,
+                    c.monthly_send_limit,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM subscribers subscribers_for_company
+                        WHERE subscribers_for_company.company_id = c.id
+                          AND subscribers_for_company.marketing_status <> 'opted_out'
+                    ) AS subscriber_count,
+                    (
+                        SELECT COUNT(*)::int
+                        FROM campaigns campaigns_for_company
+                        WHERE campaigns_for_company.company_id = c.id
+                    ) AS campaign_count,
+                    COALESCE(
+                        (
+                            SELECT COUNT(messages_for_campaign.id)::int
+                            FROM campaigns scheduled_campaigns
+                            LEFT JOIN messages messages_for_campaign
+                              ON messages_for_campaign.campaign_id = scheduled_campaigns.id,
+                            bounds
+                            WHERE scheduled_campaigns.company_id = c.id
+                              AND scheduled_campaigns.status = 'scheduled'
+                              AND scheduled_campaigns.scheduled_at >= bounds.start_date
+                              AND scheduled_campaigns.scheduled_at < bounds.end_date
+                        ),
+                        0
+                    ) AS scheduled_reach,
+                    (
+                        SELECT code
+                        FROM company_access_codes access_codes_for_company
+                        WHERE access_codes_for_company.company_id = c.id
+                          AND access_codes_for_company.revoked_at IS NULL
+                        ORDER BY access_codes_for_company.created_at DESC
+                        LIMIT 1
+                    ) AS active_access_code
+                FROM companies c
+            )
+            SELECT
+                company_id,
+                company_name,
+                subscriber_count,
+                campaign_count,
+                scheduled_reach,
+                credits_remaining,
+                monthly_send_limit,
+                CASE
+                    WHEN monthly_send_limit IS NULL OR monthly_send_limit = 0 THEN 0
+                    ELSE ROUND((scheduled_reach::numeric / monthly_send_limit::numeric), 4)::float
+                END AS quota_usage,
+                active_access_code
+            FROM company_rollups
+            ORDER BY company_name
             """,
             from_date,
             to_date,

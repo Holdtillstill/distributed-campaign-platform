@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../../api/client'
+import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { MetricCard as Metric } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
@@ -24,6 +25,33 @@ import type {
 } from '../../types'
 import { formatActivity, formatCount, formatNumber } from '../../utils'
 
+const contentTemplates = [
+  {
+    title: 'Memorial Day 30% Off Hero',
+    tag: 'Holiday sale',
+    copy: 'Memorial Day starts now: take 30% off summer favorites. Use code MEMORIAL30 through Monday.',
+    preview: '30% OFF',
+  },
+  {
+    title: 'VIP Loyalty Double Points',
+    tag: 'Loyalty',
+    copy: 'VIP weekend: earn double points on every order through Sunday. Your reward balance updates automatically.',
+    preview: '2X POINTS',
+  },
+  {
+    title: 'Weekend Flash Sale MMS',
+    tag: 'Flash sale',
+    copy: 'Flash sale: our bestsellers are back in stock for 48 hours. Tap to shop before sizes sell out.',
+    preview: '48 HRS',
+  },
+  {
+    title: 'Winback Offer',
+    tag: 'Retention',
+    copy: 'We saved you a private offer: take $15 off your next visit this week. Come back and see what is new.',
+    preview: '$15 BACK',
+  },
+]
+
 export function CompanyWorkspace({
   page,
   session,
@@ -35,10 +63,10 @@ export function CompanyWorkspace({
 }) {
   const companyId = session.companyId
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
-  const [campaignName, setCampaignName] = useState('Spring Launch')
-  const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
+  const [campaignName, setCampaignName] = useState('Memorial Day VIP Weekend')
+  const [messageBody, setMessageBody] = useState('Memorial Day starts now: take 30% off summer favorites through Monday. Use code MEMORIAL30 in-store or online.')
   const [messageType, setMessageType] = useState<'regular' | 'smart'>('regular')
-  const [campaignSubpage, setCampaignSubpage] = useState<CampaignSubpage>('list')
+  const [campaignSubpage, setCampaignSubpage] = useState<CampaignSubpage>('overview')
   const [scheduledAt, setScheduledAt] = useState('2026-05-25T16:00')
   const [smartMediaAssetId, setSmartMediaAssetId] = useState('')
   const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
@@ -52,26 +80,30 @@ export function CompanyWorkspace({
   const [subscriberPhone, setSubscriberPhone] = useState('+15550001010')
   const [subscriberSource, setSubscriberSource] = useState('import')
   const [subscriber, setSubscriber] = useState<SubscriberResult | null>(null)
+  const [selectedSubscriberListId, setSelectedSubscriberListId] = useState('all')
+  const [csvImportText, setCsvImportText] = useState('phone_number,list_name,region,source\n+15550001012,VIP Customers,Phoenix,loyalty_export')
+  const [csvImportResult, setCsvImportResult] = useState<string | null>(null)
   const [optInPhone, setOptInPhone] = useState('+15550001011')
   const [optInSource, setOptInSource] = useState('landing-page')
   const [optIn, setOptIn] = useState<OptInResult | null>(null)
   const [confirmToken, setConfirmToken] = useState('')
   const [confirmResult, setConfirmResult] = useState<OptInResult | null>(null)
-  const [mediaFilename, setMediaFilename] = useState('coupon.png')
+  const [mediaFilename, setMediaFilename] = useState('memorial-day-hero.png')
   const [mediaContentType, setMediaContentType] = useState('image/png')
-  const [mediaUrl, setMediaUrl] = useState('https://cdn.example/coupon.png')
+  const [mediaUrl, setMediaUrl] = useState('https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80')
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [trackedCampaignId, setTrackedCampaignId] = useState('')
   const [trackedSubscriberId, setTrackedSubscriberId] = useState('')
   const [trackedMediaAssetId, setTrackedMediaAssetId] = useState('')
-  const [destinationUrl, setDestinationUrl] = useState('https://example.com/spring')
+  const [destinationUrl, setDestinationUrl] = useState('https://example.com/offers/memorial-day')
   const [campaignLinks, setCampaignLinks] = useState<CampaignLink[]>([])
   const [campaignLink, setCampaignLink] = useState<CampaignLink | null>(null)
   const [performance, setPerformance] = useState<PerformanceTotals | null>(null)
   const [reminderSourceCampaignId, setReminderSourceCampaignId] = useState('')
   const [reminderAudienceRule, setReminderAudienceRule] = useState('not_clicked')
-  const [reminderMessageBody, setReminderMessageBody] = useState('Still interested?')
+  const [reminderMessageBody, setReminderMessageBody] = useState('Still thinking it over? Your VIP offer ends tonight. Tap to finish checkout before it expires.')
   const [reminderCampaign, setReminderCampaign] = useState<ReminderCampaign | null>(null)
+  const [reminderCampaigns, setReminderCampaigns] = useState<ReminderCampaign[]>([])
   const [teamUsers, setTeamUsers] = useState<CompanyUser[]>([])
   const [inviteRole, setInviteRole] = useState('campaign_manager')
   const [inviteCreditLimit, setInviteCreditLimit] = useState('2000')
@@ -90,6 +122,15 @@ export function CompanyWorkspace({
 
   const upcomingCampaigns = campaigns.filter((item) => item.status === 'scheduled')
   const pastCampaigns = campaigns.filter((item) => item.status !== 'scheduled')
+  const selectedSubscriberList = subscriberLists.find((list) => list.id === selectedSubscriberListId)
+  const visibleSubscribers =
+    selectedSubscriberListId === 'all'
+      ? subscribers
+      : subscribers.filter((subscriberItem) => subscriberItem.list_id === selectedSubscriberListId)
+  const subscriberListNameById = useMemo(
+    () => new Map(subscriberLists.map((list) => [list.id, list.name])),
+    [subscriberLists],
+  )
 
   useEffect(() => {
     async function loadDashboardSummary() {
@@ -101,16 +142,18 @@ export function CompanyWorkspace({
 
   useEffect(() => {
     async function loadCampaignPlanningData() {
-      const [listsResponse, subscribersResponse, campaignsResponse, mediaResponse] = await Promise.all([
+      const [listsResponse, subscribersResponse, campaignsResponse, mediaResponse, remindersResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
         fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`),
         fetch(`${API_BASE_URL}/companies/${companyId}/campaigns`),
         fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`),
+        fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`),
       ])
       if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
       if (subscribersResponse.ok) setSubscribers(await subscribersResponse.json())
       if (campaignsResponse.ok) setCampaigns(await campaignsResponse.json())
       if (mediaResponse.ok) setMediaAssets(await mediaResponse.json())
+      if (remindersResponse.ok) setReminderCampaigns(await remindersResponse.json())
     }
     void loadCampaignPlanningData()
   }, [companyId])
@@ -193,6 +236,82 @@ export function CompanyWorkspace({
       setSubscriber(result)
       if (result.id) setTrackedSubscriberId(result.id)
     }
+  }
+
+  function parseCsvRows(csvText: string) {
+    const [headerLine, ...lines] = csvText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    if (!headerLine) return []
+    const headers = headerLine.split(',').map((header) => header.trim().toLowerCase())
+    return lines
+      .map((line) => {
+        const values = line.split(',').map((value) => value.trim())
+        return headers.reduce<Record<string, string>>((row, header, index) => {
+          row[header] = values[index] ?? ''
+          return row
+        }, {})
+      })
+      .filter((row) => row.phone_number)
+  }
+
+  async function importCsvSubscribers(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const rows = parseCsvRows(csvImportText)
+    const importedSubscribers: SubscriberResult[] = []
+    const createdLists = new Map(subscriberLists.map((list) => [list.name.toLowerCase(), list]))
+
+    for (const row of rows) {
+      const listName = row.list_name || row.region || ''
+      let listId = ''
+      if (listName) {
+        const key = listName.toLowerCase()
+        let list = createdLists.get(key)
+        if (!list) {
+          const listResponse = await fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: listName }),
+          })
+          if (listResponse.ok) {
+            list = (await listResponse.json()) as SubscriberListResult
+            createdLists.set(key, list)
+            setSubscriberLists((current) => [list as SubscriberListResult, ...current.filter((item) => item.id !== list?.id)])
+          }
+        }
+        listId = list?.id ?? ''
+      }
+
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone_number: row.phone_number,
+          source: row.source || 'csv_import',
+          list_id: listId,
+        }),
+      })
+      if (response.ok) {
+        const result = (await response.json()) as SubscriberResult
+        importedSubscribers.push({ ...result, region: row.region, source: row.source || result.source })
+      }
+    }
+
+    if (importedSubscribers.length) {
+      setSubscribers((current) => [
+        ...importedSubscribers,
+        ...current.filter((item) => !importedSubscribers.some((imported) => imported.id === item.id)),
+      ])
+      setCsvImportResult(`Imported ${importedSubscribers.length} subscribers`)
+    } else {
+      setCsvImportResult('No subscribers imported')
+    }
+  }
+
+  function stageSubscriberCsv(file: File | undefined) {
+    if (!file) return
+    void file.text().then(setCsvImportText)
   }
 
   async function startOptIn(event: FormEvent<HTMLFormElement>) {
@@ -281,7 +400,11 @@ export function CompanyWorkspace({
         message_body: reminderMessageBody,
       }),
     })
-    if (response.ok) setReminderCampaign(await response.json())
+    if (response.ok) {
+      const result = (await response.json()) as ReminderCampaign
+      setReminderCampaign(result)
+      setReminderCampaigns((current) => [result, ...current.filter((item) => item.id !== result.id)])
+    }
   }
 
   async function createTeamAccessCode(event: FormEvent<HTMLFormElement>) {
@@ -400,21 +523,68 @@ export function CompanyWorkspace({
   }
 
   if (page === 'campaigns') {
+    const campaignTabs: { id: CampaignSubpage; label: string }[] = [
+      { id: 'overview', label: 'Overview' },
+      { id: 'scheduled', label: 'Scheduled' },
+      { id: 'past', label: 'Sent/Past' },
+      { id: 'create', label: 'Builder' },
+      { id: 'followups', label: 'Follow-ups' },
+    ]
+
     return (
       <>
         <PageHeader
           title="Campaigns"
-          description="Schedule SMS campaigns from opted-in subscribers, lists, and recent campaign follow-ups."
-          action={
-            campaignSubpage === 'list' ? (
-              <button onClick={() => setCampaignSubpage('create')}>Create campaign</button>
-            ) : (
-              <button className="secondary" onClick={() => setCampaignSubpage('list')}>
-                Back to campaigns
-              </button>
-            )
-          }
+          description="Plan broadcasts, review scheduled and sent campaigns, and build follow-up automations in their own workspace."
+          action={<button onClick={() => setCampaignSubpage('create')}>Create campaign</button>}
         />
+        <div className="segmented-control" aria-label="Campaign sections">
+          {campaignTabs.map((tab) => (
+            <button
+              className={campaignSubpage === tab.id ? 'active' : ''}
+              key={tab.id}
+              onClick={() => setCampaignSubpage(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {campaignSubpage === 'overview' ? (
+          <>
+            <div className="metric-grid spaced">
+              <Metric label="Scheduled" value={formatNumber(upcomingCampaigns.length)} trend="Broadcasts waiting to send" />
+              <Metric label="Sent/Past" value={formatNumber(pastCampaigns.length)} trend="Completed or cancelled campaigns" />
+              <Metric
+                label="Scheduled reach"
+                value={formatNumber(upcomingCampaigns.reduce((total, item) => total + item.message_count, 0))}
+                trend="Recipients in upcoming campaigns"
+              />
+              <Metric
+                label="Reminder opportunities"
+                value={formatNumber(campaigns.reduce((total, item) => total + item.reminder_count, 0))}
+                trend="Managed under Follow-ups"
+              />
+            </div>
+            <div className="campaign-board">
+              <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns.slice(0, 5)} onEdit={() => setCampaignSubpage('create')} />
+              <CampaignColumn title="Past" campaigns={pastCampaigns.slice(0, 5)} onEdit={() => setCampaignSubpage('create')} />
+            </div>
+          </>
+        ) : null}
+
+        {campaignSubpage === 'scheduled' ? (
+          <div className="campaign-board single">
+            <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns} onEdit={() => setCampaignSubpage('create')} />
+          </div>
+        ) : null}
+
+        {campaignSubpage === 'past' ? (
+          <div className="campaign-board single">
+            <CampaignColumn title="Past" campaigns={pastCampaigns} onEdit={() => setCampaignSubpage('create')} />
+          </div>
+        ) : null}
+
         {campaignSubpage === 'create' ? (
           <>
             <form className="form-grid" onSubmit={createCampaign}>
@@ -522,16 +692,14 @@ export function CompanyWorkspace({
             ) : null}
             {error ? <p className="error">{error}</p> : null}
           </>
-        ) : (
+        ) : null}
+
+        {campaignSubpage === 'followups' ? (
           <>
-            <div className="campaign-board">
-              <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns} onEdit={() => setCampaignSubpage('create')} />
-              <CampaignColumn title="Past" campaigns={pastCampaigns} onEdit={() => setCampaignSubpage('create')} />
-            </div>
             <form className="form-grid follow-up-panel" onSubmit={createReminder}>
               <div className="section-heading wide">
                 <span>Follow-up</span>
-                <strong>Reminder from recent campaign</strong>
+                <strong>Reminder automation</strong>
               </div>
               <label>
                 Follow-up source campaign
@@ -558,7 +726,8 @@ export function CompanyWorkspace({
                 Follow-up copy
                 <textarea value={reminderMessageBody ?? ''} onChange={(event) => setReminderMessageBody(event.target.value)} />
               </label>
-              <button>Create follow-up reminder</button>
+              <button disabled={!reminderSourceCampaignId}>Create follow-up reminder</button>
+              {!reminderSourceCampaignId ? <p className="helper-text wide">Choose a source campaign before creating a follow-up.</p> : null}
             </form>
             {reminderCampaign ? (
               <div className="result-strip">
@@ -567,8 +736,36 @@ export function CompanyWorkspace({
                 <span>Estimated recipients: {reminderCampaign.estimated_recipient_count}</span>
               </div>
             ) : null}
+            <section className="panel table-panel">
+              <div className="section-heading">
+                <span>Automations</span>
+                <strong>Existing follow-ups</strong>
+              </div>
+              <DataTable
+                ariaLabel="Follow-up reminders"
+                rows={reminderCampaigns}
+                getRowKey={(row) => row.id ?? `${row.source_campaign_id}-${row.audience_rule}`}
+                empty={
+                  <EmptyState
+                    title="No follow-ups yet"
+                    description="Create a reminder automation from a recent campaign engagement rule."
+                  />
+                }
+                columns={[
+                  { key: 'source', header: 'Source campaign', render: (row) => row.source_campaign_id ?? 'Unknown' },
+                  { key: 'rule', header: 'Audience rule', render: (row) => row.audience_rule ?? 'Unknown' },
+                  { key: 'copy', header: 'Copy', render: (row) => row.message_body ?? 'No copy' },
+                  { key: 'status', header: 'Status', render: (row) => row.status ?? 'draft' },
+                  {
+                    key: 'estimate',
+                    header: 'Estimated recipients',
+                    render: (row) => formatNumber(row.estimated_recipient_count),
+                  },
+                ]}
+              />
+            </section>
           </>
-        )}
+        ) : null}
       </>
     )
   }
@@ -576,8 +773,64 @@ export function CompanyWorkspace({
   if (page === 'subscribers') {
     return (
       <>
-        <PageHeader title="Subscribers" description="Manage lists, local imports, and double opt-in confirmation." />
-        <div className="split-layout">
+        <PageHeader
+          title="Subscribers"
+          description="Manage audience lists, regional segments, consent status, and CSV imports."
+        />
+        <div className="metric-grid spaced">
+          <button
+            className={`segment-card ${selectedSubscriberListId === 'all' ? 'active' : ''}`}
+            onClick={() => setSelectedSubscriberListId('all')}
+          >
+            <span>All subscribers</span>
+            <strong>{formatNumber(subscribers.length)}</strong>
+            <small>Across all visible lists</small>
+          </button>
+          {subscriberLists.map((list) => (
+            <button
+              className={`segment-card ${selectedSubscriberListId === list.id ? 'active' : ''}`}
+              key={list.id}
+              onClick={() => setSelectedSubscriberListId(list.id)}
+            >
+              <span>{list.name}</span>
+              <strong>{formatNumber(list.subscriber_count)}</strong>
+              <small>List segment</small>
+            </button>
+          ))}
+        </div>
+
+        <section className="panel table-panel">
+          <div className="section-heading">
+            <span>Directory</span>
+            <strong>{selectedSubscriberList?.name ?? 'All subscribers'}</strong>
+          </div>
+          <DataTable
+            ariaLabel="Subscriber directory"
+            rows={visibleSubscribers}
+            getRowKey={(row) => row.id}
+            empty={
+              <EmptyState
+                title="No subscribers in this segment"
+                description="Import a CSV or choose another list to review subscriber consent."
+              />
+            }
+            columns={[
+              { key: 'phone', header: 'Phone number', render: (row) => row.phone_number },
+              {
+                key: 'source',
+                header: 'Source / region / list',
+                render: (row) =>
+                  [row.source, row.region, row.list_id ? subscriberListNameById.get(row.list_id) : null]
+                    .filter(Boolean)
+                    .join(' / ') || 'Unknown',
+              },
+              { key: 'status', header: 'Consent / status', render: (row) => `${row.consent_status ?? 'unknown'} / ${row.marketing_status ?? 'unknown'}` },
+              { key: 'created', header: 'Created/imported', render: (row) => row.created_at ?? 'Recently imported' },
+            ]}
+          />
+        </section>
+
+        <div className="split-layout two-column">
           <form className="panel" onSubmit={createSubscriberList}>
             <div className="section-heading">
               <span>Lists</span>
@@ -590,9 +843,29 @@ export function CompanyWorkspace({
             <button>Create list</button>
             {subscriberList ? <p className="muted">List id: {subscriberList.id}</p> : null}
           </form>
-          <form className="panel" onSubmit={importSubscriber}>
+          <form className="panel" onSubmit={importCsvSubscribers}>
             <div className="section-heading">
               <span>Import</span>
+              <strong>CSV subscribers</strong>
+            </div>
+            <p className="helper-text">Required: phone_number. Optional: list_name, region, source.</p>
+            <label>
+              Upload CSV file
+              <input type="file" accept=".csv,text/csv" onChange={(event) => stageSubscriberCsv(event.target.files?.[0])} />
+            </label>
+            <label className="wide">
+              Paste CSV subscribers
+              <textarea value={csvImportText ?? ''} onChange={(event) => setCsvImportText(event.target.value)} />
+            </label>
+            <button>Import CSV</button>
+            {csvImportResult ? <p className="muted">{csvImportResult}</p> : null}
+          </form>
+        </div>
+
+        <div className="split-layout two-column">
+          <form className="panel" onSubmit={importSubscriber}>
+            <div className="section-heading">
+              <span>Single add</span>
               <strong>Company provided</strong>
             </div>
             <label>
@@ -644,6 +917,26 @@ export function CompanyWorkspace({
           title="Content Library"
           description="Store media, offer destinations, and tracked assets for Smart SMS campaigns."
         />
+        <section className="panel">
+          <div className="section-heading">
+            <span>Templates</span>
+            <strong>Marketing content starters</strong>
+          </div>
+          <div className="template-grid">
+            {contentTemplates.map((template) => (
+              <article className="template-card" key={template.title}>
+                <div className="template-preview">
+                  <span>{template.tag}</span>
+                  <strong>{template.preview}</strong>
+                </div>
+                <div>
+                  <strong>{template.title}</strong>
+                  <p>{template.copy}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
         <div className="split-layout two-column">
           <form className="panel" onSubmit={addMediaAsset}>
             <div className="section-heading">
@@ -684,7 +977,13 @@ export function CompanyWorkspace({
               <ul className="asset-grid embedded-list">
                 {mediaAssets.map((asset) => (
                   <li key={asset.id}>
-                    <div className="asset-thumb">{asset.content_type?.startsWith('image/') ? 'IMG' : 'FILE'}</div>
+                    <div className="asset-thumb">
+                      {asset.content_type?.startsWith('image/') && asset.url ? (
+                        <img src={asset.url} alt={`${asset.filename} preview`} loading="lazy" />
+                      ) : (
+                        <span>FILE</span>
+                      )}
+                    </div>
                     <strong>{asset.filename}</strong>
                     <span>{asset.content_type}</span>
                     <span>{asset.url}</span>
