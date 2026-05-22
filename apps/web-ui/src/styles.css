@@ -176,6 +176,51 @@ h2 { margin: 0 0 8px; }
   margin-top: 18px;
 }
 
+.engagement-grid {
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.inline-action {
+  margin-left: 10px;
+}
+
+.engagement-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(3, auto);
+  gap: 12px;
+  align-items: end;
+}
+
+.engagement-actions label {
+  margin-bottom: 0;
+}
+
+.compact-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.compact-list li {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.48);
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+
+.compact-list span {
+  display: block;
+  color: #93c5fd;
+}
+
+.engagement-stats {
+  margin-top: 18px;
+}
+
 .stat, .check {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 18px;
@@ -193,4 +238,6 @@ h2 { margin: 0 0 8px; }
   .hero, .grid, .three-column { grid-template-columns: 1fr; }
   .hero { align-items: flex-start; flex-direction: column; }
   .membership-list li { align-items: flex-start; flex-direction: column; }
+  .engagement-actions { grid-template-columns: 1fr; }
+  .inline-action { margin-left: 0; margin-top: 10px; }
 }

@@ -383,3 +383,220 @@ async def confirm_double_opt_in(pool: asyncpg.Pool, *, token: str) -> dict[str, 
         "phone_number": subscriber["phone_number"],
         "status": "confirmed",
     }
+
+
+async def create_media_asset(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    filename: str,
+    content_type: str,
+    url: str,
+) -> dict[str, Any]:
+    asset_id = str(uuid4())
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            INSERT INTO media_assets (id, company_id, filename, content_type, url)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, company_id, filename, content_type, url, created_at
+            """,
+            asset_id,
+            company_id,
+            filename,
+            content_type,
+            url,
+        )
+    return dict(row)
+
+
+async def list_media_assets(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT id, company_id, filename, content_type, url, created_at
+            FROM media_assets
+            WHERE company_id = $1
+            ORDER BY created_at DESC
+            """,
+            company_id,
+        )
+    return [dict(row) for row in rows]
+
+
+async def create_campaign_link(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    campaign_id: str,
+    subscriber_id: str | None,
+    media_asset_id: str | None,
+    destination_url: str | None,
+) -> dict[str, Any]:
+    link_id = str(uuid4())
+    token = uuid4().hex
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            INSERT INTO campaign_links (
+                id,
+                token,
+                company_id,
+                campaign_id,
+                subscriber_id,
+                media_asset_id,
+                destination_url
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING
+                id,
+                token,
+                company_id,
+                campaign_id,
+                subscriber_id,
+                media_asset_id,
+                destination_url,
+                click_count,
+                redeemed_count,
+                created_at
+            """,
+            link_id,
+            token,
+            company_id,
+            campaign_id,
+            subscriber_id,
+            media_asset_id,
+            destination_url,
+        )
+    return _link_with_public_url(dict(row))
+
+
+async def list_campaign_links(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT
+                id,
+                token,
+                company_id,
+                campaign_id,
+                subscriber_id,
+                media_asset_id,
+                destination_url,
+                click_count,
+                redeemed_count,
+                created_at
+            FROM campaign_links
+            WHERE company_id = $1
+            ORDER BY created_at DESC
+            """,
+            company_id,
+        )
+    return [_link_with_public_url(dict(row)) for row in rows]
+
+
+async def register_click(
+    pool: asyncpg.Pool,
+    *,
+    token: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> dict[str, Any] | None:
+    event_id = str(uuid4())
+    async with pool.acquire() as connection, connection.transaction():
+        link = await connection.fetchrow(
+            """
+            UPDATE campaign_links
+            SET click_count = click_count + 1
+            WHERE token = $1
+            RETURNING
+                id,
+                token,
+                destination_url,
+                click_count,
+                media_asset_id
+            """,
+            token,
+        )
+        if link is None:
+            return None
+        await connection.execute(
+            """
+            INSERT INTO click_events (id, campaign_link_id, ip_address, user_agent)
+            VALUES ($1, $2, $3, $4)
+            """,
+            event_id,
+            link["id"],
+            ip_address,
+            user_agent,
+        )
+        media_asset = None
+        if link["media_asset_id"]:
+            media_asset_row = await connection.fetchrow(
+                """
+                SELECT id, company_id, filename, content_type, url, created_at
+                FROM media_assets
+                WHERE id = $1
+                """,
+                link["media_asset_id"],
+            )
+            if media_asset_row is not None:
+                media_asset = dict(media_asset_row)
+    return {
+        "token": link["token"],
+        "destination_url": link["destination_url"],
+        "click_count": link["click_count"],
+        "media_asset": media_asset,
+    }
+
+
+async def redeem_link(pool: asyncpg.Pool, *, token: str) -> dict[str, Any] | None:
+    event_id = str(uuid4())
+    async with pool.acquire() as connection, connection.transaction():
+        link = await connection.fetchrow(
+            """
+            UPDATE campaign_links
+            SET redeemed_count = redeemed_count + 1
+            WHERE token = $1
+            RETURNING id, token, redeemed_count
+            """,
+            token,
+        )
+        if link is None:
+            return None
+        await connection.execute(
+            """
+            INSERT INTO redemption_events (id, campaign_link_id)
+            VALUES ($1, $2)
+            """,
+            event_id,
+            link["id"],
+        )
+    return {"token": link["token"], "status": "redeemed", "redeemed_count": link["redeemed_count"]}
+
+
+async def get_campaign_performance(pool: asyncpg.Pool, *, company_id: str) -> dict[str, int]:
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            SELECT
+                (SELECT COUNT(*)::int FROM media_assets WHERE company_id = $1) AS media_asset_count,
+                (
+                    SELECT COUNT(*)::int FROM campaign_links WHERE company_id = $1
+                ) AS tracked_link_count,
+                COALESCE(
+                    (SELECT SUM(click_count)::int FROM campaign_links WHERE company_id = $1),
+                    0
+                ) AS click_count,
+                COALESCE(
+                    (SELECT SUM(redeemed_count)::int FROM campaign_links WHERE company_id = $1),
+                    0
+                ) AS redemption_count
+            """,
+            company_id,
+        )
+    return dict(row)
+
+
+def _link_with_public_url(row: dict[str, Any]) -> dict[str, Any]:
+    return {**row, "public_url": f"/r/{row['token']}"}

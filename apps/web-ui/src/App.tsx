@@ -56,6 +56,47 @@ type OptInResult = {
   status?: string
 }
 
+type MediaAsset = {
+  id?: string
+  company_id?: string
+  filename?: string
+  content_type?: string
+  url?: string
+}
+
+type CampaignLink = {
+  id?: string
+  token?: string
+  public_url?: string
+  company_id?: string
+  campaign_id?: string
+  subscriber_id?: string
+  media_asset_id?: string
+  destination_url?: string
+  click_count?: number
+  redeemed_count?: number
+}
+
+type LandingPayload = {
+  token?: string
+  destination_url?: string
+  click_count?: number
+  media_asset?: MediaAsset
+}
+
+type RedemptionResult = {
+  token?: string
+  status?: string
+  redeemed_count?: number
+}
+
+type PerformanceTotals = {
+  media_asset_count: number
+  tracked_link_count: number
+  click_count: number
+  redemption_count: number
+}
+
 type SystemCheck = {
   path: string
   label: string
@@ -92,6 +133,21 @@ export default function App() {
   const [optIn, setOptIn] = useState<OptInResult | null>(null)
   const [confirmToken, setConfirmToken] = useState('')
   const [confirmResult, setConfirmResult] = useState<OptInResult | null>(null)
+  const [mediaFilename, setMediaFilename] = useState('coupon.png')
+  const [mediaContentType, setMediaContentType] = useState('image/png')
+  const [mediaUrl, setMediaUrl] = useState('https://cdn.example/coupon.png')
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
+  const [mediaAsset, setMediaAsset] = useState<MediaAsset | null>(null)
+  const [trackedCampaignId, setTrackedCampaignId] = useState('')
+  const [trackedSubscriberId, setTrackedSubscriberId] = useState('')
+  const [trackedMediaAssetId, setTrackedMediaAssetId] = useState('')
+  const [destinationUrl, setDestinationUrl] = useState('https://example.com/spring')
+  const [campaignLinks, setCampaignLinks] = useState<CampaignLink[]>([])
+  const [campaignLink, setCampaignLink] = useState<CampaignLink | null>(null)
+  const [trackedToken, setTrackedToken] = useState('')
+  const [landingPayload, setLandingPayload] = useState<LandingPayload | null>(null)
+  const [redemption, setRedemption] = useState<RedemptionResult | null>(null)
+  const [performance, setPerformance] = useState<PerformanceTotals | null>(null)
   const [campaignName, setCampaignName] = useState('Portfolio demo campaign')
   const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
   const [recipients, setRecipients] = useState(DEMO_RECIPIENTS.join('\n'))
@@ -211,7 +267,9 @@ export default function App() {
       })
 
       if (!response.ok) throw new Error(`Import subscriber failed: ${response.status}`)
-      setSubscriber(await response.json())
+      const result = (await response.json()) as SubscriberResult
+      setSubscriber(result)
+      if (result.id) setTrackedSubscriberId(result.id)
     } catch (err) {
       setScopeError(err instanceof Error ? err.message : 'unknown error')
     }
@@ -256,6 +314,128 @@ export default function App() {
     }
   }
 
+  function activeCompanyOrThrow(action: string): string {
+    const companyId = activeCompanyId.trim()
+    if (!companyId) throw new Error(`Select an active company before ${action}`)
+    return companyId
+  }
+
+  async function addMediaAsset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('adding media')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: mediaFilename, content_type: mediaContentType, url: mediaUrl }),
+      })
+
+      if (!response.ok) throw new Error(`Add media asset failed: ${response.status}`)
+      const result = (await response.json()) as MediaAsset
+      setMediaAsset(result)
+      setMediaAssets((current) => [result, ...current.filter((asset) => asset.id !== result.id)])
+      if (result.id) setTrackedMediaAssetId(result.id)
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function refreshMediaAssets() {
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('loading media')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`)
+      if (!response.ok) throw new Error(`Media asset list failed: ${response.status}`)
+      setMediaAssets(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function createTrackedLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('creating a tracked link')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign_id: trackedCampaignId,
+          subscriber_id: trackedSubscriberId,
+          media_asset_id: trackedMediaAssetId,
+          destination_url: destinationUrl,
+        }),
+      })
+
+      if (!response.ok) throw new Error(`Create tracked link failed: ${response.status}`)
+      const result = (await response.json()) as CampaignLink
+      setCampaignLink(result)
+      setCampaignLinks((current) => [result, ...current.filter((link) => link.id !== result.id)])
+      if (result.token) setTrackedToken(result.token)
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function refreshCampaignLinks() {
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('loading tracked links')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-links`)
+      if (!response.ok) throw new Error(`Tracked link list failed: ${response.status}`)
+      setCampaignLinks(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function openTrackedLink() {
+    setScopeError(null)
+
+    try {
+      const token = trackedToken.trim()
+      if (!token) throw new Error('Enter a tracked token before opening it')
+      const response = await fetch(`${API_BASE_URL}/r/${token}`)
+      if (!response.ok) throw new Error(`Open tracked link failed: ${response.status}`)
+      setLandingPayload(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function redeemTrackedLink() {
+    setScopeError(null)
+
+    try {
+      const token = trackedToken.trim()
+      if (!token) throw new Error('Enter a tracked token before redeeming it')
+      const response = await fetch(`${API_BASE_URL}/r/${token}/redeem`, { method: 'POST' })
+      if (!response.ok) throw new Error(`Redeem tracked link failed: ${response.status}`)
+      setRedemption(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
+  async function refreshPerformance() {
+    setScopeError(null)
+
+    try {
+      const companyId = activeCompanyOrThrow('loading performance')
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-performance`)
+      if (!response.ok) throw new Error(`Campaign performance failed: ${response.status}`)
+      setPerformance(await response.json())
+    } catch (err) {
+      setScopeError(err instanceof Error ? err.message : 'unknown error')
+    }
+  }
+
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
@@ -277,7 +457,9 @@ export default function App() {
       })
 
       if (!response.ok) throw new Error(`Create campaign failed: ${response.status}`)
-      setCampaign(await response.json())
+      const result = (await response.json()) as Campaign
+      setCampaign(result)
+      setTrackedCampaignId(result.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'unknown error')
     } finally {
@@ -465,6 +647,132 @@ export default function App() {
             </div>
           ) : null}
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <span>Media & engagement</span>
+          <strong>{performance ? `${performance.click_count} clicks` : 'Tracked links'}</strong>
+        </div>
+        <div className="grid engagement-grid">
+          <form onSubmit={addMediaAsset}>
+            <label>
+              Media filename
+              <input value={mediaFilename} onChange={(event) => setMediaFilename(event.target.value)} />
+            </label>
+            <label>
+              Media content type
+              <input value={mediaContentType} onChange={(event) => setMediaContentType(event.target.value)} />
+            </label>
+            <label>
+              Media url
+              <input value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} />
+            </label>
+            <button>Add media asset</button>
+            <button className="secondary inline-action" type="button" onClick={() => void refreshMediaAssets()}>
+              Refresh media assets
+            </button>
+            {mediaAsset ? (
+              <div className="result-block">
+                <span>Media id: {mediaAsset.id}</span>
+                <span>{mediaAsset.filename}</span>
+                <span>{mediaAsset.url}</span>
+              </div>
+            ) : null}
+            {mediaAssets.length ? (
+              <ul className="compact-list">
+                {mediaAssets.map((asset) => (
+                  <li key={asset.id ?? asset.url}>
+                    <strong>{asset.filename}</strong>
+                    <span>{asset.id}</span>
+                    <span>{asset.url}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </form>
+
+          <form onSubmit={createTrackedLink}>
+            <label>
+              Tracked campaign id
+              <input value={trackedCampaignId} onChange={(event) => setTrackedCampaignId(event.target.value)} />
+            </label>
+            <label>
+              Tracked subscriber id
+              <input value={trackedSubscriberId} onChange={(event) => setTrackedSubscriberId(event.target.value)} />
+            </label>
+            <label>
+              Tracked media asset id
+              <input value={trackedMediaAssetId} onChange={(event) => setTrackedMediaAssetId(event.target.value)} />
+            </label>
+            <label>
+              Destination url
+              <input value={destinationUrl} onChange={(event) => setDestinationUrl(event.target.value)} />
+            </label>
+            <button>Create tracked link</button>
+            <button className="secondary inline-action" type="button" onClick={() => void refreshCampaignLinks()}>
+              Refresh tracked links
+            </button>
+            {campaignLink ? (
+              <div className="result-block">
+                <span>Token: {campaignLink.token}</span>
+                <span>{campaignLink.public_url}</span>
+              </div>
+            ) : null}
+            {campaignLinks.length ? (
+              <ul className="compact-list">
+                {campaignLinks.map((link) => (
+                  <li key={link.id ?? link.token}>
+                    <strong>{link.token}</strong>
+                    <span>{link.destination_url}</span>
+                    <span>Clicks: {link.click_count ?? 0}</span>
+                    <span>Redeemed: {link.redeemed_count ?? 0}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </form>
+        </div>
+
+        <div className="engagement-actions">
+          <label>
+            Tracked token
+            <input value={trackedToken} onChange={(event) => setTrackedToken(event.target.value)} />
+          </label>
+          <button className="secondary" type="button" onClick={() => void openTrackedLink()}>
+            Open tracked link
+          </button>
+          <button className="secondary" type="button" onClick={() => void redeemTrackedLink()}>
+            Redeem tracked link
+          </button>
+          <button className="secondary" type="button" onClick={() => void refreshPerformance()}>
+            Refresh performance
+          </button>
+        </div>
+
+        {landingPayload ? (
+          <div className="result-block">
+            <span>Landing token: {landingPayload.token}</span>
+            <span>{landingPayload.destination_url}</span>
+            <span>Click count: {landingPayload.click_count ?? 0}</span>
+            {landingPayload.media_asset?.filename ? <span>{landingPayload.media_asset.filename}</span> : null}
+          </div>
+        ) : null}
+        {redemption ? (
+          <div className="result-block">
+            <span>Redeem token: {redemption.token}</span>
+            <span>Status: {redemption.status}</span>
+            <span>Redeemed count: {redemption.redeemed_count ?? 0}</span>
+          </div>
+        ) : null}
+        {performance ? (
+          <div className="stats engagement-stats">
+            <Stat label="Media assets" value={performance.media_asset_count} />
+            <Stat label="Tracked links" value={performance.tracked_link_count} />
+            <Stat label="Clicks" value={performance.click_count} />
+            <Stat label="Redemptions" value={performance.redemption_count} />
+          </div>
+        ) : null}
       </section>
 
       <section className="grid">

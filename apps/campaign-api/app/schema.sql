@@ -134,9 +134,50 @@ CREATE TABLE IF NOT EXISTS double_opt_in_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS media_assets (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    url TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS campaign_links (
+    id TEXT PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    subscriber_id TEXT REFERENCES subscribers(id) ON DELETE SET NULL,
+    media_asset_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL,
+    destination_url TEXT,
+    click_count INTEGER NOT NULL DEFAULT 0,
+    redeemed_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS click_events (
+    id TEXT PRIMARY KEY,
+    campaign_link_id TEXT NOT NULL REFERENCES campaign_links(id) ON DELETE CASCADE,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS redemption_events (
+    id TEXT PRIMARY KEY,
+    campaign_link_id TEXT NOT NULL REFERENCES campaign_links(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_subscribers_company_phone ON subscribers(company_id, phone_number);
 CREATE INDEX IF NOT EXISTS idx_consent_events_subscriber_created ON consent_events(subscriber_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_double_opt_in_tokens_subscriber ON double_opt_in_tokens(subscriber_id);
+CREATE INDEX IF NOT EXISTS idx_media_assets_company_id ON media_assets(company_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_links_company_id ON campaign_links(company_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_links_campaign_id ON campaign_links(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_click_events_link_created ON click_events(campaign_link_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_redemption_events_link_created ON redemption_events(campaign_link_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_company_id ON campaigns(company_id);
 CREATE INDEX IF NOT EXISTS idx_messages_company_id ON messages(company_id);

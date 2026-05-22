@@ -131,6 +131,62 @@ class DoubleOptInConfirmResponse(BaseModel):
     status: str
 
 
+class MediaAssetCreateRequest(BaseModel):
+    filename: str = Field(min_length=1)
+    content_type: str = Field(min_length=1)
+    url: str = Field(min_length=1)
+
+
+class MediaAssetResponse(BaseModel):
+    id: str
+    company_id: str | None = None
+    filename: str
+    content_type: str
+    url: str
+    created_at: Any | None = None
+
+
+class CampaignLinkCreateRequest(BaseModel):
+    campaign_id: str = Field(min_length=1)
+    subscriber_id: str | None = None
+    media_asset_id: str | None = None
+    destination_url: str | None = None
+
+
+class CampaignLinkResponse(BaseModel):
+    id: str
+    token: str
+    company_id: str
+    campaign_id: str
+    subscriber_id: str | None = None
+    media_asset_id: str | None = None
+    destination_url: str | None = None
+    public_url: str
+    click_count: int
+    redeemed_count: int
+    created_at: Any | None = None
+
+
+class LandingPayloadResponse(BaseModel):
+    token: str
+    destination_url: str | None = None
+    click_count: int
+    media_asset: MediaAssetResponse | None = None
+
+
+class RedemptionResponse(BaseModel):
+    token: str
+    status: str
+    redeemed_count: int
+
+
+class CampaignPerformanceResponse(BaseModel):
+    media_asset_count: int
+    tracked_link_count: int
+    click_count: int
+    redemption_count: int
+
+
 class CampaignRepository(Protocol):
     async def create_campaign_with_messages(
         self,
@@ -175,6 +231,41 @@ class CampaignRepository(Protocol):
     ) -> dict[str, Any]: ...
 
     async def confirm_double_opt_in(self, *, token: str) -> dict[str, Any] | None: ...
+
+    async def create_media_asset(
+        self,
+        *,
+        company_id: str,
+        filename: str,
+        content_type: str,
+        url: str,
+    ) -> dict[str, Any]: ...
+
+    async def list_media_assets(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
+    async def create_campaign_link(
+        self,
+        *,
+        company_id: str,
+        campaign_id: str,
+        subscriber_id: str | None,
+        media_asset_id: str | None,
+        destination_url: str | None,
+    ) -> dict[str, Any]: ...
+
+    async def list_campaign_links(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
+    async def register_click(
+        self,
+        *,
+        token: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> dict[str, Any] | None: ...
+
+    async def redeem_link(self, *, token: str) -> dict[str, Any] | None: ...
+
+    async def get_campaign_performance(self, *, company_id: str) -> dict[str, int]: ...
 
 
 class MessagePublisher(Protocol):
@@ -317,6 +408,66 @@ class AsyncpgCampaignRepository:
 
     async def confirm_double_opt_in(self, *, token: str) -> dict[str, Any] | None:
         return await db.confirm_double_opt_in(self._pool, token=token)
+
+    async def create_media_asset(
+        self,
+        *,
+        company_id: str,
+        filename: str,
+        content_type: str,
+        url: str,
+    ) -> dict[str, Any]:
+        return await db.create_media_asset(
+            self._pool,
+            company_id=company_id,
+            filename=filename,
+            content_type=content_type,
+            url=url,
+        )
+
+    async def list_media_assets(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_media_assets(self._pool, company_id=company_id)
+
+    async def create_campaign_link(
+        self,
+        *,
+        company_id: str,
+        campaign_id: str,
+        subscriber_id: str | None,
+        media_asset_id: str | None,
+        destination_url: str | None,
+    ) -> dict[str, Any]:
+        return await db.create_campaign_link(
+            self._pool,
+            company_id=company_id,
+            campaign_id=campaign_id,
+            subscriber_id=subscriber_id,
+            media_asset_id=media_asset_id,
+            destination_url=destination_url,
+        )
+
+    async def list_campaign_links(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_campaign_links(self._pool, company_id=company_id)
+
+    async def register_click(
+        self,
+        *,
+        token: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> dict[str, Any] | None:
+        return await db.register_click(
+            self._pool,
+            token=token,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+    async def redeem_link(self, *, token: str) -> dict[str, Any] | None:
+        return await db.redeem_link(self._pool, token=token)
+
+    async def get_campaign_performance(self, *, company_id: str) -> dict[str, int]:
+        return await db.get_campaign_performance(self._pool, company_id=company_id)
 
 
 @asynccontextmanager
@@ -482,8 +633,98 @@ async def confirm_double_opt_in(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="confirmation token not found",
-        )
+    )
     return result
+
+
+@app.post(
+    "/companies/{company_id}/media-assets",
+    response_model=MediaAssetResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_media_asset(
+    company_id: str,
+    request: MediaAssetCreateRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.create_media_asset(
+        company_id=company_id,
+        filename=request.filename,
+        content_type=request.content_type,
+        url=request.url,
+    )
+
+
+@app.get("/companies/{company_id}/media-assets", response_model=list[MediaAssetResponse])
+async def list_media_assets(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_media_assets(company_id=company_id)
+
+
+@app.post(
+    "/companies/{company_id}/campaign-links",
+    response_model=CampaignLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_campaign_link(
+    company_id: str,
+    request: CampaignLinkCreateRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.create_campaign_link(
+        company_id=company_id,
+        campaign_id=request.campaign_id,
+        subscriber_id=request.subscriber_id,
+        media_asset_id=request.media_asset_id,
+        destination_url=request.destination_url,
+    )
+
+
+@app.get("/companies/{company_id}/campaign-links", response_model=list[CampaignLinkResponse])
+async def list_campaign_links(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_campaign_links(company_id=company_id)
+
+
+@app.get("/r/{token}", response_model=LandingPayloadResponse)
+async def open_campaign_link(
+    token: str,
+    http_request: Request,
+    user_agent: str | None = Header(None, alias="User-Agent"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    client_host = http_request.client.host if http_request.client else None
+    result = await repository.register_click(
+        token=token,
+        ip_address=client_host,
+        user_agent=user_agent,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="campaign link not found")
+    return result
+
+
+@app.post("/r/{token}/redeem", response_model=RedemptionResponse)
+async def redeem_campaign_link(
+    token: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.redeem_link(token=token)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="campaign link not found")
+    return result
+
+
+@app.get("/companies/{company_id}/campaign-performance", response_model=CampaignPerformanceResponse)
+async def get_campaign_performance(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, int]:
+    return await repository.get_campaign_performance(company_id=company_id)
 
 
 @app.get("/campaigns/{campaign_id}", response_model=CampaignStatusResponse)

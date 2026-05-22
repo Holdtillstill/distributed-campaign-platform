@@ -94,6 +94,87 @@ function mockFetch() {
       })
     }
 
+    if (url.endsWith('/companies/company-2/media-assets') && method === 'POST') {
+      return okJson({
+        id: 'media-1',
+        company_id: 'company-2',
+        filename: 'coupon.png',
+        content_type: 'image/png',
+        url: 'https://cdn.example/coupon.png',
+      })
+    }
+
+    if (url.endsWith('/companies/company-2/media-assets')) {
+      return okJson([
+        {
+          id: 'media-1',
+          company_id: 'company-2',
+          filename: 'coupon.png',
+          content_type: 'image/png',
+          url: 'https://cdn.example/coupon.png',
+        },
+      ])
+    }
+
+    if (url.endsWith('/companies/company-2/campaign-links') && method === 'POST') {
+      return okJson({
+        id: 'link-1',
+        token: 'spring-token',
+        public_url: '/r/spring-token',
+        company_id: 'company-2',
+        campaign_id: 'campaign-1',
+        subscriber_id: 'subscriber-1',
+        media_asset_id: 'media-1',
+        destination_url: 'https://example.com/spring',
+        click_count: 0,
+        redeemed_count: 0,
+      })
+    }
+
+    if (url.endsWith('/companies/company-2/campaign-links')) {
+      return okJson([
+        {
+          id: 'link-1',
+          token: 'spring-token',
+          public_url: '/r/spring-token',
+          company_id: 'company-2',
+          campaign_id: 'campaign-1',
+          subscriber_id: 'subscriber-1',
+          media_asset_id: 'media-1',
+          destination_url: 'https://example.com/spring',
+          click_count: 1,
+          redeemed_count: 1,
+        },
+      ])
+    }
+
+    if (url.endsWith('/r/spring-token') && method === 'GET') {
+      return okJson({
+        token: 'spring-token',
+        destination_url: 'https://example.com/spring',
+        click_count: 1,
+        media_asset: {
+          id: 'media-1',
+          filename: 'coupon.png',
+          content_type: 'image/png',
+          url: 'https://cdn.example/coupon.png',
+        },
+      })
+    }
+
+    if (url.endsWith('/r/spring-token/redeem') && method === 'POST') {
+      return okJson({ token: 'spring-token', status: 'redeemed', redeemed_count: 1 })
+    }
+
+    if (url.endsWith('/companies/company-2/campaign-performance')) {
+      return okJson({
+        media_asset_count: 1,
+        tracked_link_count: 1,
+        click_count: 1,
+        redemption_count: 1,
+      })
+    }
+
     return Promise.reject(new Error(`Unexpected request: ${method} ${url}`))
   })
 
@@ -273,5 +354,79 @@ describe('App', () => {
         }),
       }),
     )
+  })
+
+  it('manages media assets, tracked links, click simulation, redemption, and reporting', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    render(<App />)
+
+    await user.clear(screen.getByLabelText(/active company id/i))
+    await user.type(screen.getByLabelText(/active company id/i), 'company-2')
+
+    await user.clear(screen.getByLabelText(/media filename/i))
+    await user.type(screen.getByLabelText(/media filename/i), 'coupon.png')
+    await user.clear(screen.getByLabelText(/media content type/i))
+    await user.type(screen.getByLabelText(/media content type/i), 'image/png')
+    await user.clear(screen.getByLabelText(/media url/i))
+    await user.type(screen.getByLabelText(/media url/i), 'https://cdn.example/coupon.png')
+    await user.click(screen.getByRole('button', { name: /add media asset/i }))
+    expect(await screen.findAllByText(/media-1/i)).not.toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: /refresh media assets/i }))
+    expect(await screen.findAllByText(/coupon\.png/i)).not.toHaveLength(0)
+
+    await user.clear(screen.getByLabelText(/tracked campaign id/i))
+    await user.type(screen.getByLabelText(/tracked campaign id/i), 'campaign-1')
+    await user.clear(screen.getByLabelText(/tracked subscriber id/i))
+    await user.type(screen.getByLabelText(/tracked subscriber id/i), 'subscriber-1')
+    await user.clear(screen.getByLabelText(/tracked media asset id/i))
+    await user.type(screen.getByLabelText(/tracked media asset id/i), 'media-1')
+    await user.clear(screen.getByLabelText(/destination url/i))
+    await user.type(screen.getByLabelText(/destination url/i), 'https://example.com/spring')
+    await user.click(screen.getByRole('button', { name: /create tracked link/i }))
+    expect(await screen.findAllByText(/spring-token/i)).not.toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: /refresh tracked links/i }))
+    await screen.findByText(/Clicks: 1/i)
+
+    await user.click(screen.getByRole('button', { name: /open tracked link/i }))
+    expect(await screen.findAllByText(/https:\/\/example\.com\/spring/i)).not.toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: /redeem tracked link/i }))
+    expect(await screen.findAllByText(/redeemed/i)).not.toHaveLength(0)
+
+    await user.click(screen.getByRole('button', { name: /refresh performance/i }))
+    await screen.findByText(/Media assets/)
+    expect(screen.getByText(/Tracked links/)).toBeInTheDocument()
+    expect(screen.getByText(/Redemptions/)).toBeInTheDocument()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/companies/company-2/media-assets',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          filename: 'coupon.png',
+          content_type: 'image/png',
+          url: 'https://cdn.example/coupon.png',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/companies/company-2/campaign-links',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          campaign_id: 'campaign-1',
+          subscriber_id: 'subscriber-1',
+          media_asset_id: 'media-1',
+          destination_url: 'https://example.com/spring',
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/r/spring-token')
+    expect(fetchMock).toHaveBeenCalledWith('/api/r/spring-token/redeem', expect.objectContaining({ method: 'POST' }))
+    expect(fetchMock).toHaveBeenCalledWith('/api/companies/company-2/campaign-performance')
   })
 })
