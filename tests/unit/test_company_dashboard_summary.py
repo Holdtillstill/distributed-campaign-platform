@@ -33,9 +33,11 @@ class FakeDashboardRepository:
             "company_id": "company-1",
             "company_name": "Acme Retail",
             "monthly_send_limit": 50000,
+            "credit_balance": 42000,
             "subscriber_count": 123,
             "campaign_count": 4,
             "message_count": 1000,
+            "credits_used": 8000,
             "click_count": 123,
             "redemption_count": 45,
         }
@@ -61,9 +63,11 @@ def test_company_dashboard_summary_returns_tenant_totals(campaign_module, fake_r
         "company_id": "company-1",
         "company_name": "Acme Retail",
         "monthly_send_limit": 50000,
+        "credit_balance": 42000,
         "subscriber_count": 123,
         "campaign_count": 4,
         "message_count": 1000,
+        "credits_used": 8000,
         "click_count": 123,
         "redemption_count": 45,
     }

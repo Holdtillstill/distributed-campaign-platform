@@ -11,6 +11,15 @@ import asyncpg
 
 DEFAULT_DATABASE_URL = "postgresql://campaign:campaign@localhost:5432/campaign_local"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+MESSAGE_CREDIT_COSTS = {"regular": 1, "smart": 2}
+
+
+class InsufficientCreditsError(Exception):
+    def __init__(self, detail: str, *, required_credits: int, available_credits: int) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.required_credits = required_credits
+        self.available_credits = available_credits
 
 
 def database_url_from_env() -> str:
@@ -33,18 +42,87 @@ async def create_campaign_with_messages(
     campaign_id: str,
     name: str,
     body: str,
+    message_type: str,
+    actor_email: str | None,
     messages: list[dict[str, Any]],
-) -> None:
+) -> dict[str, int]:
+    unit_cost = MESSAGE_CREDIT_COSTS[message_type]
+    credit_cost = unit_cost * len(messages)
     async with pool.acquire() as connection, connection.transaction():
+        company = await connection.fetchrow(
+            """
+            SELECT credit_balance
+            FROM companies
+            WHERE id = $1
+            FOR UPDATE
+            """,
+            company_id,
+        )
+        if company is None:
+            raise InsufficientCreditsError(
+                "company not found",
+                required_credits=credit_cost,
+                available_credits=0,
+            )
+        if company["credit_balance"] < credit_cost:
+            raise InsufficientCreditsError(
+                "company credits exhausted",
+                required_credits=credit_cost,
+                available_credits=company["credit_balance"],
+            )
+        if actor_email:
+            membership = await connection.fetchrow(
+                """
+                SELECT cm.credit_limit, cm.credits_used
+                FROM company_memberships cm
+                JOIN users u ON u.id = cm.user_id
+                WHERE cm.company_id = $1 AND u.email = $2
+                FOR UPDATE OF cm
+                """,
+                company_id,
+                actor_email,
+            )
+            if membership and membership["credit_limit"] is not None:
+                available_user_credits = membership["credit_limit"] - membership["credits_used"]
+                if available_user_credits < credit_cost:
+                    raise InsufficientCreditsError(
+                        "user budget exhausted",
+                        required_credits=credit_cost,
+                        available_credits=available_user_credits,
+                    )
+                await connection.execute(
+                    """
+                    UPDATE company_memberships
+                    SET credits_used = credits_used + $1
+                    WHERE company_id = $2
+                      AND user_id = (SELECT id FROM users WHERE email = $3)
+                    """,
+                    credit_cost,
+                    company_id,
+                    actor_email,
+                )
+        remaining_credits = await connection.fetchval(
+            """
+            UPDATE companies
+            SET credit_balance = credit_balance - $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING credit_balance
+            """,
+            credit_cost,
+            company_id,
+        )
         await connection.execute(
             """
-                INSERT INTO campaigns (id, company_id, name, body)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO campaigns (id, company_id, name, body, message_type, credit_cost)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 """,
             campaign_id,
             company_id,
             name,
             body,
+            message_type,
+            credit_cost,
         )
         await connection.executemany(
             """
@@ -72,6 +150,7 @@ async def create_campaign_with_messages(
                 for message in messages
             ],
         )
+    return {"credit_cost": credit_cost, "remaining_credits": remaining_credits}
 
 
 async def get_campaign_status(pool: asyncpg.Pool, campaign_id: str) -> dict[str, Any] | None:
@@ -124,6 +203,7 @@ async def create_company_with_admin(
     slug: str,
     admin_email: str,
     monthly_send_limit: int | None = None,
+    credit_balance: int = 0,
 ) -> dict[str, Any]:
     company_id = str(uuid4())
     user_id = str(uuid4())
@@ -131,14 +211,15 @@ async def create_company_with_admin(
     async with pool.acquire() as connection, connection.transaction():
         company = await connection.fetchrow(
             """
-            INSERT INTO companies (id, name, slug, monthly_send_limit)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, name, slug, monthly_send_limit
+            INSERT INTO companies (id, name, slug, monthly_send_limit, credit_balance)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, name, slug, monthly_send_limit, credit_balance
             """,
             company_id,
             name,
             slug,
             monthly_send_limit,
+            credit_balance,
         )
         user = await connection.fetchrow(
             """
@@ -174,6 +255,7 @@ async def create_company_with_admin(
             company_id=company["id"],
             company_slug=company["slug"],
             role_slug="customer_admin",
+            credit_limit=None,
         )
 
     return {
@@ -181,6 +263,7 @@ async def create_company_with_admin(
         "name": company["name"],
         "slug": company["slug"],
         "monthly_send_limit": company["monthly_send_limit"],
+        "credit_balance": company["credit_balance"],
         "access_code": access_code["code"],
         "admin_user": {
             "id": user["id"],
@@ -198,7 +281,9 @@ async def list_user_memberships(pool: asyncpg.Pool, *, email: str) -> list[dict[
                 c.id AS company_id,
                 c.name AS company_name,
                 c.slug AS company_slug,
-                cm.role_slug AS role
+                cm.role_slug AS role,
+                cm.credit_limit,
+                cm.credits_used
             FROM users u
             JOIN company_memberships cm ON cm.user_id = u.id
             JOIN companies c ON c.id = cm.company_id
@@ -215,6 +300,7 @@ async def create_company_access_code(
     *,
     company_id: str,
     role_slug: str = "customer_admin",
+    credit_limit: int | None = None,
 ) -> dict[str, Any] | None:
     async with pool.acquire() as connection:
         company = await connection.fetchrow(
@@ -232,6 +318,7 @@ async def create_company_access_code(
             company_id=company["id"],
             company_slug=company["slug"],
             role_slug=role_slug,
+            credit_limit=credit_limit,
         )
 
 
@@ -251,6 +338,7 @@ async def signup_with_access_code(
                 ac.code,
                 ac.company_id,
                 ac.role_slug,
+                ac.credit_limit,
                 c.name AS company_name
             FROM company_access_codes ac
             JOIN companies c ON c.id = ac.company_id
@@ -277,14 +365,16 @@ async def signup_with_access_code(
         )
         await connection.execute(
             """
-            INSERT INTO company_memberships (company_id, user_id, role_slug)
-            VALUES ($1, $2, $3)
+            INSERT INTO company_memberships (company_id, user_id, role_slug, credit_limit)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (company_id, user_id) DO UPDATE SET
-                role_slug = EXCLUDED.role_slug
+                role_slug = EXCLUDED.role_slug,
+                credit_limit = COALESCE(EXCLUDED.credit_limit, company_memberships.credit_limit)
             """,
             code_row["company_id"],
             user["id"],
             code_row["role_slug"],
+            code_row["credit_limit"],
         )
     return {
         "role": "company_user",
@@ -292,6 +382,7 @@ async def signup_with_access_code(
         "company_id": code_row["company_id"],
         "company_name": code_row["company_name"],
         "membership_role": code_row["role_slug"],
+        "credit_limit": code_row["credit_limit"],
     }
 
 
@@ -307,9 +398,14 @@ async def get_company_dashboard_summary(
                 c.id AS company_id,
                 c.name AS company_name,
                 c.monthly_send_limit,
+                c.credit_balance,
                 (SELECT COUNT(*)::int FROM subscribers WHERE company_id = c.id) AS subscriber_count,
                 (SELECT COUNT(*)::int FROM campaigns WHERE company_id = c.id) AS campaign_count,
                 (SELECT COUNT(*)::int FROM messages WHERE company_id = c.id) AS message_count,
+                COALESCE(
+                    (SELECT SUM(credit_cost)::int FROM campaigns WHERE company_id = c.id),
+                    0
+                ) AS credits_used,
                 COALESCE(
                     (SELECT SUM(click_count)::int FROM campaign_links WHERE company_id = c.id),
                     0
@@ -322,6 +418,61 @@ async def get_company_dashboard_summary(
             WHERE c.id = $1
             """,
             company_id,
+        )
+    return dict(row) if row is not None else None
+
+
+async def list_company_users(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
+            """
+            SELECT
+                u.id AS user_id,
+                u.email,
+                u.display_name,
+                cm.role_slug AS role,
+                cm.credit_limit,
+                cm.credits_used
+            FROM company_memberships cm
+            JOIN users u ON u.id = cm.user_id
+            WHERE cm.company_id = $1
+            ORDER BY u.email
+            """,
+            company_id,
+        )
+    return [dict(row) for row in rows]
+
+
+async def update_company_user(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    email: str,
+    role_slug: str,
+    credit_limit: int | None,
+) -> dict[str, Any] | None:
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            UPDATE company_memberships cm
+            SET role_slug = $3,
+                credit_limit = $4
+            FROM users u
+            WHERE cm.user_id = u.id
+              AND cm.company_id = $1
+              AND u.email = $2
+            RETURNING
+                u.id AS user_id,
+                u.email,
+                u.display_name,
+                cm.role_slug AS role,
+                cm.credit_limit,
+                cm.credits_used
+            """,
+            company_id,
+            email,
+            role_slug,
+            credit_limit,
         )
     return dict(row) if row is not None else None
 
@@ -916,6 +1067,7 @@ async def _create_company_access_code(
     company_id: str,
     company_slug: str,
     role_slug: str,
+    credit_limit: int | None,
 ) -> dict[str, Any]:
     prefix = _access_code_prefix(company_slug)
     for _ in range(5):
@@ -923,13 +1075,14 @@ async def _create_company_access_code(
         try:
             row = await connection.fetchrow(
                 """
-                INSERT INTO company_access_codes (code, company_id, role_slug)
-                VALUES ($1, $2, $3)
-                RETURNING code, company_id, role_slug AS role, created_at, revoked_at
+                INSERT INTO company_access_codes (code, company_id, role_slug, credit_limit)
+                VALUES ($1, $2, $3, $4)
+                RETURNING code, company_id, role_slug AS role, credit_limit, created_at, revoked_at
                 """,
                 code,
                 company_id,
                 role_slug,
+                credit_limit,
             )
             return dict(row)
         except asyncpg.UniqueViolationError:

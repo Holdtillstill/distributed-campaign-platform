@@ -35,6 +35,7 @@ function mockFetch() {
           name: 'Acme Retail',
           slug: 'acme-retail',
           monthly_send_limit: 50000,
+          credit_balance: 50000,
           access_code: 'ACME-1234',
           admin_user: { id: 'user-1', email: 'admin@acme.test', role: 'customer_admin' },
         },
@@ -66,6 +67,7 @@ function mockFetch() {
           company_id: 'company-1',
           company_name: 'Acme Retail',
           membership_role: 'customer_admin',
+          credit_limit: null,
         },
         201,
       )
@@ -80,6 +82,8 @@ function mockFetch() {
           company_name: 'Acme Retail',
           company_slug: 'acme-retail',
           role: 'customer_admin',
+          credit_limit: 50000,
+          credits_used: 0,
         },
       ])
     }
@@ -89,9 +93,11 @@ function mockFetch() {
         company_id: 'company-1',
         company_name: 'Acme Retail',
         monthly_send_limit: 50000,
+        credit_balance: 42000,
         subscriber_count: 123,
         campaign_count: 4,
         message_count: 1000,
+        credits_used: 8000,
         click_count: 123,
         redemption_count: 45,
       })
@@ -200,7 +206,10 @@ function mockFetch() {
           id: 'campaign-1',
           company_id: 'company-1',
           name: 'Spring Launch',
+          message_type: 'smart',
           message_count: 2,
+          credit_cost: 4,
+          remaining_credits: 41996,
           status_counts: { queued: 2, sent: 0, failed: 0, retried: 0, dead_lettered: 0 },
         },
         201,
@@ -233,6 +242,37 @@ function mockFetch() {
       ])
     }
 
+    if (url.endsWith('/companies/company-1/access-codes') && method === 'POST') {
+      return okJson(
+        { code: 'ACME-MGR1', company_id: 'company-1', role: 'campaign_manager', credit_limit: 2000 },
+        201,
+      )
+    }
+
+    if (url.endsWith('/companies/company-1/users') && method === 'GET') {
+      return okJson([
+        {
+          user_id: 'user-1',
+          email: 'owner@acme.test',
+          display_name: 'Acme Owner',
+          role: 'customer_admin',
+          credit_limit: 50000,
+          credits_used: 125,
+        },
+      ])
+    }
+
+    if (url.endsWith('/companies/company-1/users/owner%40acme.test') && method === 'PATCH') {
+      return okJson({
+        user_id: 'user-1',
+        email: 'owner@acme.test',
+        display_name: 'Acme Owner',
+        role: 'regional_manager',
+        credit_limit: 2500,
+        credits_used: 125,
+      })
+    }
+
     if (url.endsWith('/signup/access-code') && method === 'POST') {
       return notFoundJson({ detail: 'access code not found' })
     }
@@ -263,16 +303,27 @@ async function signupAsCompanyUser(user: ReturnType<typeof userEvent.setup>) {
 describe('App', () => {
   afterEach(() => {
     window.localStorage.clear()
+    window.history.pushState(null, '', '/')
     vi.unstubAllGlobals()
   })
 
-  it('shows local login and signup choices when unauthenticated', () => {
+  it('shows a customer-facing marketing site on the main URL', () => {
     mockFetch()
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /distributed campaign platform/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /login as internal admin/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /send smarter campaigns/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
+    expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
+  })
+
+  it('shows company login and signup choices from the customer app surface', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: /customer login/i }))
+
     expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /find my companies/i })).toBeInTheDocument()
   })
@@ -281,6 +332,7 @@ describe('App', () => {
     mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/internal')
     render(<App />)
     await loginAsInternalAdmin(user)
 
@@ -298,6 +350,7 @@ describe('App', () => {
     const fetchMock = mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/internal')
     render(<App />)
     await loginAsInternalAdmin(user)
     await user.click(screen.getByRole('button', { name: /companies/i }))
@@ -309,10 +362,12 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/initial admin email/i), 'admin@acme.test')
     await user.clear(screen.getByLabelText(/monthly send limit/i))
     await user.type(screen.getByLabelText(/monthly send limit/i), '50000')
+    await user.clear(screen.getByLabelText(/contract credits/i))
+    await user.type(screen.getByLabelText(/contract credits/i), '50000')
     await user.click(screen.getByRole('button', { name: /create company/i }))
 
     expect(await screen.findByText(/ACME-1234/i)).toBeInTheDocument()
-    expect(screen.getByText(/50,000/)).toBeInTheDocument()
+    expect(screen.getAllByText(/50,000/)).not.toHaveLength(0)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/admin/companies',
       expect.objectContaining({
@@ -323,6 +378,7 @@ describe('App', () => {
           slug: 'acme-retail',
           admin_email: 'admin@acme.test',
           monthly_send_limit: 50000,
+          credit_balance: 50000,
         }),
       }),
     )
@@ -332,6 +388,7 @@ describe('App', () => {
     mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
     await signupAsCompanyUser(user)
 
@@ -351,6 +408,7 @@ describe('App', () => {
     mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
     await user.clear(screen.getByLabelText(/login email/i))
     await user.type(screen.getByLabelText(/login email/i), 'owner@acme.test')
@@ -366,6 +424,7 @@ describe('App', () => {
     mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
     await user.clear(screen.getByLabelText(/login email/i))
     await user.type(screen.getByLabelText(/login email/i), 'missing@acme.test')
@@ -378,6 +437,7 @@ describe('App', () => {
     mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
     await signupAsCompanyUser(user)
 
@@ -404,6 +464,7 @@ describe('App', () => {
     const fetchMock = mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
     await signupAsCompanyUser(user)
     await user.click(screen.getByRole('button', { name: /campaigns/i }))
@@ -411,6 +472,7 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/campaign name/i), 'Spring Launch')
     await user.clear(screen.getByLabelText(/message body/i))
     await user.type(screen.getByLabelText(/message body/i), 'Launch copy')
+    await user.selectOptions(screen.getByLabelText(/message type/i), 'smart')
     await user.clear(screen.getByLabelText(/recipients/i))
     await user.type(screen.getByLabelText(/recipients/i), '+15550001012\n+15550001013')
     await user.click(screen.getByRole('button', { name: /create campaign/i }))
@@ -423,7 +485,55 @@ describe('App', () => {
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
           'X-Company-Id': 'company-1',
+          'X-User-Email': 'owner@acme.test',
         }),
+        body: JSON.stringify({
+          name: 'Spring Launch',
+          body: 'Launch copy',
+          message_type: 'smart',
+          recipients: ['+15550001012', '+15550001013'],
+        }),
+      }),
+    )
+  })
+
+  it('lets company admins create access codes and adjust team budgets', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    await user.selectOptions(screen.getByLabelText(/invite role/i), 'campaign_manager')
+    await user.clear(screen.getAllByLabelText(/user credit limit/i)[0])
+    await user.type(screen.getAllByLabelText(/user credit limit/i)[0], '2000')
+    await user.click(screen.getByRole('button', { name: /create user access code/i }))
+
+    expect(await screen.findByText(/ACME-MGR1/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /refresh team/i }))
+    expect(await screen.findAllByText(/owner@acme.test/)).not.toHaveLength(0)
+    await user.clear(screen.getByLabelText(/user email/i))
+    await user.type(screen.getByLabelText(/user email/i), 'owner@acme.test')
+    await user.selectOptions(screen.getByLabelText(/user role/i), 'regional_manager')
+    await user.clear(screen.getAllByLabelText(/user credit limit/i)[1])
+    await user.type(screen.getAllByLabelText(/user credit limit/i)[1], '2500')
+    await user.click(screen.getByRole('button', { name: /update user permissions/i }))
+
+    expect(await screen.findByText(/regional_manager/)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/companies/company-1/access-codes',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ role: 'campaign_manager', credit_limit: 2000 }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/companies/company-1/users/owner%40acme.test',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ role: 'regional_manager', credit_limit: 2500 }),
       }),
     )
   })
@@ -432,12 +542,13 @@ describe('App', () => {
     mockFetch()
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
     await signupAsCompanyUser(user)
     await waitFor(() => expect(window.localStorage.getItem(SESSION_KEY)).not.toBeNull())
     await user.click(screen.getByRole('button', { name: /logout/i }))
 
     expect(window.localStorage.getItem(SESSION_KEY)).toBeNull()
-    expect(screen.getByRole('button', { name: /login as internal admin/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /sign in to your campaign workspace/i })).toBeInTheDocument()
   })
 })

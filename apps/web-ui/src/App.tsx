@@ -20,6 +20,8 @@ type Membership = {
   company_name: string
   company_slug?: string
   role: string
+  credit_limit?: number | null
+  credits_used?: number
 }
 
 type CompanyResult = {
@@ -27,6 +29,7 @@ type CompanyResult = {
   name: string
   slug: string
   monthly_send_limit?: number | null
+  credit_balance: number
   access_code: string
   admin_user: {
     id: string
@@ -51,9 +54,11 @@ type DashboardSummary = {
   company_id: string
   company_name: string
   monthly_send_limit?: number | null
+  credit_balance: number
   subscriber_count: number
   campaign_count: number
   message_count: number
+  credits_used: number
   click_count: number
   redemption_count: number
 }
@@ -70,8 +75,27 @@ type Campaign = {
   id: string
   company_id: string
   name: string
+  message_type: 'regular' | 'smart'
   message_count: number
+  credit_cost: number
+  remaining_credits: number
   status_counts: StatusCounts
+}
+
+type CompanyUser = {
+  user_id: string
+  email: string
+  display_name?: string | null
+  role: string
+  credit_limit?: number | null
+  credits_used: number
+}
+
+type AccessCodeResult = {
+  code: string
+  company_id: string
+  role: string
+  credit_limit?: number | null
 }
 
 type SubscriberListResult = {
@@ -142,6 +166,7 @@ type SystemCheck = {
 }
 
 type AdminPage = 'dashboard' | 'companies' | 'usage'
+type Surface = 'marketing' | 'app' | 'internal'
 type CompanyPage =
   | 'dashboard'
   | 'campaigns'
@@ -197,8 +222,17 @@ function asMemberships(payload: unknown): Membership[] {
   return []
 }
 
+function surfaceFromLocation(): Surface {
+  const host = window.location.hostname.toLowerCase()
+  const path = window.location.pathname
+  if (host.startsWith('admin.') || host.startsWith('ops.') || path.startsWith('/internal')) return 'internal'
+  if (path.startsWith('/app')) return 'app'
+  return 'marketing'
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => loadStoredSession())
+  const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
   const [adminPage, setAdminPage] = useState<AdminPage>('dashboard')
   const [companyPage, setCompanyPage] = useState<CompanyPage>('dashboard')
   const [authMessage, setAuthMessage] = useState<string | null>(null)
@@ -208,6 +242,18 @@ export default function App() {
   const [signupName, setSignupName] = useState('Acme Owner')
   const [accessCode, setAccessCode] = useState('')
   const [memberships, setMemberships] = useState<Membership[]>([])
+
+  function navigate(nextSurface: Surface) {
+    const path = nextSurface === 'internal' ? '/internal' : nextSurface === 'app' ? '/app' : '/'
+    window.history.pushState(null, '', path)
+    setSurface(nextSurface)
+  }
+
+  useEffect(() => {
+    const handlePopState = () => setSurface(surfaceFromLocation())
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   function persistSession(nextSession: Session) {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession))
@@ -226,6 +272,7 @@ export default function App() {
   function loginInternalAdmin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     persistSession({ role: 'internal_admin', email: adminEmail })
+    setSurface('internal')
   }
 
   async function lookupMemberships(event: FormEvent<HTMLFormElement>) {
@@ -270,20 +317,24 @@ export default function App() {
       companyName: result.company_name,
       membershipRole: result.membership_role,
     })
+    setSurface('app')
     setCompanyPage('dashboard')
   }
 
   if (!session) {
-    return (
-      <main className="auth-screen">
-        <section className="auth-hero">
-          <p className="eyebrow">Local portfolio auth</p>
-          <h1>Distributed Campaign Platform</h1>
-          <p>Operate companies, quotas, access-code onboarding, and SMS campaign workflows from one SaaS shell.</p>
-        </section>
+    if (surface === 'marketing') {
+      return <MarketingLanding onCustomerAccess={() => navigate('app')} />
+    }
 
-        <section className="auth-grid" aria-label="Authentication choices">
-          <form className="panel" onSubmit={loginInternalAdmin}>
+    if (surface === 'internal') {
+      return (
+        <main className="auth-screen compact-auth">
+          <section className="auth-hero">
+            <p className="eyebrow">Internal operations</p>
+            <h1>Operator console</h1>
+            <p>Create contracted companies, grant credits, issue access codes, and monitor platform usage.</p>
+          </section>
+          <form className="panel auth-card" onSubmit={loginInternalAdmin}>
             <div className="section-heading">
               <span>Internal team</span>
               <strong>Admin access</strong>
@@ -294,7 +345,19 @@ export default function App() {
             </label>
             <button>Login as internal admin</button>
           </form>
+        </main>
+      )
+    }
 
+    return (
+      <main className="auth-screen">
+        <section className="auth-hero">
+          <p className="eyebrow">Customer access</p>
+          <h1>Sign in to your campaign workspace</h1>
+          <p>Use a company access code for first-time setup, or find existing company memberships by email.</p>
+        </section>
+
+        <section className="auth-grid" aria-label="Authentication choices">
           <form className="panel" onSubmit={signupWithAccessCode}>
             <div className="section-heading">
               <span>Company signup</span>
@@ -360,6 +423,10 @@ export default function App() {
     )
   }
 
+  if (session.role === 'internal_admin' && surface !== 'internal') {
+    return <MarketingLanding onCustomerAccess={() => navigate('app')} onInternalAccess={() => navigate('internal')} />
+  }
+
   return (
     <main className="app-frame">
       <header className="topbar">
@@ -405,11 +472,107 @@ export default function App() {
   )
 }
 
+function MarketingLanding({
+  onCustomerAccess,
+  onInternalAccess,
+}: {
+  onCustomerAccess: () => void
+  onInternalAccess?: () => void
+}) {
+  return (
+    <main className="marketing-site">
+      <header className="marketing-nav">
+        <strong>CampaignOS</strong>
+        <nav aria-label="Public navigation">
+          <a href="#pricing">Pricing</a>
+          <a href="#platform">Platform</a>
+          <button className="secondary" onClick={onCustomerAccess}>
+            Customer login
+          </button>
+          {onInternalAccess ? (
+            <button className="ghost" onClick={onInternalAccess}>
+              Internal
+            </button>
+          ) : null}
+        </nav>
+      </header>
+
+      <section className="marketing-hero">
+        <div>
+          <p className="eyebrow">Contract-first SMS marketing SaaS</p>
+          <h1>Send smarter campaigns without losing control of spend.</h1>
+          <p>
+            Give each brand, region, or campaign owner a clean SMS workspace with credit budgets, tracked links,
+            reminders, and reporting your finance team can actually reconcile.
+          </p>
+          <div className="hero-actions">
+            <button onClick={onCustomerAccess}>Start with access code</button>
+            <a className="docs-link secondary-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
+              API docs
+            </a>
+          </div>
+        </div>
+        <div className="product-shot" aria-label="Product summary">
+          <div className="product-shot-header">
+            <span>Acme Retail</span>
+            <strong>42,000 credits</strong>
+          </div>
+          <div className="product-metrics">
+            <Metric label="Smart messages" value="18k" />
+            <Metric label="Regional budget" value="62%" />
+            <Metric label="Reminder lift" value="+14%" />
+          </div>
+        </div>
+      </section>
+
+      <section className="marketing-band" id="platform">
+        <div>
+          <span>01</span>
+          <h2>Contracted company setup</h2>
+          <p>Internal operators create the tenant, grant prepaid or monthly credits, and issue the first admin code.</p>
+        </div>
+        <div>
+          <span>02</span>
+          <h2>Company-owned teams</h2>
+          <p>Customer admins invite users, choose roles, and allocate budgets by region or campaign owner.</p>
+        </div>
+        <div>
+          <span>03</span>
+          <h2>Credit-aware sending</h2>
+          <p>Regular SMS and smart tracked campaigns consume credits before sends leave the platform.</p>
+        </div>
+      </section>
+
+      <section className="pricing-section" id="pricing">
+        <div>
+          <p className="eyebrow">Usage model</p>
+          <h2>Simple credits for real campaign economics.</h2>
+        </div>
+        <div className="pricing-grid">
+          <div>
+            <strong>Regular SMS</strong>
+            <span>1 credit per recipient segment</span>
+          </div>
+          <div>
+            <strong>Smart SMS</strong>
+            <span>2 credits with tracking and reminder support</span>
+          </div>
+          <div>
+            <strong>Budget guardrails</strong>
+            <span>Company and user-level limits block overspend</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
 function AdminWorkspace({ page }: { page: AdminPage }) {
   const [companyName, setCompanyName] = useState('Acme Retail')
   const [companySlug, setCompanySlug] = useState('acme-retail')
   const [initialAdminEmail, setInitialAdminEmail] = useState('admin@acme.test')
   const [monthlySendLimit, setMonthlySendLimit] = useState('50000')
+  const [creditBalance, setCreditBalance] = useState('50000')
   const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null)
   const [usageFromDate, setUsageFromDate] = useState('2026-05-01')
   const [usageToDate, setUsageToDate] = useState('2026-05-21')
@@ -441,6 +604,7 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
     event.preventDefault()
     setError(null)
     const limit = monthlySendLimit.trim() ? Number(monthlySendLimit) : null
+    const credits = creditBalance.trim() ? Number(creditBalance) : 0
     const response = await fetch(`${API_BASE_URL}/admin/companies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Internal-Admin': 'true' },
@@ -449,6 +613,7 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
         slug: companySlug,
         admin_email: initialAdminEmail,
         monthly_send_limit: limit,
+        credit_balance: credits,
       }),
     })
     if (!response.ok) {
@@ -531,6 +696,10 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
               onChange={(event) => setMonthlySendLimit(event.target.value)}
             />
           </label>
+          <label>
+            Contract credits
+            <input inputMode="numeric" value={creditBalance} onChange={(event) => setCreditBalance(event.target.value)} />
+          </label>
           <button>Create company</button>
         </form>
         {companyResult ? (
@@ -538,6 +707,7 @@ function AdminWorkspace({ page }: { page: AdminPage }) {
             <strong>{companyResult.name}</strong>
             <span>{companyResult.id}</span>
             <span>Monthly limit: {formatNumber(companyResult.monthly_send_limit)}</span>
+            <span>Credits: {formatNumber(companyResult.credit_balance)}</span>
             <span>Access code: {companyResult.access_code}</span>
             <span>Admin: {companyResult.admin_user.email}</span>
           </div>
@@ -584,6 +754,7 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
   const [campaignName, setCampaignName] = useState('Spring Launch')
   const [messageBody, setMessageBody] = useState('Hello from the Kubernetes campaign platform')
+  const [messageType, setMessageType] = useState<'regular' | 'smart'>('regular')
   const [recipients, setRecipients] = useState(DEMO_RECIPIENTS.join('\n'))
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [listName, setListName] = useState('VIP List')
@@ -612,6 +783,13 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
   const [reminderMessageBody, setReminderMessageBody] = useState('Still interested?')
   const [reminderCampaigns, setReminderCampaigns] = useState<ReminderCampaign[]>([])
   const [reminderCampaign, setReminderCampaign] = useState<ReminderCampaign | null>(null)
+  const [teamUsers, setTeamUsers] = useState<CompanyUser[]>([])
+  const [inviteRole, setInviteRole] = useState('campaign_manager')
+  const [inviteCreditLimit, setInviteCreditLimit] = useState('2000')
+  const [accessCodeResult, setAccessCodeResult] = useState<AccessCodeResult | null>(null)
+  const [editUserEmail, setEditUserEmail] = useState('')
+  const [editUserRole, setEditUserRole] = useState('campaign_manager')
+  const [editCreditLimit, setEditCreditLimit] = useState('2000')
   const [error, setError] = useState<string | null>(null)
 
   const recipientList = useMemo(
@@ -636,8 +814,8 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     setError(null)
     const response = await fetch(`${API_BASE_URL}/campaigns`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Company-Id': companyId },
-      body: JSON.stringify({ name: campaignName, body: messageBody, recipients: recipientList }),
+      headers: { 'Content-Type': 'application/json', 'X-Company-Id': companyId, 'X-User-Email': session.email },
+      body: JSON.stringify({ name: campaignName, body: messageBody, message_type: messageType, recipients: recipientList }),
     })
     if (!response.ok) {
       setError(`Create campaign failed: ${response.status}`)
@@ -645,6 +823,17 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     }
     const result = (await response.json()) as Campaign
     setCampaign(result)
+    setDashboardSummary((current) =>
+      current
+        ? {
+            ...current,
+            credit_balance: result.remaining_credits,
+            credits_used: current.credits_used + result.credit_cost,
+            campaign_count: current.campaign_count + 1,
+            message_count: current.message_count + result.message_count,
+          }
+        : current,
+    )
     setTrackedCampaignId(result.id)
     setReminderSourceCampaignId(result.id)
   }
@@ -760,6 +949,43 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
     if (response.ok) setReminderCampaigns(await response.json())
   }
 
+  async function createTeamAccessCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/access-codes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: inviteRole,
+        credit_limit: inviteCreditLimit.trim() ? Number(inviteCreditLimit) : null,
+      }),
+    })
+    if (response.ok) setAccessCodeResult(await response.json())
+  }
+
+  async function refreshTeamUsers() {
+    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/users`)
+    if (response.ok) setTeamUsers(await response.json())
+  }
+
+  async function updateTeamUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/users/${encodeURIComponent(editUserEmail)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: editUserRole,
+        credit_limit: editCreditLimit.trim() ? Number(editCreditLimit) : null,
+      }),
+    })
+    if (response.ok) {
+      const updatedUser = (await response.json()) as CompanyUser
+      setTeamUsers((current) => [
+        updatedUser,
+        ...current.filter((user) => user.email.toLowerCase() !== updatedUser.email.toLowerCase()),
+      ])
+    }
+  }
+
   if (page === 'dashboard') {
     return (
       <>
@@ -768,6 +994,8 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
           <Metric label="Subscribers" value={formatNumber(dashboardSummary?.subscriber_count)} />
           <Metric label="Campaigns" value={formatNumber(dashboardSummary?.campaign_count)} />
           <Metric label="Messages" value={formatNumber(dashboardSummary?.message_count)} />
+          <Metric label="Credits remaining" value={formatNumber(dashboardSummary?.credit_balance)} />
+          <Metric label="Credits used" value={formatNumber(dashboardSummary?.credits_used)} />
           <Metric label="Clicks" value={formatNumber(dashboardSummary?.click_count)} />
           <Metric label="Redemptions" value={formatNumber(dashboardSummary?.redemption_count)} />
           <Metric label="Monthly send limit" value={formatNumber(dashboardSummary?.monthly_send_limit)} />
@@ -785,6 +1013,13 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
             Campaign name
             <input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} />
           </label>
+          <label>
+            Message type
+            <select value={messageType} onChange={(event) => setMessageType(event.target.value as 'regular' | 'smart')}>
+              <option value="regular">Regular SMS - 1 credit</option>
+              <option value="smart">Smart SMS - 2 credits</option>
+            </select>
+          </label>
           <label className="wide">
             Message body
             <textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
@@ -793,6 +1028,9 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
             Recipients
             <textarea value={recipients} onChange={(event) => setRecipients(event.target.value)} />
           </label>
+          <p className="estimate">
+            Estimated cost: {formatNumber(recipientList.length * (messageType === 'smart' ? 2 : 1))} credits
+          </p>
           <button>Create campaign</button>
         </form>
         {campaign ? (
@@ -800,7 +1038,10 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
             <strong>Campaign status</strong>
             <strong>{campaign.id}</strong>
             <span>{campaign.company_id}</span>
+            <span>{campaign.message_type}</span>
             <span>Messages: {campaign.message_count}</span>
+            <span>Credits spent: {campaign.credit_cost}</span>
+            <span>Remaining: {formatNumber(campaign.remaining_credits)}</span>
             <span>Queued: {campaign.status_counts.queued}</span>
             <span>Sent: {campaign.status_counts.sent}</span>
             <span>Retried: {campaign.status_counts.retried}</span>
@@ -1025,12 +1266,84 @@ function CompanyWorkspace({ page, session }: { page: CompanyPage; session: Extra
 
   return (
     <>
-      <PageHeader title="Settings" description="Local tenant identity and quota context for this demo workspace." />
+      <PageHeader title="Settings" description="Manage tenant identity, team access, roles, and regional credit budgets." />
       <div className="result-strip">
         <strong>{session.companyName}</strong>
         <span>{companyId}</span>
         <span>{session.membershipRole ?? 'company_user'}</span>
+        <span>Credits: {formatNumber(dashboardSummary?.credit_balance)}</span>
       </div>
+      <div className="split-layout two-column settings-grid">
+        <form className="panel" onSubmit={createTeamAccessCode}>
+          <div className="section-heading">
+            <span>Invite</span>
+            <strong>Access code</strong>
+          </div>
+          <label>
+            Invite role
+            <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value)}>
+              <option value="customer_admin">Company admin</option>
+              <option value="campaign_manager">Campaign manager</option>
+              <option value="regional_manager">Regional manager</option>
+              <option value="analyst">Analyst</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </label>
+          <label>
+            User credit limit
+            <input value={inviteCreditLimit} onChange={(event) => setInviteCreditLimit(event.target.value)} />
+          </label>
+          <button>Create user access code</button>
+          {accessCodeResult ? (
+            <p className="notice">
+              Code {accessCodeResult.code} grants {accessCodeResult.role} with{' '}
+              {formatNumber(accessCodeResult.credit_limit)} credits.
+            </p>
+          ) : null}
+        </form>
+
+        <form className="panel" onSubmit={updateTeamUser}>
+          <div className="section-heading">
+            <span>Permissions</span>
+            <strong>Adjust user</strong>
+          </div>
+          <label>
+            User email
+            <input value={editUserEmail} onChange={(event) => setEditUserEmail(event.target.value)} />
+          </label>
+          <label>
+            User role
+            <select value={editUserRole} onChange={(event) => setEditUserRole(event.target.value)}>
+              <option value="customer_admin">Company admin</option>
+              <option value="campaign_manager">Campaign manager</option>
+              <option value="regional_manager">Regional manager</option>
+              <option value="analyst">Analyst</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </label>
+          <label>
+            User credit limit
+            <input value={editCreditLimit} onChange={(event) => setEditCreditLimit(event.target.value)} />
+          </label>
+          <button>Update user permissions</button>
+          <button className="secondary inline-action" type="button" onClick={() => void refreshTeamUsers()}>
+            Refresh team
+          </button>
+        </form>
+      </div>
+      {teamUsers.length ? (
+        <ul className="compact-list">
+          {teamUsers.map((user) => (
+            <li key={user.user_id}>
+              <strong>{user.email}</strong>
+              <span>{user.role}</span>
+              <span>
+                Budget: {formatNumber(user.credits_used)} used / {formatNumber(user.credit_limit)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </>
   )
 }

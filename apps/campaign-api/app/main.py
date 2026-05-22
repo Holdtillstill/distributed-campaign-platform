@@ -32,6 +32,7 @@ tracer = get_tracer(__name__)
 class CampaignCreateRequest(BaseModel):
     name: str = Field(min_length=1)
     body: str = DEFAULT_BODY
+    message_type: Literal["regular", "smart"] = "regular"
     recipients: list[str] | None = None
 
 
@@ -48,7 +49,10 @@ class CampaignCreateResponse(BaseModel):
     id: str
     company_id: str
     name: str
+    message_type: str
     message_count: int
+    credit_cost: int
+    remaining_credits: int
     status_counts: dict[str, int]
 
 
@@ -64,6 +68,7 @@ class CompanyCreateRequest(BaseModel):
     slug: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
     admin_email: str = Field(min_length=3)
     monthly_send_limit: int | None = Field(default=None, ge=0)
+    credit_balance: int = Field(default=0, ge=0)
 
 
 class AdminUserResponse(BaseModel):
@@ -77,6 +82,7 @@ class CompanyCreateResponse(BaseModel):
     name: str
     slug: str
     monthly_send_limit: int | None = None
+    credit_balance: int
     access_code: str
     admin_user: AdminUserResponse
 
@@ -86,12 +92,20 @@ class MembershipResponse(BaseModel):
     company_name: str
     company_slug: str
     role: str
+    credit_limit: int | None = None
+    credits_used: int = 0
+
+
+class AccessCodeCreateRequest(BaseModel):
+    role: str = "customer_admin"
+    credit_limit: int | None = Field(default=None, ge=0)
 
 
 class AccessCodeCreateResponse(BaseModel):
     code: str
     company_id: str
     role: str
+    credit_limit: int | None = None
 
 
 class AccessCodeSignupRequest(BaseModel):
@@ -106,17 +120,34 @@ class AccessCodeSignupResponse(BaseModel):
     company_id: str
     company_name: str
     membership_role: str
+    credit_limit: int | None = None
 
 
 class CompanyDashboardSummaryResponse(BaseModel):
     company_id: str
     company_name: str
     monthly_send_limit: int | None = None
+    credit_balance: int
     subscriber_count: int
     campaign_count: int
     message_count: int
+    credits_used: int
     click_count: int
     redemption_count: int
+
+
+class CompanyUserResponse(BaseModel):
+    user_id: str
+    email: str
+    display_name: str | None = None
+    role: str
+    credit_limit: int | None = None
+    credits_used: int
+
+
+class CompanyUserUpdateRequest(BaseModel):
+    role: str
+    credit_limit: int | None = Field(default=None, ge=0)
 
 
 class SubscriberListCreateRequest(BaseModel):
@@ -259,6 +290,8 @@ class CampaignRepository(Protocol):
         name: str,
         body: str,
         recipients: list[str],
+        message_type: str,
+        actor_email: str | None,
     ) -> dict[str, Any]: ...
 
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None: ...
@@ -270,6 +303,7 @@ class CampaignRepository(Protocol):
         slug: str,
         admin_email: str,
         monthly_send_limit: int | None,
+        credit_balance: int,
     ) -> dict[str, Any]: ...
 
     async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]: ...
@@ -279,6 +313,7 @@ class CampaignRepository(Protocol):
         *,
         company_id: str,
         role_slug: str,
+        credit_limit: int | None,
     ) -> dict[str, Any] | None: ...
 
     async def signup_with_access_code(
@@ -293,6 +328,17 @@ class CampaignRepository(Protocol):
         self,
         *,
         company_id: str,
+    ) -> dict[str, Any] | None: ...
+
+    async def list_company_users(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
+    async def update_company_user(
+        self,
+        *,
+        company_id: str,
+        email: str,
+        role_slug: str,
+        credit_limit: int | None,
     ) -> dict[str, Any] | None: ...
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]: ...
@@ -422,16 +468,20 @@ class AsyncpgCampaignRepository:
         name: str,
         body: str,
         recipients: list[str],
+        message_type: str,
+        actor_email: str | None,
     ) -> dict[str, Any]:
         campaign_id = str(uuid4())
         message_rows = build_message_rows(campaign_id, recipients, body)
-        await db.create_campaign_with_messages(
+        credit_result = await db.create_campaign_with_messages(
             self._pool,
             company_id=company_id,
             campaign_id=campaign_id,
             name=name,
             body=body,
             messages=[row.model_dump() for row in message_rows],
+            message_type=message_type,
+            actor_email=actor_email,
         )
         with tracer.start_as_current_span("nats.publish.messages.dispatch"):
             await self._publisher.publish(message_rows)
@@ -444,7 +494,10 @@ class AsyncpgCampaignRepository:
             "id": campaign_id,
             "company_id": company_id,
             "name": name,
+            "message_type": message_type,
             "message_count": len(message_rows),
+            "credit_cost": credit_result["credit_cost"],
+            "remaining_credits": credit_result["remaining_credits"],
             "status_counts": aggregate_status_counts(message_rows),
         }
 
@@ -458,6 +511,7 @@ class AsyncpgCampaignRepository:
         slug: str,
         admin_email: str,
         monthly_send_limit: int | None = None,
+        credit_balance: int = 0,
     ) -> dict[str, Any]:
         return await db.create_company_with_admin(
             self._pool,
@@ -465,6 +519,7 @@ class AsyncpgCampaignRepository:
             slug=slug,
             admin_email=admin_email,
             monthly_send_limit=monthly_send_limit,
+            credit_balance=credit_balance,
         )
 
     async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]:
@@ -475,11 +530,13 @@ class AsyncpgCampaignRepository:
         *,
         company_id: str,
         role_slug: str = "customer_admin",
+        credit_limit: int | None = None,
     ) -> dict[str, Any] | None:
         return await db.create_company_access_code(
             self._pool,
             company_id=company_id,
             role_slug=role_slug,
+            credit_limit=credit_limit,
         )
 
     async def signup_with_access_code(
@@ -498,6 +555,25 @@ class AsyncpgCampaignRepository:
 
     async def get_company_dashboard_summary(self, *, company_id: str) -> dict[str, Any] | None:
         return await db.get_company_dashboard_summary(self._pool, company_id=company_id)
+
+    async def list_company_users(self, *, company_id: str) -> list[dict[str, Any]]:
+        return await db.list_company_users(self._pool, company_id=company_id)
+
+    async def update_company_user(
+        self,
+        *,
+        company_id: str,
+        email: str,
+        role_slug: str,
+        credit_limit: int | None,
+    ) -> dict[str, Any] | None:
+        return await db.update_company_user(
+            self._pool,
+            company_id=company_id,
+            email=email,
+            role_slug=role_slug,
+            credit_limit=credit_limit,
+        )
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]:
         return await db.create_subscriber_list(self._pool, company_id=company_id, name=name)
@@ -669,21 +745,37 @@ def ensure_unique_recipients(recipients: Sequence[str]) -> None:
 async def create_campaign(
     request: CampaignCreateRequest,
     company_id: str = Header(DEFAULT_COMPANY_ID, alias="X-Company-Id"),
+    user_email: str | None = Header(None, alias="X-User-Email"),
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, Any]:
     recipients = request.recipients if request.recipients is not None else default_recipients()
     ensure_unique_recipients(recipients)
-    result = await repository.create_campaign_with_messages(
-        company_id=company_id,
-        name=request.name,
-        body=request.body,
-        recipients=recipients,
-    )
+    try:
+        result = await repository.create_campaign_with_messages(
+            company_id=company_id,
+            name=request.name,
+            body=request.body,
+            message_type=request.message_type,
+            actor_email=user_email,
+            recipients=recipients,
+        )
+    except db.InsufficientCreditsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": exc.detail,
+                "required_credits": exc.required_credits,
+                "available_credits": exc.available_credits,
+            },
+        ) from exc
     return {
         "id": result["id"],
         "company_id": result["company_id"],
         "name": result["name"],
+        "message_type": result["message_type"],
         "message_count": result["message_count"],
+        "credit_cost": result["credit_cost"],
+        "remaining_credits": result["remaining_credits"],
         "status_counts": result["status_counts"],
     }
 
@@ -708,6 +800,7 @@ async def create_customer_company(
         slug=request.slug,
         admin_email=request.admin_email,
         monthly_send_limit=request.monthly_send_limit,
+        credit_balance=request.credit_balance,
     )
 
 
@@ -718,6 +811,7 @@ async def create_customer_company(
 )
 async def create_company_access_code(
     company_id: str,
+    request: AccessCodeCreateRequest | None = None,
     internal_admin: str | None = Header(None, alias="X-Internal-Admin"),
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, Any]:
@@ -726,9 +820,31 @@ async def create_company_access_code(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="internal admin access required",
         )
+    access_code_request = request or AccessCodeCreateRequest()
     result = await repository.create_company_access_code(
         company_id=company_id,
-        role_slug="customer_admin",
+        role_slug=access_code_request.role,
+        credit_limit=access_code_request.credit_limit,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="company not found")
+    return result
+
+
+@app.post(
+    "/companies/{company_id}/access-codes",
+    response_model=AccessCodeCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_company_user_access_code(
+    company_id: str,
+    request: AccessCodeCreateRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.create_company_access_code(
+        company_id=company_id,
+        role_slug=request.role,
+        credit_limit=request.credit_limit,
     )
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="company not found")
@@ -778,6 +894,32 @@ async def get_company_dashboard_summary(
     result = await repository.get_company_dashboard_summary(company_id=company_id)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="company not found")
+    return result
+
+
+@app.get("/companies/{company_id}/users", response_model=list[CompanyUserResponse])
+async def list_company_users(
+    company_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> list[dict[str, Any]]:
+    return await repository.list_company_users(company_id=company_id)
+
+
+@app.patch("/companies/{company_id}/users/{email}", response_model=CompanyUserResponse)
+async def update_company_user(
+    company_id: str,
+    email: str,
+    request: CompanyUserUpdateRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.update_company_user(
+        company_id=company_id,
+        email=email,
+        role_slug=request.role,
+        credit_limit=request.credit_limit,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="company user not found")
     return result
 
 

@@ -33,6 +33,11 @@ spec:
         - protocol: TCP
           port: 8080
   egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
     - to:
         - podSelector:
             matchLabels:
@@ -61,4 +66,31 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "campaign-platform.fullname" . }}-data-plane-ingress
+  labels:
+    {{- include "campaign-platform.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [postgres, nats]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [campaign-api, dispatcher]
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 4222
 {{- end }}

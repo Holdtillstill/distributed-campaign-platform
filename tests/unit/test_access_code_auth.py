@@ -45,6 +45,7 @@ class FakeAccessCodeRepository:
             "company_id": "company-1",
             "company_name": "Acme Retail",
             "membership_role": "customer_admin",
+            "credit_limit": None,
         }
 
 
@@ -77,6 +78,7 @@ def test_valid_access_code_signs_user_into_company(campaign_module, fake_repo) -
         "company_id": "company-1",
         "company_name": "Acme Retail",
         "membership_role": "customer_admin",
+        "credit_limit": None,
     }
     assert fake_repo.signup_calls == 1
 

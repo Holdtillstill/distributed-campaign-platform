@@ -38,18 +38,21 @@ class FakeTenantRepository:
         slug: str,
         admin_email: str,
         monthly_send_limit: int | None = None,
+        credit_balance: int = 0,
     ) -> dict[str, object]:
         self.company_request = {
             "name": name,
             "slug": slug,
             "admin_email": admin_email,
             "monthly_send_limit": monthly_send_limit,
+            "credit_balance": credit_balance,
         }
         return {
             "id": "company-1",
             "name": name,
             "slug": slug,
             "monthly_send_limit": monthly_send_limit,
+            "credit_balance": credit_balance,
             "access_code": "ACME-1234",
             "admin_user": {
                 "id": "user-1",
@@ -65,6 +68,8 @@ class FakeTenantRepository:
                 "company_name": "Acme Retail",
                 "company_slug": "acme-retail",
                 "role": "customer_admin",
+                "credit_limit": None,
+                "credits_used": 0,
             }
         ]
 
@@ -75,18 +80,25 @@ class FakeTenantRepository:
         name: str,
         body: str,
         recipients: list[str],
+        message_type: str = "regular",
+        actor_email: str | None = None,
     ) -> dict[str, object]:
         self.campaign_request = {
             "company_id": company_id,
             "name": name,
             "body": body,
             "recipients": recipients,
+            "message_type": message_type,
+            "actor_email": actor_email,
         }
         return {
             "id": "campaign-1",
             "company_id": company_id,
             "name": name,
+            "message_type": message_type,
             "message_count": len(recipients),
+            "credit_cost": len(recipients),
+            "remaining_credits": 999,
             "status_counts": {
                 "queued": len(recipients),
                 "sent": 0,
@@ -170,6 +182,7 @@ def test_internal_admin_can_create_customer_company_with_quota_and_access_code(
         "name": "Acme Retail",
         "slug": "acme-retail",
         "monthly_send_limit": 50000,
+        "credit_balance": 0,
         "access_code": "ACME-1234",
         "admin_user": {
             "id": "user-1",
@@ -182,6 +195,7 @@ def test_internal_admin_can_create_customer_company_with_quota_and_access_code(
         "slug": "acme-retail",
         "admin_email": "admin@acme.example",
         "monthly_send_limit": 50000,
+        "credit_balance": 0,
     }
 
 
@@ -214,6 +228,8 @@ def test_me_memberships_uses_authenticated_user_email(campaign_module, fake_repo
             "company_name": "Acme Retail",
             "company_slug": "acme-retail",
             "role": "customer_admin",
+            "credit_limit": None,
+            "credits_used": 0,
         }
     ]
 
@@ -234,4 +250,6 @@ def test_campaign_creation_is_scoped_to_company_header(campaign_module, fake_rep
         "name": "launch",
         "body": "hello",
         "recipients": ["+155****1001"],
+        "message_type": "regular",
+        "actor_email": None,
     }

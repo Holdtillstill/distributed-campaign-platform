@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS companies (
     slug TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
     monthly_send_limit INTEGER,
+    credit_balance INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -26,6 +27,8 @@ CREATE TABLE IF NOT EXISTS company_memberships (
     company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role_slug TEXT NOT NULL REFERENCES roles(slug),
+    credit_limit INTEGER,
+    credits_used INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (company_id, user_id)
 );
@@ -44,6 +47,7 @@ VALUES
     ('internal_admin', 'Internal operator with cross-tenant administration access'),
     ('customer_admin', 'Customer administrator for company users and settings'),
     ('campaign_manager', 'Customer user who can create and schedule campaigns'),
+    ('regional_manager', 'Customer regional marketing manager with an allocated budget'),
     ('analyst', 'Customer user who can view reporting and performance data'),
     ('viewer', 'Read-only customer user')
 ON CONFLICT (slug) DO NOTHING;
@@ -55,19 +59,34 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS monthly_send_limit INTEGER;
 
+ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS credit_balance INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE company_memberships
+    ADD COLUMN IF NOT EXISTS credit_limit INTEGER;
+
+ALTER TABLE company_memberships
+    ADD COLUMN IF NOT EXISTS credits_used INTEGER NOT NULL DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS company_access_codes (
     code TEXT PRIMARY KEY,
     company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     role_slug TEXT NOT NULL DEFAULT 'customer_admin' REFERENCES roles(slug),
+    credit_limit INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     revoked_at TIMESTAMPTZ
 );
+
+ALTER TABLE company_access_codes
+    ADD COLUMN IF NOT EXISTS credit_limit INTEGER;
 
 CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL DEFAULT 'demo-company' REFERENCES companies(id) ON DELETE RESTRICT,
     name TEXT NOT NULL,
     body TEXT NOT NULL,
+    message_type TEXT NOT NULL DEFAULT 'regular' CHECK (message_type IN ('regular', 'smart')),
+    credit_cost INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -86,6 +105,13 @@ CREATE TABLE IF NOT EXISTS messages (
 
 ALTER TABLE campaigns
     ADD COLUMN IF NOT EXISTS company_id TEXT NOT NULL DEFAULT 'demo-company' REFERENCES companies(id) ON DELETE RESTRICT;
+
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS message_type TEXT NOT NULL DEFAULT 'regular'
+    CHECK (message_type IN ('regular', 'smart'));
+
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS credit_cost INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS company_id TEXT NOT NULL DEFAULT 'demo-company' REFERENCES companies(id) ON DELETE RESTRICT;

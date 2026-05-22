@@ -39,6 +39,8 @@ class FakeRepository:
         name: str,
         body: str,
         recipients: list[str],
+        message_type: str = "regular",
+        actor_email: str | None = None,
     ) -> dict[str, object]:
         campaign_id = "campaign-test-1"
         self.created_campaign = {
@@ -46,6 +48,8 @@ class FakeRepository:
             "company_id": company_id,
             "name": name,
             "body": body,
+            "message_type": message_type,
+            "actor_email": actor_email,
         }
         self.created_messages = [
             row.model_dump() if hasattr(row, "model_dump") else dict(row)
@@ -59,7 +63,10 @@ class FakeRepository:
             "company_id": company_id,
             "name": name,
             "body": body,
+            "message_type": message_type,
             "message_count": len(self.created_messages),
+            "credit_cost": len(self.created_messages),
+            "remaining_credits": 997,
             "status_counts": self.status_counts,
         }
 
@@ -106,7 +113,10 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "id": "campaign-test-1",
         "company_id": "demo-company",
         "name": "launch",
+        "message_type": "regular",
         "message_count": 3,
+        "credit_cost": 3,
+        "remaining_credits": 997,
         "status_counts": {
             "queued": 3,
             "sent": 0,
@@ -120,6 +130,8 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "company_id": "demo-company",
         "name": "launch",
         "body": "hello",
+        "message_type": "regular",
+        "actor_email": None,
     }
     assert [row["recipient"] for row in fake_repo.created_messages] == [
         "+15550001001",

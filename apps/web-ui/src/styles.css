@@ -39,10 +39,175 @@ button.secondary {
   color: #243044;
 }
 
+button.ghost {
+  background: transparent;
+  color: #64748b;
+}
+
+.marketing-site {
+  min-height: 100vh;
+  background: #f7faf8;
+  color: #172033;
+}
+
+.marketing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 22px 0;
+}
+
+.marketing-nav strong {
+  color: #0f4f49;
+  font-size: 1.2rem;
+}
+
+.marketing-nav nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.marketing-nav a {
+  color: #475569;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.marketing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(360px, 0.72fr);
+  gap: 48px;
+  align-items: center;
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 62px 0 54px;
+}
+
+.marketing-hero h1 {
+  max-width: 800px;
+  margin: 0;
+  color: #101827;
+  font-size: clamp(2.6rem, 6vw, 5.7rem);
+  letter-spacing: 0;
+  line-height: 0.94;
+}
+
+.marketing-hero p:not(.eyebrow) {
+  max-width: 690px;
+  color: #475569;
+  font-size: 1.14rem;
+  line-height: 1.65;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.secondary-link {
+  background: #e6edf5;
+  color: #243044;
+}
+
+.product-shot {
+  border: 1px solid #d5e4df;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+  padding: 18px;
+}
+
+.product-shot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 16px;
+  color: #64748b;
+}
+
+.product-shot-header strong {
+  color: #0f766e;
+}
+
+.product-metrics {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.marketing-band,
+.pricing-section {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.marketing-band {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 24px 0 54px;
+}
+
+.marketing-band div,
+.pricing-grid div {
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.marketing-band span {
+  color: #9a3412;
+  font-weight: 850;
+}
+
+.marketing-band h2,
+.pricing-section h2 {
+  margin: 10px 0;
+  color: #111827;
+  letter-spacing: 0;
+}
+
+.marketing-band p,
+.pricing-grid span {
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.pricing-section {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.6fr) minmax(0, 1fr);
+  gap: 26px;
+  border-top: 1px solid #d9e2ef;
+  padding: 44px 0 70px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .auth-screen {
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 48px 0;
+}
+
+.compact-auth {
+  max-width: 760px;
+}
+
+.auth-card {
+  max-width: 430px;
 }
 
 .auth-hero {
@@ -319,6 +484,16 @@ textarea {
   margin-top: 18px;
 }
 
+.estimate {
+  margin: 0;
+  color: #64748b;
+  font-weight: 750;
+}
+
+.settings-grid {
+  margin-top: 20px;
+}
+
 .status-section {
   margin-top: 24px;
 }
@@ -357,6 +532,10 @@ textarea {
 
 @media (max-width: 920px) {
   .auth-grid,
+  .marketing-hero,
+  .marketing-band,
+  .pricing-section,
+  .pricing-grid,
   .workspace,
   .split-layout,
   .two-column,
