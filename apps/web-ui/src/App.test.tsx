@@ -393,7 +393,7 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /send smarter campaigns/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /CampaignOS/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
   })
@@ -447,9 +447,25 @@ describe('App', () => {
     render(<App />)
     await loginAsInternalAdmin(user)
 
-    expect(await screen.findByText(/companies created/i)).toBeInTheDocument()
-    expect(screen.getByText('10')).toBeInTheDocument()
-    expect(screen.getByText('92,000')).toBeInTheDocument()
+    expect(await screen.findAllByText(/active companies/i)).not.toHaveLength(0)
+    expect(screen.getByText('9')).toBeInTheDocument()
+    expect(screen.getAllByText('92,000')).not.toHaveLength(0)
+  })
+
+  it('shows internal admin layout and company table scaffold', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+    await loginAsInternalAdmin(user)
+    await user.click(screen.getByRole('button', { name: /^companies$/i }))
+
+    expect(screen.getByLabelText(/admin navigation/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^companies$/i })).toBeInTheDocument()
+    expect(screen.getByText(/existing companies/i)).toBeInTheDocument()
+    expect(screen.getByText(/monthly limit/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/access code/i)).not.toHaveLength(0)
   })
 
   it('lets internal admin create a company and displays quota plus access code', async () => {
@@ -472,7 +488,8 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/contract credits/i), '50000')
     await user.click(screen.getByRole('button', { name: /create company/i }))
 
-    expect(await screen.findByText(/ACME-1234/i)).toBeInTheDocument()
+    expect(await screen.findByText(/give this code to the initial company admin/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/ACME-1234/i)).not.toHaveLength(0)
     expect(screen.getAllByText(/50,000/)).not.toHaveLength(0)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/admin/companies',
@@ -510,6 +527,23 @@ describe('App', () => {
     })
   })
 
+  it('shows quota bar and quick actions on company dashboard without Not set', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+
+    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(screen.queryByText(/not set/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/monthly send quota/i)).toBeInTheDocument()
+    expect(screen.getByText(/create campaign/i)).toBeInTheDocument()
+    expect(screen.getByText(/import subscribers/i)).toBeInTheDocument()
+    expect(screen.getByText(/upload media/i)).toBeInTheDocument()
+    expect(screen.getByText(/view analytics/i)).toBeInTheDocument()
+  })
+
   it('logs company users in by email membership lookup', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -536,7 +570,7 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/login email/i), 'missing@acme.test')
     await user.click(screen.getByRole('button', { name: /find my companies/i }))
 
-    expect(await screen.findByText(/sign up with an access code/i)).toBeInTheDocument()
+    expect(await screen.findByText(/No companies found/i)).toBeInTheDocument()
   })
 
   it('switches company user pages one at a time', async () => {

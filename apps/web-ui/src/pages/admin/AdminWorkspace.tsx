@@ -1,0 +1,134 @@
+import { useEffect, useState, type FormEvent } from 'react'
+
+import { API_BASE_URL } from '../../api/client'
+import type { AdminDashboardSummary, AdminPage, CompanyResult, SystemCheck, UsageRow } from '../../types'
+import { AdminDashboard } from './AdminDashboard'
+import { CompaniesPage } from './CompaniesPage'
+import { UsagePage } from './UsagePage'
+
+export function AdminWorkspace({ page }: { page: AdminPage }) {
+  const [companyName, setCompanyName] = useState('Acme Retail')
+  const [companySlug, setCompanySlug] = useState('acme-retail')
+  const [initialAdminEmail, setInitialAdminEmail] = useState('admin@acme.test')
+  const [monthlySendLimit, setMonthlySendLimit] = useState('50000')
+  const [creditBalance, setCreditBalance] = useState('50000')
+  const [companyResult, setCompanyResult] = useState<CompanyResult | null>(null)
+  const [adminSummary, setAdminSummary] = useState<AdminDashboardSummary | null>(null)
+  const [usageFromDate, setUsageFromDate] = useState('2026-05-01')
+  const [usageToDate, setUsageToDate] = useState('2026-05-21')
+  const [usageRows, setUsageRows] = useState<UsageRow[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [systemChecks, setSystemChecks] = useState<SystemCheck[]>([
+    { path: '/healthz', label: 'Campaign API liveness', state: 'checking', detail: 'Not checked yet' },
+    { path: '/readyz', label: 'Campaign API readiness', state: 'checking', detail: 'Not checked yet' },
+    { path: '/metrics', label: 'Prometheus metrics', state: 'checking', detail: 'Not checked yet' },
+  ])
+
+  useEffect(() => {
+    async function loadAdminSummary() {
+      const response = await fetch(`${API_BASE_URL}/admin/dashboard-summary`, {
+        headers: { 'X-Internal-Admin': 'true' },
+      })
+      if (response.ok) setAdminSummary(await response.json())
+    }
+    void loadAdminSummary()
+  }, [companyResult])
+
+  function toSystemCheck(response: Response, path: string, label: string): SystemCheck {
+    if (!response.ok) {
+      return { path, label, state: 'error', detail: `${response.status} ${response.statusText}` }
+    }
+    return { path, label, state: 'ok', detail: `${path} responded ${response.status}` }
+  }
+
+  async function refreshSystemStatus() {
+    const checks = await Promise.all([
+      fetch(`${API_BASE_URL}/healthz`).then((response) => toSystemCheck(response, '/healthz', 'Campaign API liveness')),
+      fetch(`${API_BASE_URL}/readyz`).then((response) => toSystemCheck(response, '/readyz', 'Campaign API readiness')),
+      fetch(`${API_BASE_URL}/metrics`).then((response) => toSystemCheck(response, '/metrics', 'Prometheus metrics')),
+    ])
+    setSystemChecks(checks)
+  }
+
+  async function createCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    const limit = monthlySendLimit.trim() ? Number(monthlySendLimit) : null
+    const credits = creditBalance.trim() ? Number(creditBalance) : 0
+    const response = await fetch(`${API_BASE_URL}/admin/companies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Admin': 'true' },
+      body: JSON.stringify({
+        name: companyName,
+        slug: companySlug,
+        admin_email: initialAdminEmail,
+        monthly_send_limit: limit,
+        credit_balance: credits,
+      }),
+    })
+    if (!response.ok) {
+      setError(`Create company failed: ${response.status}`)
+      return
+    }
+    setCompanyResult(await response.json())
+  }
+
+  async function loadUsage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    const params = new URLSearchParams({ from: usageFromDate, to: usageToDate })
+    const response = await fetch(`${API_BASE_URL}/admin/usage?${params.toString()}`, {
+      headers: { 'X-Internal-Admin': 'true' },
+    })
+    if (!response.ok) {
+      setError(`Usage dashboard failed: ${response.status}`)
+      return
+    }
+    setUsageRows(await response.json())
+  }
+
+  if (page === 'companies') {
+    return (
+      <CompaniesPage
+        companyName={companyName}
+        companySlug={companySlug}
+        initialAdminEmail={initialAdminEmail}
+        monthlySendLimit={monthlySendLimit}
+        creditBalance={creditBalance}
+        companyResult={companyResult}
+        companies={usageRows}
+        error={error}
+        onCompanyName={setCompanyName}
+        onCompanySlug={setCompanySlug}
+        onInitialAdminEmail={setInitialAdminEmail}
+        onMonthlySendLimit={setMonthlySendLimit}
+        onCreditBalance={setCreditBalance}
+        onCreateCompany={createCompany}
+      />
+    )
+  }
+
+  if (page === 'usage') {
+    return (
+      <UsagePage
+        usageFromDate={usageFromDate}
+        usageToDate={usageToDate}
+        usageRows={usageRows}
+        error={error}
+        onUsageFromDate={setUsageFromDate}
+        onUsageToDate={setUsageToDate}
+        onLoadUsage={loadUsage}
+      />
+    )
+  }
+
+  return (
+    <AdminDashboard
+      adminSummary={adminSummary}
+      companyResult={companyResult}
+      usageRows={usageRows}
+      systemChecks={systemChecks}
+      onRefreshSystemStatus={() => void refreshSystemStatus()}
+    />
+  )
+}

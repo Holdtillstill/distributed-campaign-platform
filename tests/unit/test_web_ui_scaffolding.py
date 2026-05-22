@@ -11,6 +11,14 @@ CHART_DIR = REPO_ROOT / "deploy" / "helm" / "campaign-platform"
 COMPOSE_FILE = REPO_ROOT / "compose.yaml"
 
 
+def read_web_ui_source() -> str:
+    return "\n".join(
+        path.read_text()
+        for path in sorted((WEB_UI_DIR / "src").rglob("*"))
+        if path.suffix in {".ts", ".tsx", ".css"}
+    )
+
+
 def test_web_ui_has_vite_react_application_scaffold() -> None:
     package_json = json.loads((WEB_UI_DIR / "package.json").read_text())
 
@@ -32,10 +40,10 @@ def test_web_ui_has_vite_react_application_scaffold() -> None:
 
 
 def test_web_ui_implements_campaign_demo_experience() -> None:
-    app_source = (WEB_UI_DIR / "src" / "App.tsx").read_text()
+    app_source = read_web_ui_source()
 
     for expected_text in [
-        "Distributed Campaign Platform",
+        "CampaignOS",
         "Create campaign",
         "Campaign status",
         "System status",

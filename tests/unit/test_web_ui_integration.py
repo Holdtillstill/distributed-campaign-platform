@@ -10,6 +10,14 @@ WEB_UI_DIR = REPO_ROOT / "apps" / "web-ui"
 CHART_DIR = REPO_ROOT / "deploy" / "helm" / "campaign-platform"
 
 
+def read_web_ui_source() -> str:
+    return "\n".join(
+        path.read_text()
+        for path in sorted((WEB_UI_DIR / "src").rglob("*"))
+        if path.suffix in {".ts", ".tsx", ".css"}
+    )
+
+
 def test_web_ui_package_declares_demo_dashboard_scripts() -> None:
     package = json.loads((WEB_UI_DIR / "package.json").read_text())
 
@@ -19,7 +27,7 @@ def test_web_ui_package_declares_demo_dashboard_scripts() -> None:
 
 
 def test_web_ui_source_contains_campaign_demo_flows() -> None:
-    source = (WEB_UI_DIR / "src" / "App.tsx").read_text()
+    source = read_web_ui_source()
 
     for expected in [
         "Create campaign",
