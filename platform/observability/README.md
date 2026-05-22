@@ -68,3 +68,26 @@ Prometheus should then show the app targets as `up`:
 - `campaign-platform-campaign-api`
 - `campaign-platform-dispatcher`
 - `campaign-platform-provider-simulator`
+
+## Essential Grafana dashboards
+
+Load the local dashboard ConfigMap after Grafana is installed:
+
+```bash
+scripts/local/install-observability-dashboards.sh
+```
+
+This installs two starter dashboards:
+
+- `Campaign Platform Essential Overview`
+- `Kubernetes Essential Overview`
+
+Grafana dashboard URLs:
+
+- <http://127.0.0.1:3000/d/campaign-platform-essential/campaign-platform-essential-overview>
+- <http://127.0.0.1:3000/d/k8s-essential-overview/kubernetes-essential-overview>
+
+Prometheus v3 redirects `/graph` to the newer query UI. Use:
+
+- <http://127.0.0.1:9090/query>
+- <http://127.0.0.1:9090/targets>

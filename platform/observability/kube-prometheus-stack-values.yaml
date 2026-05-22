@@ -32,3 +32,15 @@ kube-state-metrics:
 
 prometheus-node-exporter:
   enabled: true
+
+# kind does not expose these control-plane metrics endpoints on the node
+# addresses that kube-prometheus-stack discovers by default. Disable them
+# locally so Prometheus targets stay clean and actionable.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
