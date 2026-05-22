@@ -4,19 +4,23 @@ import asyncio
 import contextlib
 import json
 import os
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import asyncpg
 import httpx
 from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
+from campaign_common.observability import add_platform_endpoints
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 SERVICE_NAME = "dispatcher"
 DEFAULT_NATS_URL = "nats://nats:4222"
 DEFAULT_NATS_SUBJECT = "messages.dispatch"
+DEFAULT_NATS_STREAM = "CAMPAIGN_MESSAGES"
+DEFAULT_NATS_DURABLE = "dispatcher"
 DEFAULT_PROVIDER_URL = "http://provider-simulator:8080"
 
 configure_logging(SERVICE_NAME)
@@ -37,6 +41,15 @@ class ProviderResult(BaseModel):
     http_status: int
     accepted: bool = False
     body: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class NatsConsumerConfig:
+    nats_url: str = DEFAULT_NATS_URL
+    subject: str = DEFAULT_NATS_SUBJECT
+    stream: str = DEFAULT_NATS_STREAM
+    durable: str = DEFAULT_NATS_DURABLE
+    use_jetstream: bool = True
 
 
 class MessageRepository(Protocol):
@@ -63,6 +76,7 @@ async def lifespan(app_instance: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Dispatcher", version="0.1.0", lifespan=lifespan)
+add_platform_endpoints(app, service_name=SERVICE_NAME)
 
 
 @app.get("/healthz")
@@ -134,14 +148,47 @@ class AsyncpgMessageRepository:
             )
 
 
+def _env_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def nats_consumer_config_from_env(env: Mapping[str, str] | None = None) -> NatsConsumerConfig:
+    source = os.environ if env is None else env
+    return NatsConsumerConfig(
+        nats_url=source.get("NATS_URL", DEFAULT_NATS_URL),
+        subject=source.get("NATS_SUBJECT", DEFAULT_NATS_SUBJECT),
+        stream=source.get("NATS_STREAM", DEFAULT_NATS_STREAM),
+        durable=source.get("NATS_DURABLE", DEFAULT_NATS_DURABLE),
+        use_jetstream=_env_bool(source.get("NATS_USE_JETSTREAM"), default=True),
+    )
+
+
 async def run_worker(
     *,
     nats_url: str | None = None,
-    subject: str = DEFAULT_NATS_SUBJECT,
+    subject: str | None = None,
     provider_url: str | None = None,
     database_url: str | None = None,
 ) -> None:
-    resolved_nats_url = nats_url or os.getenv("NATS_URL", DEFAULT_NATS_URL)
+    config = nats_consumer_config_from_env()
+    if nats_url is not None:
+        config = NatsConsumerConfig(
+            nats_url=nats_url,
+            subject=subject or config.subject,
+            stream=config.stream,
+            durable=config.durable,
+            use_jetstream=config.use_jetstream,
+        )
+    elif subject is not None:
+        config = NatsConsumerConfig(
+            nats_url=config.nats_url,
+            subject=subject,
+            stream=config.stream,
+            durable=config.durable,
+            use_jetstream=config.use_jetstream,
+        )
     resolved_provider_url = provider_url or os.getenv("PROVIDER_URL", DEFAULT_PROVIDER_URL)
     resolved_database_url = database_url or os.getenv("DATABASE_URL")
     if resolved_database_url is None:
@@ -151,7 +198,7 @@ async def run_worker(
 
     pool = await asyncpg.create_pool(dsn=resolved_database_url)
     repository = AsyncpgMessageRepository(pool)
-    nc = await nats.connect(resolved_nats_url)
+    nc = await nats.connect(config.nats_url)
 
     async def handle_message(msg: Any) -> None:
         job = MessageJob.model_validate_json(msg.data)
@@ -160,8 +207,21 @@ async def run_worker(
             return await send_to_provider_http(provider_job, resolved_provider_url)
 
         await dispatch_message(job, provider_sender, repository.update_status)
+        if hasattr(msg, "ack"):
+            await msg.ack()
 
-    await nc.subscribe(subject, cb=handle_message)
+    if config.use_jetstream:
+        js = nc.jetstream()
+        await js.add_stream(name=config.stream, subjects=[config.subject])
+        await js.subscribe(
+            config.subject,
+            durable=config.durable,
+            stream=config.stream,
+            cb=handle_message,
+            manual_ack=True,
+        )
+    else:
+        await nc.subscribe(config.subject, cb=handle_message)
     try:
         await asyncio.Event().wait()
     finally:

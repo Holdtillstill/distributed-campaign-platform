@@ -7,11 +7,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir \
+RUN pip install --default-timeout=100 --no-cache-dir \
     "asyncpg>=0.29" \
     "fastapi>=0.115" \
     "httpx>=0.27" \
     "nats-py>=2.8" \
+    "prometheus-client>=0.20" \
     "pydantic>=2.8" \
     "structlog>=24.0" \
     "uvicorn[standard]>=0.30"

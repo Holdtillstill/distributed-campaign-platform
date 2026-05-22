@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from campaign_common.logging import configure_logging, get_logger
+from campaign_common.observability import add_platform_endpoints
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
@@ -61,6 +62,7 @@ class SimulatedProviderResult:
 
 
 app = FastAPI(title="Provider Simulator", version="0.1.0")
+add_platform_endpoints(app, service_name="provider-simulator")
 
 
 @app.get("/healthz")

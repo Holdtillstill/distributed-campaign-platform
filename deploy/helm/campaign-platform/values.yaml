@@ -1,0 +1,51 @@
+global:
+  imagePullPolicy: IfNotPresent
+  nats:
+    url: nats://campaign-platform-nats:4222
+    subject: messages.dispatch
+    stream: CAMPAIGN_MESSAGES
+    useJetStream: "true"
+  postgres:
+    database: campaigns
+    user: campaigns
+    password: campaigns
+    host: campaign-platform-postgres
+    port: 5432
+
+campaignApi:
+  image:
+    repository: campaign-api
+    tag: local
+  replicas: 1
+  service:
+    port: 8080
+
+providerSimulator:
+  image:
+    repository: provider-simulator
+    tag: local
+  replicas: 1
+  service:
+    port: 8080
+  providerMode: success
+  latencyMs: "0"
+  failureRate: "0.0"
+
+dispatcher:
+  image:
+    repository: dispatcher
+    tag: local
+  replicas: 1
+  service:
+    port: 8080
+  durable: dispatcher
+
+postgres:
+  image: postgres:16-alpine
+  storage: 1Gi
+
+redis:
+  image: redis:7-alpine
+
+nats:
+  image: nats:2.10-alpine

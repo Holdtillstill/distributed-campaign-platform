@@ -10,8 +10,8 @@ COPY pyproject.toml README.md ./
 COPY apps/shared ./apps/shared
 COPY apps/provider-simulator ./apps/provider-simulator
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir fastapi uvicorn[standard] pydantic structlog
+RUN pip install --default-timeout=100 --no-cache-dir --upgrade pip \
+    && pip install --default-timeout=100 --no-cache-dir fastapi uvicorn[standard] pydantic prometheus-client structlog
 
 EXPOSE 8080
 

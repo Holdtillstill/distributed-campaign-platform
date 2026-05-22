@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -12,6 +13,7 @@ import db
 from campaign_common.idempotency import generate_idempotency_key
 from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
+from campaign_common.observability import add_platform_endpoints
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -72,13 +74,38 @@ class NoopMessagePublisher:
         return None
 
 
+@dataclass(frozen=True)
+class NatsPublisherConfig:
+    nats_url: str
+    subject: str = "messages.dispatch"
+    stream: str = "CAMPAIGN_MESSAGES"
+    use_jetstream: bool = True
+
+
 class NatsMessagePublisher:
-    def __init__(self, nats_url: str, subject: str = "messages.dispatch") -> None:
-        self._nats_url = nats_url
-        self._subject = subject
+    def __init__(
+        self,
+        nats_url: str,
+        subject: str = "messages.dispatch",
+        *,
+        stream: str = "CAMPAIGN_MESSAGES",
+        use_jetstream: bool = True,
+    ) -> None:
+        self.config = NatsPublisherConfig(
+            nats_url=nats_url,
+            subject=subject,
+            stream=stream,
+            use_jetstream=use_jetstream,
+        )
 
     async def publish(self, rows: Sequence[MessageRow]) -> None:
-        await publish_message_jobs(self._nats_url, self._subject, rows)
+        await publish_message_jobs(
+            self.config.nats_url,
+            self.config.subject,
+            rows,
+            stream=self.config.stream,
+            use_jetstream=self.config.use_jetstream,
+        )
 
 
 class AsyncpgCampaignRepository:
@@ -129,6 +156,7 @@ async def lifespan(app_instance: FastAPI):
 
 
 app = FastAPI(title="Campaign API", version="0.1.0", lifespan=lifespan)
+add_platform_endpoints(app, service_name=SERVICE_NAME)
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -231,24 +259,59 @@ async def publish_message_jobs(
     rows: Sequence[MessageRow | dict[str, Any]],
     *,
     channel: str = "sms",
+    stream: str = "CAMPAIGN_MESSAGES",
+    use_jetstream: bool = True,
 ) -> None:
     import nats
 
     nc = await nats.connect(nats_url)
     try:
-        for row in rows:
-            payload = json.dumps(message_job_from_row(row, channel=channel)).encode("utf-8")
-            await nc.publish(subject, payload)
-        await nc.flush()
+        if use_jetstream:
+            js = nc.jetstream()
+            await js.add_stream(name=stream, subjects=[subject])
+            for row in rows:
+                payload = json.dumps(message_job_from_row(row, channel=channel)).encode("utf-8")
+                await js.publish(subject, payload)
+        else:
+            for row in rows:
+                payload = json.dumps(message_job_from_row(row, channel=channel)).encode("utf-8")
+                await nc.publish(subject, payload)
+            await nc.flush()
     finally:
         await nc.drain()
 
 
-def publisher_from_env() -> MessagePublisher:
-    nats_url = os.getenv("NATS_URL")
+def _env_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def nats_publisher_config_from_env(
+    env: Mapping[str, str] | None = None,
+) -> NatsPublisherConfig | None:
+    source = os.environ if env is None else env
+    nats_url = source.get("NATS_URL")
     if not nats_url:
+        return None
+    return NatsPublisherConfig(
+        nats_url=nats_url,
+        subject=source.get("NATS_SUBJECT", "messages.dispatch"),
+        stream=source.get("NATS_STREAM", "CAMPAIGN_MESSAGES"),
+        use_jetstream=_env_bool(source.get("NATS_USE_JETSTREAM"), default=True),
+    )
+
+
+def publisher_from_env() -> MessagePublisher:
+    config = nats_publisher_config_from_env()
+    if config is None:
         return NoopMessagePublisher()
-    return NatsMessagePublisher(nats_url, os.getenv("NATS_SUBJECT", "messages.dispatch"))
+    return NatsMessagePublisher(
+        config.nats_url,
+        config.subject,
+        stream=config.stream,
+        use_jetstream=config.use_jetstream,
+    )
 
 
 def aggregate_status_counts(messages: Iterable[dict[str, Any] | MessageRow]) -> dict[str, int]:

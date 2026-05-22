@@ -2,7 +2,7 @@
 
 A production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
 
-> Status: Phase 1 local distributed app skeleton complete and verified end-to-end.
+> Status: Phase 2 Kubernetes-ready local platform complete and verified end-to-end.
 
 ## Goals
 
@@ -77,6 +77,12 @@ The local Compose stack runs PostgreSQL, Redis, NATS JetStream, Campaign API, Pr
 - Provider Simulator: <http://127.0.0.1:8082>
 - Dispatcher health app: <http://127.0.0.1:8083>
 
+Each app exposes:
+
+- `/healthz` for liveness
+- `/readyz` for Kubernetes readiness
+- `/metrics` for Prometheus-format service metadata
+
 Run the stack and smoke test:
 
 ```bash
@@ -103,6 +109,23 @@ To stop the local stack:
 docker compose down
 ```
 
+## Local kind + Helm validation
+
+Render and lint the Kubernetes chart without touching AWS:
+
+```bash
+helm lint deploy/helm/campaign-platform
+helm template campaign-platform deploy/helm/campaign-platform >/tmp/campaign-platform-rendered.yaml
+```
+
+Deploy to a local kind cluster:
+
+```bash
+scripts/local/kind-deploy.sh
+```
+
+The kind path builds local images, loads them into kind, installs the Helm chart, and waits for the three app deployments to roll out.
+
 ## Current next step
 
-See [`docs/plans/0000-phase-0-repo-foundation.md`](docs/plans/0000-phase-0-repo-foundation.md) and [`docs/setup.md`](docs/setup.md).
+See [`docs/plans/0002-phase-2-kubernetes-ready-local-platform.md`](docs/plans/0002-phase-2-kubernetes-ready-local-platform.md) for the latest verified milestone. Recommended next phase: add open-source observability stack wiring and reliability controls around retries/dead-lettering.
