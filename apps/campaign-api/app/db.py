@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -196,3 +197,189 @@ async def list_user_memberships(pool: asyncpg.Pool, *, email: str) -> list[dict[
             email,
         )
     return [dict(row) for row in rows]
+
+
+async def create_subscriber_list(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    name: str,
+) -> dict[str, Any]:
+    list_id = str(uuid4())
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            INSERT INTO subscriber_lists (id, company_id, name)
+            VALUES ($1, $2, $3)
+            RETURNING id, company_id, name
+            """,
+            list_id,
+            company_id,
+            name,
+        )
+    return {**dict(row), "subscriber_count": 0}
+
+
+async def import_subscriber(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    phone_number: str,
+    source: str,
+    list_id: str | None,
+) -> dict[str, Any]:
+    subscriber_id = str(uuid4())
+    consent_event_id = str(uuid4())
+    async with pool.acquire() as connection, connection.transaction():
+        subscriber = await connection.fetchrow(
+            """
+            INSERT INTO subscribers (
+                id, company_id, phone_number, marketing_status, consent_status, source
+            )
+            VALUES ($1, $2, $3, 'imported', 'company_provided', $4)
+            ON CONFLICT (company_id, phone_number) DO UPDATE SET
+                marketing_status = 'imported',
+                consent_status = 'company_provided',
+                source = EXCLUDED.source,
+                updated_at = NOW()
+            RETURNING id, company_id, phone_number, marketing_status, consent_status
+            """,
+            subscriber_id,
+            company_id,
+            phone_number,
+            source,
+        )
+        if list_id:
+            await connection.execute(
+                """
+                INSERT INTO subscriber_list_memberships (subscriber_list_id, subscriber_id)
+                VALUES ($1, $2)
+                ON CONFLICT DO NOTHING
+                """,
+                list_id,
+                subscriber["id"],
+            )
+        await connection.execute(
+            """
+            INSERT INTO consent_events (id, company_id, subscriber_id, event_type, source)
+            VALUES ($1, $2, $3, 'company_provided', $4)
+            """,
+            consent_event_id,
+            company_id,
+            subscriber["id"],
+            source,
+        )
+    return {**dict(subscriber), "list_id": list_id}
+
+
+async def start_double_opt_in(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    phone_number: str,
+    source: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> dict[str, Any]:
+    subscriber_id = str(uuid4())
+    token = str(uuid4())
+    event_id = str(uuid4())
+    expires_at = datetime.now(UTC) + timedelta(hours=24)
+    async with pool.acquire() as connection, connection.transaction():
+        subscriber = await connection.fetchrow(
+            """
+            INSERT INTO subscribers (
+                id, company_id, phone_number, marketing_status, consent_status, source
+            )
+            VALUES ($1, $2, $3, 'pending_confirmation', 'double_opt_in_requested', $4)
+            ON CONFLICT (company_id, phone_number) DO UPDATE SET
+                marketing_status = 'pending_confirmation',
+                consent_status = 'double_opt_in_requested',
+                source = EXCLUDED.source,
+                updated_at = NOW()
+            RETURNING id, company_id, phone_number
+            """,
+            subscriber_id,
+            company_id,
+            phone_number,
+            source,
+        )
+        await connection.execute(
+            """
+            INSERT INTO double_opt_in_tokens (token, company_id, subscriber_id, expires_at)
+            VALUES ($1, $2, $3, $4)
+            """,
+            token,
+            company_id,
+            subscriber["id"],
+            expires_at,
+        )
+        await connection.execute(
+            """
+            INSERT INTO consent_events (
+                id, company_id, subscriber_id, event_type, source, ip_address, user_agent
+            )
+            VALUES ($1, $2, $3, 'double_opt_in_requested', $4, $5, $6)
+            """,
+            event_id,
+            company_id,
+            subscriber["id"],
+            source,
+            ip_address,
+            user_agent,
+        )
+    return {
+        "subscriber_id": subscriber["id"],
+        "company_id": subscriber["company_id"],
+        "phone_number": subscriber["phone_number"],
+        "status": "pending_confirmation",
+        "confirmation_token": token,
+    }
+
+
+async def confirm_double_opt_in(pool: asyncpg.Pool, *, token: str) -> dict[str, Any] | None:
+    event_id = str(uuid4())
+    async with pool.acquire() as connection, connection.transaction():
+        token_row = await connection.fetchrow(
+            """
+            SELECT token, company_id, subscriber_id
+            FROM double_opt_in_tokens
+            WHERE token = $1 AND confirmed_at IS NULL AND expires_at > NOW()
+            """,
+            token,
+        )
+        if token_row is None:
+            return None
+        subscriber = await connection.fetchrow(
+            """
+            UPDATE subscribers
+            SET marketing_status = 'confirmed',
+                consent_status = 'double_opt_in_confirmed',
+                confirmed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, company_id, phone_number
+            """,
+            token_row["subscriber_id"],
+        )
+        await connection.execute(
+            """
+            UPDATE double_opt_in_tokens SET confirmed_at = NOW() WHERE token = $1
+            """,
+            token,
+        )
+        await connection.execute(
+            """
+            INSERT INTO consent_events (id, company_id, subscriber_id, event_type, source)
+            VALUES ($1, $2, $3, 'double_opt_in_confirmed', 'confirmation_link')
+            """,
+            event_id,
+            token_row["company_id"],
+            token_row["subscriber_id"],
+        )
+    return {
+        "subscriber_id": subscriber["id"],
+        "company_id": subscriber["company_id"],
+        "phone_number": subscriber["phone_number"],
+        "status": "confirmed",
+    }

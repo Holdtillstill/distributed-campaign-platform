@@ -78,6 +78,66 @@ ALTER TABLE campaigns
 ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS company_id TEXT NOT NULL DEFAULT 'demo-company' REFERENCES companies(id) ON DELETE RESTRICT;
 
+CREATE TABLE IF NOT EXISTS subscriber_lists (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (company_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS subscribers (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    phone_number TEXT NOT NULL,
+    marketing_status TEXT NOT NULL DEFAULT 'pending_confirmation' CHECK (marketing_status IN ('imported', 'pending_confirmation', 'confirmed', 'opted_out')),
+    consent_status TEXT NOT NULL DEFAULT 'none' CHECK (consent_status IN ('none', 'company_provided', 'double_opt_in_requested', 'double_opt_in_confirmed', 'opted_out')),
+    source TEXT NOT NULL,
+    confirmed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (company_id, phone_number)
+);
+
+CREATE TABLE IF NOT EXISTS subscriber_list_memberships (
+    subscriber_list_id TEXT NOT NULL REFERENCES subscriber_lists(id) ON DELETE CASCADE,
+    subscriber_id TEXT NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (subscriber_list_id, subscriber_id)
+);
+
+CREATE TABLE IF NOT EXISTS consent_events (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    subscriber_id TEXT NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL CHECK (event_type IN ('company_provided', 'double_opt_in_requested', 'double_opt_in_confirmed', 'opted_out')),
+    source TEXT NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS suppression_list (
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    phone_number TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (company_id, phone_number)
+);
+
+CREATE TABLE IF NOT EXISTS double_opt_in_tokens (
+    token TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    subscriber_id TEXT NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    confirmed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscribers_company_phone ON subscribers(company_id, phone_number);
+CREATE INDEX IF NOT EXISTS idx_consent_events_subscriber_created ON consent_events(subscriber_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_double_opt_in_tokens_subscriber ON double_opt_in_tokens(subscriber_id);
+
 CREATE INDEX IF NOT EXISTS idx_campaigns_company_id ON campaigns(company_id);
 CREATE INDEX IF NOT EXISTS idx_messages_company_id ON messages(company_id);
 CREATE INDEX IF NOT EXISTS idx_messages_campaign_id ON messages(campaign_id);

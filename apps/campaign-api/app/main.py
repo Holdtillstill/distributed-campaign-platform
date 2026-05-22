@@ -15,7 +15,7 @@ from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints
 from campaign_common.tracing import get_tracer, inject_trace_context, instrument_fastapi_app
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 SERVICE_NAME = "campaign-api"
@@ -84,6 +84,53 @@ class MembershipResponse(BaseModel):
     role: str
 
 
+class SubscriberListCreateRequest(BaseModel):
+    name: str = Field(min_length=1)
+
+
+class SubscriberListResponse(BaseModel):
+    id: str
+    company_id: str
+    name: str
+    subscriber_count: int
+
+
+class SubscriberImportRequest(BaseModel):
+    phone_number: str = Field(min_length=3)
+    source: str = Field(min_length=1)
+    list_id: str | None = None
+
+
+class SubscriberResponse(BaseModel):
+    id: str
+    company_id: str
+    phone_number: str
+    marketing_status: str
+    consent_status: str
+    list_id: str | None = None
+
+
+class DoubleOptInStartRequest(BaseModel):
+    company_id: str = Field(min_length=1)
+    phone_number: str = Field(min_length=3)
+    source: str = Field(min_length=1)
+
+
+class DoubleOptInStartResponse(BaseModel):
+    subscriber_id: str
+    company_id: str
+    phone_number: str
+    status: str
+    confirmation_token: str
+
+
+class DoubleOptInConfirmResponse(BaseModel):
+    subscriber_id: str
+    company_id: str
+    phone_number: str
+    status: str
+
+
 class CampaignRepository(Protocol):
     async def create_campaign_with_messages(
         self,
@@ -105,6 +152,29 @@ class CampaignRepository(Protocol):
     ) -> dict[str, Any]: ...
 
     async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]: ...
+
+    async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]: ...
+
+    async def import_subscriber(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        source: str,
+        list_id: str | None,
+    ) -> dict[str, Any]: ...
+
+    async def start_double_opt_in(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        source: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> dict[str, Any]: ...
+
+    async def confirm_double_opt_in(self, *, token: str) -> dict[str, Any] | None: ...
 
 
 class MessagePublisher(Protocol):
@@ -208,6 +278,46 @@ class AsyncpgCampaignRepository:
     async def list_user_memberships(self, *, email: str) -> list[dict[str, Any]]:
         return await db.list_user_memberships(self._pool, email=email)
 
+    async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, Any]:
+        return await db.create_subscriber_list(self._pool, company_id=company_id, name=name)
+
+    async def import_subscriber(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        source: str,
+        list_id: str | None,
+    ) -> dict[str, Any]:
+        return await db.import_subscriber(
+            self._pool,
+            company_id=company_id,
+            phone_number=phone_number,
+            source=source,
+            list_id=list_id,
+        )
+
+    async def start_double_opt_in(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        source: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> dict[str, Any]:
+        return await db.start_double_opt_in(
+            self._pool,
+            company_id=company_id,
+            phone_number=phone_number,
+            source=source,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+    async def confirm_double_opt_in(self, *, token: str) -> dict[str, Any] | None:
+        return await db.confirm_double_opt_in(self._pool, token=token)
+
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
@@ -308,6 +418,72 @@ async def list_my_memberships(
             detail="X-User-Email header required",
         )
     return await repository.list_user_memberships(email=user_email)
+
+
+@app.post(
+    "/companies/{company_id}/subscriber-lists",
+    response_model=SubscriberListResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_subscriber_list(
+    company_id: str,
+    request: SubscriberListCreateRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.create_subscriber_list(company_id=company_id, name=request.name)
+
+
+@app.post(
+    "/companies/{company_id}/subscribers",
+    response_model=SubscriberResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_subscriber(
+    company_id: str,
+    request: SubscriberImportRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.import_subscriber(
+        company_id=company_id,
+        phone_number=request.phone_number,
+        source=request.source,
+        list_id=request.list_id,
+    )
+
+
+@app.post(
+    "/public/opt-ins",
+    response_model=DoubleOptInStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_double_opt_in(
+    request: DoubleOptInStartRequest,
+    http_request: Request,
+    user_agent: str | None = Header(None, alias="User-Agent"),
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    client_host = http_request.client.host if http_request.client else None
+    return await repository.start_double_opt_in(
+        company_id=request.company_id,
+        phone_number=request.phone_number,
+        source=request.source,
+        ip_address=client_host,
+        user_agent=user_agent,
+    )
+
+
+@app.post("/public/opt-ins/{token}/confirm", response_model=DoubleOptInConfirmResponse)
+async def confirm_double_opt_in(
+    token: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.confirm_double_opt_in(token=token)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="confirmation token not found",
+        )
+    return result
 
 
 @app.get("/campaigns/{campaign_id}", response_model=CampaignStatusResponse)
