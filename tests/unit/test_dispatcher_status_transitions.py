@@ -118,7 +118,7 @@ async def test_dispatch_message_marks_retried_after_rate_limit(dispatcher_module
 
 
 @pytest.mark.asyncio()
-async def test_dispatch_message_marks_failed_after_server_error(dispatcher_module) -> None:
+async def test_dispatch_message_marks_retried_after_server_error(dispatcher_module) -> None:
     job = dispatcher_module.MessageJob(
         message_id="message-3",
         campaign_id="campaign-1",
@@ -138,12 +138,12 @@ async def test_dispatch_message_marks_failed_after_server_error(dispatcher_modul
 
     status = await dispatcher_module.dispatch_message(job, send_to_provider, update_status)
 
-    assert status == "failed"
-    assert updates == [("message-3", "failed")]
+    assert status == "retried"
+    assert updates == [("message-3", "retried")]
 
 
 @pytest.mark.asyncio()
-async def test_dispatch_message_marks_failed_after_unexpected_exception(dispatcher_module) -> None:
+async def test_dispatch_message_marks_retried_after_unexpected_exception(dispatcher_module) -> None:
     job = dispatcher_module.MessageJob(
         message_id="message-4",
         campaign_id="campaign-1",
@@ -163,8 +163,8 @@ async def test_dispatch_message_marks_failed_after_unexpected_exception(dispatch
 
     status = await dispatcher_module.dispatch_message(job, send_to_provider, update_status)
 
-    assert status == "failed"
-    assert updates == [("message-4", "failed")]
+    assert status == "retried"
+    assert updates == [("message-4", "retried")]
 
 
 def test_campaign_message_job_payload_from_row_defaults_to_sms(campaign_module) -> None:

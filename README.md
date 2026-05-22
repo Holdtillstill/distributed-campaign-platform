@@ -2,7 +2,7 @@
 
 A production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
 
-> Status: Phase 2 Kubernetes-ready local platform complete and verified end-to-end.
+> Status: Phase 3 observability, reliability, and Kubernetes hardening complete and verified locally.
 
 ## Goals
 
@@ -90,7 +90,14 @@ docker compose up --build -d
 scripts/local/e2e-smoke-test.sh
 ```
 
-The smoke test waits for the local dependencies and service health endpoints, creates a campaign through the Campaign API, then polls `GET /campaigns/{id}` until every message has left `queued` and reached a terminal Phase 1 status (`sent`, `retried`, `failed`, or `dead_lettered`). Compose defaults the provider simulator to `PROVIDER_MODE=success`, so the deterministic expected result is `sent == message_count`.
+The smoke test waits for the local dependencies and service health endpoints, creates a campaign through the Campaign API, then polls `GET /campaigns/{id}` until every message has left `queued` and reached a terminal status (`sent`, `failed`, or `dead_lettered`). Compose defaults the provider simulator to `PROVIDER_MODE=success`, so the deterministic expected result is `sent == message_count`.
+
+Dispatcher reliability defaults:
+
+- transient provider statuses `429`, `500`, `502`, `503`, and `504` are retried
+- retries are published to `messages.dispatch.retry`
+- exhausted messages are published to `messages.dispatch.dead_letter`
+- `DISPATCHER_MAX_ATTEMPTS` defaults to `3`
 
 Useful overrides:
 
@@ -126,6 +133,18 @@ scripts/local/kind-deploy.sh
 
 The kind path builds local images, loads them into kind, installs the Helm chart, and waits for the three app deployments to roll out.
 
+## Observability stack scaffolding
+
+Open-source observability Helm values live in:
+
+```text
+platform/observability
+```
+
+The scaffold covers Prometheus/Alertmanager/Grafana, Loki, Tempo, and OpenTelemetry Collector values. The app chart can emit `ServiceMonitor` resources when the Prometheus Operator CRDs are installed.
+
+See [`platform/observability/README.md`](platform/observability/README.md) for install commands.
+
 ## Current next step
 
-See [`docs/plans/0002-phase-2-kubernetes-ready-local-platform.md`](docs/plans/0002-phase-2-kubernetes-ready-local-platform.md) for the latest verified milestone. Recommended next phase: add open-source observability stack wiring and reliability controls around retries/dead-lettering.
+See [`docs/plans/0003-phase-3-observability-reliability-hardening.md`](docs/plans/0003-phase-3-observability-reliability-hardening.md) for the latest verified milestone. Recommended next phase: add CI gates, Grafana dashboards/alerts, and OpenTelemetry app instrumentation.

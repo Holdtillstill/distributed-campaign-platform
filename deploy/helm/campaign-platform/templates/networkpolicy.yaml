@@ -1,0 +1,60 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "campaign-platform.fullname" . }}-default-deny
+  labels:
+    {{- include "campaign-platform.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "campaign-platform.fullname" . }}-app-dependencies
+  labels:
+    {{- include "campaign-platform.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - campaign-api
+          - dispatcher
+          - provider-simulator
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: provider-simulator
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

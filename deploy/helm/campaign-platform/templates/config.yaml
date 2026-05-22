@@ -20,6 +20,8 @@ metadata:
 data:
   NATS_URL: {{ .Values.global.nats.url | quote }}
   NATS_SUBJECT: {{ .Values.global.nats.subject | quote }}
+  NATS_RETRY_SUBJECT: {{ .Values.global.nats.retrySubject | quote }}
+  NATS_DEAD_LETTER_SUBJECT: {{ .Values.global.nats.deadLetterSubject | quote }}
   NATS_STREAM: {{ .Values.global.nats.stream | quote }}
   NATS_USE_JETSTREAM: {{ .Values.global.nats.useJetStream | quote }}
   PROVIDER_URL: "http://{{ include "campaign-platform.fullname" . }}-provider-simulator:8080"
@@ -27,3 +29,4 @@ data:
   PROVIDER_LATENCY_MS: {{ .Values.providerSimulator.latencyMs | quote }}
   PROVIDER_FAILURE_RATE: {{ .Values.providerSimulator.failureRate | quote }}
   NATS_DURABLE: {{ .Values.dispatcher.durable | quote }}
+  DISPATCHER_MAX_ATTEMPTS: {{ .Values.dispatcher.maxAttempts | quote }}

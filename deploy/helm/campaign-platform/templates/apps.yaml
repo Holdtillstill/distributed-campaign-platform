@@ -48,6 +48,8 @@ spec:
             - name: DISPATCHER_WORKER_ENABLED
               value: "true"
             {{- end }}
+          resources:
+            {{- toYaml $service.values.resources | nindent 12 }}
           readinessProbe:
             httpGet:
               path: /readyz

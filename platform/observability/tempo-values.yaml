@@ -1,0 +1,21 @@
+tempo:
+  retention: 72h
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+        http:
+  storage:
+    trace:
+      backend: local
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

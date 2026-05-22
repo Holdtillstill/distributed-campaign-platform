@@ -268,7 +268,10 @@ async def publish_message_jobs(
     try:
         if use_jetstream:
             js = nc.jetstream()
-            await js.add_stream(name=stream, subjects=[subject])
+            try:
+                await js.add_stream(name=stream, subjects=[subject])
+            except Exception:
+                await js.update_stream(name=stream, subjects=[subject])
             for row in rows:
                 payload = json.dumps(message_job_from_row(row, channel=channel)).encode("utf-8")
                 await js.publish(subject, payload)
