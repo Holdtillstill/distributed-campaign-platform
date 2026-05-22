@@ -2,6 +2,7 @@ import type { FormEvent } from 'react'
 
 import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
+import { MetricCard as Metric } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
 import type { CompanyHealthRow, UsageRow } from '../../types'
 import { formatNumber } from '../../utils'
@@ -25,6 +26,17 @@ export function UsagePage({
   onUsageToDate: (value: string) => void
   onLoadUsage: (event: FormEvent<HTMLFormElement>) => void
 }) {
+  const topTenantByMessages = usageRows.reduce<UsageRow | null>(
+    (topTenant, row) => (!topTenant || row.message_count > topTenant.message_count ? row : topTenant),
+    null,
+  )
+  const scheduledReach = companyHealthRows.reduce((total, row) => total + row.scheduled_reach, 0)
+  const highestQuotaUsage = companyHealthRows.reduce<CompanyHealthRow | null>(
+    (highest, row) => (!highest || row.quota_usage > highest.quota_usage ? row : highest),
+    null,
+  )
+  const totalSubscribers = companyHealthRows.reduce((total, row) => total + row.subscriber_count, 0)
+
   return (
     <>
       <PageHeader title="Usage" description="Review cross-tenant campaign, message, engagement, and reminder volume." />
@@ -39,6 +51,28 @@ export function UsagePage({
         </label>
         <button>Load usage</button>
       </form>
+      <div className="metric-grid spaced">
+        <Metric
+          label="Top tenant by message volume"
+          value={topTenantByMessages?.company_name ?? 'No usage loaded'}
+          trend={
+            topTenantByMessages
+              ? `${formatNumber(topTenantByMessages.message_count)} messages in selected range`
+              : 'Load usage to rank tenants by volume'
+          }
+        />
+        <Metric
+          label="Scheduled reach next 30 days"
+          value={formatNumber(scheduledReach)}
+          trend="Upcoming tenant send pressure"
+        />
+        <Metric
+          label="Highest quota usage"
+          value={highestQuotaUsage ? `${Math.round(highestQuotaUsage.quota_usage * 100)}%` : 'No health loaded'}
+          trend={highestQuotaUsage ? highestQuotaUsage.company_name : 'Admin dashboard loads health automatically'}
+        />
+        <Metric label="Marketable subscribers" value={formatNumber(totalSubscribers)} trend="Across loaded company health" />
+      </div>
       <section className="panel table-panel">
         <DataTable
           ariaLabel="Usage rows"

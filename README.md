@@ -2,7 +2,7 @@
 
 A production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
 
-> Status: Phase 4 demo web UI complete and verified locally on kind.
+> Status: SaaS product-depth demo slice in progress: local-first multi-tenant SMS workflows, admin health, content templates, and analytics are covered by targeted UI/API tests.
 
 ## Goals
 
@@ -93,7 +93,7 @@ scripts/local/e2e-smoke-test.sh
 
 The smoke test waits for the local dependencies and service health endpoints, creates a campaign through the Campaign API, then polls `GET /campaigns/{id}` until every message has left `queued` and reached a terminal status (`sent`, `failed`, or `dead_lettered`). Compose defaults the provider simulator to `PROVIDER_MODE=success`, so the deterministic expected result is `sent == message_count`.
 
-The browser demo UI is served by Nginx and proxies API calls under `/api/*` to the Campaign API, so `http://127.0.0.1:8080` can create campaigns and poll status without CORS configuration.
+The browser demo UI is served by Nginx and proxies API calls under `/api/*` to the Campaign API, so `http://127.0.0.1:8080` can create campaigns and poll status without CORS configuration. The frontend keeps the API base local-first through `window.__APP_CONFIG__?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL ?? "/api"`.
 
 Dispatcher reliability defaults:
 
@@ -129,6 +129,14 @@ python scripts/local/seed-demo-data.py
 ```
 
 The script is rerunnable and prints the Demo Retail Co customer email, access code, and company id. It populates regional lists, 12 subscribers, realistic media assets, and scheduled campaigns.
+
+Demo flow after seeding:
+
+1. Open the web UI and use the internal surface to log in as an admin.
+2. Review Companies, then use Review on Demo Retail Co to inspect subscribers, campaigns, scheduled reach, credits, quota usage, access code, and recent/upcoming campaigns.
+3. Open the customer app with the seeded customer access code, then use Content Library templates to prefill Campaign Builder with copy, Smart SMS type, and matching media where available.
+4. Review Company Analytics for scheduled reach, campaign count, message volume, subscriber lists, clicks/redemptions, and campaign summary rows.
+5. Review Internal Usage for top tenant, scheduled reach, quota usage, and company health.
 
 ## Local kind + Helm validation
 
@@ -168,4 +176,4 @@ See [`platform/observability/README.md`](platform/observability/README.md) for i
 
 ## Current next step
 
-See [`docs/plans/0004-phase-4-demo-web-ui.md`](docs/plans/0004-phase-4-demo-web-ui.md) for the latest verified milestone. Recommended next phase: add CI gates, Grafana dashboards/alerts, OpenTelemetry app instrumentation, and Playwright UI smoke tests.
+See [`docs/plans/0008-overnight-saas-depth-run.md`](docs/plans/0008-overnight-saas-depth-run.md) for the current product-depth slice. Recommended next phase: add CI gates, Grafana dashboards/alerts, OpenTelemetry app instrumentation, and Playwright UI smoke tests.

@@ -72,6 +72,17 @@ function mockFetch() {
           quota_usage: 0.85,
           active_access_code: 'ACME-1234',
         },
+        {
+          company_id: 'company-demo',
+          company_name: 'Demo Retail Co',
+          subscriber_count: 2450,
+          campaign_count: 7,
+          scheduled_reach: 1125,
+          credits_remaining: 44000,
+          monthly_send_limit: 50000,
+          quota_usage: 0.225,
+          active_access_code: 'DEMO-2026',
+        },
       ])
     }
 
@@ -183,6 +194,35 @@ function mockFetch() {
           created_at: '2026-05-20T15:00:00Z',
           message_count: 10,
           credit_cost: 10,
+          reminder_count: 1,
+        },
+      ])
+    }
+
+    if (url.endsWith('/companies/company-demo/campaigns')) {
+      return okJson([
+        {
+          id: 'demo-upcoming',
+          company_id: 'company-demo',
+          name: 'Summer Preview',
+          message_type: 'smart',
+          status: 'scheduled',
+          scheduled_at: '2026-06-01T17:30:00Z',
+          created_at: '2026-05-22T05:00:00Z',
+          message_count: 1125,
+          credit_cost: 2250,
+          reminder_count: 0,
+        },
+        {
+          id: 'demo-past',
+          company_id: 'company-demo',
+          name: 'Spring Clearance',
+          message_type: 'regular',
+          status: 'sent',
+          scheduled_at: '2026-05-18T18:00:00Z',
+          created_at: '2026-05-17T15:00:00Z',
+          message_count: 980,
+          credit_cost: 980,
           reminder_count: 1,
         },
       ])
@@ -514,6 +554,30 @@ describe('App', () => {
     expect(screen.getAllByText(/access code/i)).not.toHaveLength(0)
   })
 
+  it('opens a company detail workspace from Review with Demo Retail Co health fields', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+    await loginAsInternalAdmin(user)
+    await user.click(screen.getByRole('button', { name: /^companies$/i }))
+
+    const demoRow = await screen.findByRole('row', { name: /Demo Retail Co/i })
+    await user.click(within(demoRow).getByRole('button', { name: /review demo retail co/i }))
+
+    expect(await screen.findByRole('heading', { name: /Demo Retail Co workspace/i })).toBeInTheDocument()
+    expect(screen.getByText('company-demo')).toBeInTheDocument()
+    expect(screen.getAllByText('2,450')).not.toHaveLength(0)
+    expect(screen.getAllByText('1,125')).not.toHaveLength(0)
+    expect(screen.getAllByText('44,000')).not.toHaveLength(0)
+    expect(screen.getAllByText('50,000')).not.toHaveLength(0)
+    expect(screen.getAllByText(/23% used/i)).not.toHaveLength(0)
+    expect(screen.getAllByText('DEMO-2026')).not.toHaveLength(0)
+    expect(screen.getByText(/Summer Preview/i)).toBeInTheDocument()
+    expect(screen.getByText(/Operator notes have not been added/i)).toBeInTheDocument()
+  })
+
   it('lets internal admin create a company and displays quota plus access code', async () => {
     const fetchMock = mockFetch()
     const user = userEvent.setup()
@@ -808,6 +872,63 @@ describe('App', () => {
     expect(screen.getByText(/Weekend Flash Sale MMS/i)).toBeInTheDocument()
     expect(screen.getByText(/Winback Offer/i)).toBeInTheDocument()
     expect(screen.getByText(/Use code MEMORIAL30/i)).toBeInTheDocument()
+  })
+
+  it('uses a content template to move into the campaign builder with copy and media prefilled', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /content library/i }))
+
+    const flashSaleCard = await screen.findByRole('article', { name: /Weekend Flash Sale MMS/i })
+    await user.click(within(flashSaleCard).getByRole('button', { name: /use template/i }))
+
+    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /builder/i })).toHaveClass('active')
+    expect(screen.getByLabelText(/campaign name/i)).toHaveValue('Weekend Flash Sale MMS')
+    expect(screen.getByLabelText(/message body/i)).toHaveValue(
+      'Flash sale: our bestsellers are back in stock for 48 hours. Tap to shop before sizes sell out.',
+    )
+    expect(screen.getByLabelText(/message type/i)).toHaveValue('smart')
+    expect(screen.getByLabelText(/smart sms media/i)).toHaveValue('media-1')
+  })
+
+  it('renders company analytics summaries from loaded tenant data', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /^analytics$/i }))
+
+    expect(await screen.findByRole('heading', { name: /analytics/i })).toBeInTheDocument()
+    expect(screen.getByText(/Scheduled reach/i)).toBeInTheDocument()
+    expect(screen.getByText(/Subscriber lists/i)).toBeInTheDocument()
+    expect(screen.getByText(/Message volume/i)).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /campaign analytics summary/i })).toBeInTheDocument()
+    expect(screen.getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.getByText(/May 25, 2026/i)).toBeInTheDocument()
+  })
+
+  it('renders internal usage top tenant and scheduled reach summaries', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+    await loginAsInternalAdmin(user)
+    await user.click(screen.getByRole('button', { name: /usage/i }))
+    await user.click(screen.getByRole('button', { name: /load usage/i }))
+
+    expect(await screen.findByText(/Top tenant by message volume/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Acme Retail/i)).not.toHaveLength(0)
+    expect(screen.getAllByText(/Scheduled reach next 30 days/i)).not.toHaveLength(0)
+    expect(screen.getByText('1,975')).toBeInTheDocument()
+    expect(screen.getByText(/Highest quota usage/i)).toBeInTheDocument()
   })
 
   it('lets company admins create access codes and adjust team budgets', async () => {

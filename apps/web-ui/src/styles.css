@@ -407,8 +407,15 @@ button.ghost {
   margin-bottom: 18px;
 }
 
-.section-heading strong {
+.section-heading strong,
+.section-heading h2 {
   color: #111827;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0;
 }
 
 .helper-text,
@@ -679,6 +686,16 @@ textarea {
   color: #64748b;
 }
 
+.compact-list small,
+.subtle-id,
+.compact-id-strip small {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
 .asset-grid {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
@@ -829,6 +846,63 @@ textarea {
   font-size: 1.7rem;
 }
 
+.template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-actions button {
+  flex: 1 1 120px;
+}
+
+.campaign-builder {
+  display: grid;
+  gap: 16px;
+  max-width: 1040px;
+}
+
+.builder-step {
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.builder-step[aria-label="Audience step"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.builder-step[aria-label="Audience step"] .section-heading {
+  grid-column: 1 / -1;
+}
+
+.review-step {
+  display: grid;
+  gap: 10px;
+  align-items: start;
+}
+
+.advanced-tools {
+  margin-top: 22px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px 18px;
+}
+
+.advanced-tools summary {
+  color: #334155;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.company-detail-workspace {
+  margin-top: 20px;
+}
+
 .compact-list li.ok {
   border-color: #86efac;
 }
@@ -933,6 +1007,18 @@ textarea {
   white-space: nowrap;
 }
 
+.company-cell-action {
+  display: grid;
+  gap: 8px;
+  min-width: 128px;
+}
+
+.company-cell-action .inline-action {
+  margin-left: 0;
+  width: fit-content;
+  padding: 7px 10px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -982,6 +1068,7 @@ textarea {
   .two-column,
   .dashboard-grid,
   .analytics-grid,
+  .builder-step[aria-label="Audience step"],
   .audience-picker,
   .campaign-board,
   .form-grid,

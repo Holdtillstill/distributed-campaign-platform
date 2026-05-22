@@ -1,7 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../../api/client'
-import type { AdminDashboardSummary, AdminPage, CompanyHealthRow, CompanyResult, SystemCheck, UsageRow } from '../../types'
+import type {
+  AdminDashboardSummary,
+  AdminPage,
+  CampaignListItem,
+  CompanyHealthRow,
+  CompanyResult,
+  SystemCheck,
+  UsageRow,
+} from '../../types'
 import { AdminDashboard } from './AdminDashboard'
 import { CompaniesPage } from './CompaniesPage'
 import { UsagePage } from './UsagePage'
@@ -18,6 +26,8 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
   const [usageToDate, setUsageToDate] = useState('2026-05-21')
   const [usageRows, setUsageRows] = useState<UsageRow[]>([])
   const [companyHealthRows, setCompanyHealthRows] = useState<CompanyHealthRow[]>([])
+  const [selectedCompanyHealth, setSelectedCompanyHealth] = useState<CompanyHealthRow | null>(null)
+  const [selectedCompanyCampaigns, setSelectedCompanyCampaigns] = useState<CampaignListItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [systemChecks, setSystemChecks] = useState<SystemCheck[]>([
     { path: '/healthz', label: 'Campaign API liveness', state: 'checking', detail: 'Not checked yet' },
@@ -46,6 +56,18 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
       headers: { 'X-Internal-Admin': 'true' },
     })
     if (response.ok) setCompanyHealthRows(await response.json())
+  }
+
+  async function reviewCompany(row: CompanyHealthRow) {
+    setError(null)
+    setSelectedCompanyHealth(row)
+    setSelectedCompanyCampaigns([])
+    const response = await fetch(`${API_BASE_URL}/companies/${row.company_id}/campaigns`)
+    if (!response.ok) {
+      setError(`Company campaign history failed: ${response.status}`)
+      return
+    }
+    setSelectedCompanyCampaigns(await response.json())
   }
 
   function toSystemCheck(response: Response, path: string, label: string): SystemCheck {
@@ -113,6 +135,8 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
         companies={usageRows}
         companyHealthRows={companyHealthRows}
         error={error}
+        selectedCompanyHealth={selectedCompanyHealth}
+        selectedCompanyCampaigns={selectedCompanyCampaigns}
         onCompanyName={setCompanyName}
         onCompanySlug={setCompanySlug}
         onInitialAdminEmail={setInitialAdminEmail}
@@ -120,6 +144,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
         onCreditBalance={setCreditBalance}
         onCreateCompany={createCompany}
         onRefreshCompanyHealth={() => void refreshCompanyHealth()}
+        onReviewCompany={(row) => void reviewCompany(row)}
       />
     )
   }
