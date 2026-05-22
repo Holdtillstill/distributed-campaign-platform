@@ -97,6 +97,10 @@ observability:
   serviceMonitor:
     enabled: true
     interval: 15s
+  otel:
+    enabled: true
+    endpoint: http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317
+    protocol: grpc
 
 networkPolicy:
   enabled: true

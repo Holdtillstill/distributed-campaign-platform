@@ -13,6 +13,7 @@ import httpx
 from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints
+from campaign_common.tracing import context_from_payload, get_tracer, instrument_fastapi_app
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
@@ -28,6 +29,7 @@ DEFAULT_PROVIDER_URL = "http://provider-simulator:8080"
 
 configure_logging(SERVICE_NAME)
 logger = get_logger(__name__)
+tracer = get_tracer(__name__)
 
 
 class MessageJob(BaseModel):
@@ -38,6 +40,7 @@ class MessageJob(BaseModel):
     idempotency_key: str = Field(min_length=1)
     channel: str = "sms"
     retry_count: int = 0
+    trace_context: dict[str, str] = Field(default_factory=dict)
 
 
 class ProviderResult(BaseModel):
@@ -91,6 +94,7 @@ async def lifespan(app_instance: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Dispatcher", version="0.1.0", lifespan=lifespan)
+instrument_fastapi_app(app, SERVICE_NAME)
 add_platform_endpoints(app, service_name=SERVICE_NAME)
 
 
@@ -136,6 +140,8 @@ def dispatch_outcome_from_provider_result(
 
 def retry_job_payload(job: MessageJob, *, retry_count: int) -> dict[str, Any]:
     payload = job.model_dump()
+    if not payload.get("trace_context"):
+        payload.pop("trace_context", None)
     payload["retry_count"] = retry_count
     return payload
 
@@ -298,22 +304,28 @@ async def run_worker(
             await nc.flush()
 
     async def handle_message(msg: Any) -> None:
-        job = MessageJob.model_validate_json(msg.data)
+        raw_payload = json.loads(msg.data.decode("utf-8"))
+        job = MessageJob.model_validate(raw_payload)
 
         async def provider_sender(provider_job: MessageJob) -> ProviderResult:
-            return await send_to_provider_http(provider_job, resolved_provider_url)
+            with tracer.start_as_current_span("provider.send"):
+                return await send_to_provider_http(provider_job, resolved_provider_url)
 
-        await dispatch_message(
-            job,
-            provider_sender,
-            repository.update_status,
-            max_attempts=config.max_attempts,
-            publish_retry=lambda payload: publish_payload(config.retry_subject, payload),
-            publish_dead_letter=lambda payload: publish_payload(
-                config.dead_letter_subject,
-                payload,
-            ),
-        )
+        with tracer.start_as_current_span(
+            "message.consume",
+            context=context_from_payload(raw_payload),
+        ):
+            await dispatch_message(
+                job,
+                provider_sender,
+                repository.update_status,
+                max_attempts=config.max_attempts,
+                publish_retry=lambda payload: publish_payload(config.retry_subject, payload),
+                publish_dead_letter=lambda payload: publish_payload(
+                    config.dead_letter_subject,
+                    payload,
+                ),
+            )
         if hasattr(msg, "ack"):
             await msg.ack()
 

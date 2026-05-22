@@ -14,6 +14,7 @@ from campaign_common.idempotency import generate_idempotency_key
 from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints
+from campaign_common.tracing import get_tracer, inject_trace_context, instrument_fastapi_app
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -23,6 +24,7 @@ STATUS_VALUES = tuple(status_value.value for status_value in MessageStatus)
 
 configure_logging(SERVICE_NAME)
 logger = get_logger(__name__)
+tracer = get_tracer(__name__)
 
 
 class CampaignCreateRequest(BaseModel):
@@ -129,7 +131,8 @@ class AsyncpgCampaignRepository:
             body=body,
             messages=[row.model_dump() for row in message_rows],
         )
-        await self._publisher.publish(message_rows)
+        with tracer.start_as_current_span("nats.publish.messages.dispatch"):
+            await self._publisher.publish(message_rows)
         logger.info(
             "campaign_created",
             campaign_id=campaign_id,
@@ -156,6 +159,7 @@ async def lifespan(app_instance: FastAPI):
 
 
 app = FastAPI(title="Campaign API", version="0.1.0", lifespan=lifespan)
+instrument_fastapi_app(app, SERVICE_NAME)
 add_platform_endpoints(app, service_name=SERVICE_NAME)
 
 
@@ -243,14 +247,16 @@ def build_message_rows(campaign_id: str, recipients: Sequence[str], body: str) -
 
 def message_job_from_row(row: MessageRow | dict[str, Any], channel: str = "sms") -> dict[str, Any]:
     message = row.model_dump() if isinstance(row, MessageRow) else row
-    return {
-        "message_id": message["message_id"],
-        "campaign_id": message["campaign_id"],
-        "recipient": message["recipient"],
-        "body": message["body"],
-        "idempotency_key": message["idempotency_key"],
-        "channel": channel,
-    }
+    return inject_trace_context(
+        {
+            "message_id": message["message_id"],
+            "campaign_id": message["campaign_id"],
+            "recipient": message["recipient"],
+            "body": message["body"],
+            "idempotency_key": message["idempotency_key"],
+            "channel": channel,
+        }
+    )
 
 
 async def publish_message_jobs(

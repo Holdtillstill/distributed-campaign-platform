@@ -33,6 +33,10 @@ helm upgrade --install tempo grafana/tempo \
 helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
   --namespace observability \
   -f platform/observability/opentelemetry-collector-values.yaml
+
+helm upgrade --install alloy grafana/alloy \
+  --namespace observability \
+  -f platform/observability/alloy-values.yaml
 ```
 
 ## Local access after install

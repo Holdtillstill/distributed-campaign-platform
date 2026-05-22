@@ -46,14 +46,26 @@ spec:
             - secretRef:
                 name: {{ include "campaign-platform.fullname" $root }}-app-env
           env:
+            {{- if and $root.Values.observability.otel.enabled (ne $service.component "web-ui") }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ $root.Values.observability.otel.endpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: {{ $root.Values.observability.otel.protocol | quote }}
+            - name: OTEL_TRACES_EXPORTER
+              value: otlp
+            - name: OTEL_METRICS_EXPORTER
+              value: none
+            - name: OTEL_LOGS_EXPORTER
+              value: none
+            - name: OTEL_SERVICE_NAME
+              value: {{ $service.component | quote }}
+            {{- end }}
             {{- if eq $service.component "dispatcher" }}
             - name: DISPATCHER_WORKER_ENABLED
               value: "true"
             {{- else if eq $service.component "web-ui" }}
             - name: CAMPAIGN_API_UPSTREAM
               value: {{ $root.Values.webUi.campaignApiUpstream | quote }}
-            {{- else }}
-            []
             {{- end }}
           resources:
             {{- toYaml $service.values.resources | nindent 12 }}

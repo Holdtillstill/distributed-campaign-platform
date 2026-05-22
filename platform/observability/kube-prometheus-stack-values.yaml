@@ -15,7 +15,15 @@ grafana:
     - name: Tempo
       type: tempo
       access: proxy
-      url: http://tempo.observability.svc.cluster.local:3100
+      url: http://tempo.observability.svc.cluster.local:3200
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: Loki
+          spanStartTimeShift: -5m
+          spanEndTimeShift: 5m
+          tags: [{ key: service.name, value: service }]
+        tracesToMetrics:
+          datasourceUid: prometheus
 
 prometheus:
   prometheusSpec:
