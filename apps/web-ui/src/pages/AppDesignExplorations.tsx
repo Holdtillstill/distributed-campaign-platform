@@ -1,7 +1,7 @@
-type AppDesignId = '1' | '2' | '3' | '4' | '5'
+type AppDesignId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10'
 
 export function routeToAppDesign(pathname: string): AppDesignId | null {
-  const match = /^\/app-designs\/([1-5])\/?$/.exec(pathname)
+  const match = /^\/app-designs\/([1-9]|10)\/?$/.exec(pathname)
   return match ? (match[1] as AppDesignId) : null
 }
 
@@ -14,6 +14,18 @@ function AppDesignLinks({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
     <div className={`app-design-links app-design-links-${tone}`}>
       <a href="/app">Open customer app</a>
       <a href="/app/monitor">Open real-time monitor</a>
+      <a href="/internal">Internal admin</a>
+    </div>
+  )
+}
+
+function AppDesignResourceLinks({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
+  return (
+    <div className={`app-design-links app-design-links-${tone}`}>
+      <a href="/app">Open app</a>
+      <a href="/monitor">Open monitor</a>
+      <a href="/features">Features</a>
+      <a href="/kb">Knowledge base</a>
       <a href="/internal">Internal admin</a>
     </div>
   )
@@ -411,10 +423,376 @@ function RetailOpsWorkspace() {
   )
 }
 
+function MinimalEnterpriseWorkspace() {
+  const workItems = [
+    ['Campaigns', 'Summer Preview', 'Scheduled Jun 1 / owner approved'],
+    ['Broadcast monitor', '64 workers idle-ready', 'Projected 41.8k/min after release'],
+    ['Subscribers', 'VIP Customers + West Region', '375k modeled / double opt-in filters on'],
+    ['Analytics', 'Weekly executive report', 'Clicks, redemptions, and cost by segment'],
+  ]
+
+  return (
+    <main className="app-design app-design-minimal">
+      <aside className="minimal-sidebar">
+        <div className="minimal-brand">
+          <span>CampaignOS</span>
+          <strong>{tenant}</strong>
+        </div>
+        <RailNav active="Dashboard" />
+        <section aria-label="Role and budget">
+          <span>Role and budget</span>
+          <strong>Company owner</strong>
+          <p>{owner} / 4.8M credits available</p>
+        </section>
+      </aside>
+
+      <section className="minimal-workspace">
+        <header className="minimal-topbar">
+          <div>
+            <span>Authenticated workspace</span>
+            <h1>Minimal Enterprise Workspace</h1>
+          </div>
+          <AppDesignResourceLinks />
+        </header>
+
+        <section className="minimal-command" aria-label="Dashboard command surface">
+          <div>
+            <span>Dashboard</span>
+            <strong>Today needs one broadcast approval and one budget review.</strong>
+          </div>
+          <dl>
+            <div>
+              <dt>Credits</dt>
+              <dd>4.8M</dd>
+            </div>
+            <div>
+              <dt>Scheduled reach</dt>
+              <dd>1.36M</dd>
+            </div>
+            <div>
+              <dt>Approval SLA</dt>
+              <dd>42m</dd>
+            </div>
+          </dl>
+        </section>
+
+        <div className="minimal-layout">
+          <section className="minimal-list" aria-label="Campaigns and live broadcast monitor">
+            {workItems.map(([label, title, detail]) => (
+              <article key={label}>
+                <span>{label}</span>
+                <strong>{title}</strong>
+                <p>{detail}</p>
+              </article>
+            ))}
+          </section>
+
+          <aside className="minimal-inspector" aria-label="Settings team budget compliance">
+            <section>
+              <span>Settings</span>
+              <strong>Team permissions</strong>
+              <p>Owner, campaign manager, analyst, and viewer roles are mapped to credit ceilings.</p>
+            </section>
+            <section>
+              <span>Compliance</span>
+              <strong>Consent guardrails active</strong>
+              <p>Quiet hours, opt-out copy, and approval notes are required before send.</p>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function RealtimeBroadcastWarRoom() {
+  const stages = [
+    ['Queued', '412,700', '72%'],
+    ['Sent', '947,300', '64%'],
+    ['Retry watch', '412', '18%'],
+    ['Dead letters', '0', '2%'],
+  ]
+
+  return (
+    <main className="app-design app-design-warroom">
+      <aside className="warroom-rail">
+        <div>
+          <span>War room</span>
+          <strong>{tenant}</strong>
+        </div>
+        <RailNav active="Broadcast monitor" />
+        <section aria-label="Role and budget">
+          <span>Role and budget</span>
+          <strong>Operations lead</strong>
+          <p>Live-send authority / 4.8M credits / retry threshold 0.8%</p>
+        </section>
+      </aside>
+
+      <section className="warroom-main">
+        <header className="warroom-header">
+          <div>
+            <span>Live command surface</span>
+            <h1>Realtime Broadcast War Room</h1>
+          </div>
+          <AppDesignResourceLinks tone="dark" />
+        </header>
+
+        <section className="warroom-monitor" aria-label="Campaigns live broadcast monitor">
+          <div>
+            <span>Campaigns / broadcast monitor</span>
+            <strong>Summer Preview is moving at 41.8k/min.</strong>
+            <p>64 active workers / ETA 18m / no provider incidents / manual refresh armed.</p>
+          </div>
+          <div className="warroom-radar" aria-label="Dashboard">
+            <b>LIVE</b>
+            <i />
+            <i />
+            <i />
+          </div>
+        </section>
+
+        <section className="warroom-stages" aria-label="Broadcast status">
+          {stages.map(([label, value, width]) => (
+            <article key={label}>
+              <div>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+              <i style={{ width }} />
+            </article>
+          ))}
+        </section>
+
+        <div className="warroom-bottom">
+          <section aria-label="Subscribers segments">
+            <span>Subscribers</span>
+            <strong>VIP Customers / West Region</strong>
+            <p>Consent-filtered modeled audience: 375k.</p>
+          </section>
+          <section aria-label="Analytics reporting">
+            <span>Analytics</span>
+            <strong>Delivery curve stable</strong>
+            <p>Clicks, redemptions, provider latency, and retry heat are streaming.</p>
+          </section>
+          <section aria-label="Settings team budget compliance">
+            <span>Settings</span>
+            <strong>Escalation policy</strong>
+            <p>Pause rights limited to owner and operations lead while budget remains green.</p>
+          </section>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function MobileRegionalManager() {
+  return (
+    <main className="app-design app-design-mobile">
+      <section className="mobile-device" aria-label="Mobile authenticated app shell">
+        <header className="mobile-statusbar">
+          <span>Southwest market</span>
+          <strong>2,375 credits</strong>
+        </header>
+
+        <section className="mobile-hero" aria-label="Dashboard">
+          <span>Regional manager</span>
+          <h1>Regional Manager Mobile Console</h1>
+          <p>Three store campaigns need review before the afternoon send window.</p>
+        </section>
+
+        <nav className="mobile-tabs" aria-label="Mobile design navigation">
+          {['Home', 'Sends', 'Segments', 'Reports'].map((item) => (
+            <span className={item === 'Home' ? 'active' : ''} key={item}>
+              {item}
+            </span>
+          ))}
+        </nav>
+
+        <section className="mobile-live-card" aria-label="Campaigns live broadcast monitor">
+          <span>Campaigns / broadcast monitor</span>
+          <strong>Memorial Day Promo</strong>
+          <p>947k sent / 41.8k per minute / ETA 18m</p>
+        </section>
+
+        <section className="mobile-stack">
+          <article aria-label="Subscribers segments">
+            <span>Subscribers</span>
+            <strong>West Region</strong>
+            <p>125k modeled / consent confirmed / import ready</p>
+          </article>
+          <article aria-label="Analytics reporting">
+            <span>Analytics</span>
+            <strong>45 redemptions</strong>
+            <p>Store leaderboard and tracked-link report ready</p>
+          </article>
+          <article aria-label="Settings team budget compliance">
+            <span>Settings</span>
+            <strong>Team budget</strong>
+            <p>Regional manager / Southwest only / compliance copy locked</p>
+          </article>
+        </section>
+      </section>
+
+      <aside className="mobile-companion">
+        <div>
+          <span>Role and budget</span>
+          <strong>{tenant}</strong>
+          <p>{owner} / regional manager with limited budget and local segments.</p>
+        </div>
+        <RailNav active="Subscribers" />
+        <AppDesignResourceLinks />
+      </aside>
+    </main>
+  )
+}
+
+function ComplianceConsentCenter() {
+  const auditRows = [
+    ['Campaigns', 'Winback Offer', 'Needs legal copy approval'],
+    ['Subscribers', 'CSV import #1842', '2,410 rows missing source notes'],
+    ['Broadcast monitor', 'Summer Preview', 'Approved / send window open'],
+    ['Analytics', 'Consent decay report', 'Export ready for compliance review'],
+  ]
+
+  return (
+    <main className="app-design app-design-compliance">
+      <header className="compliance-topbar">
+        <div>
+          <span>Consent operations</span>
+          <h1>Compliance Consent Command Center</h1>
+        </div>
+        <AppDesignResourceLinks />
+      </header>
+
+      <section className="compliance-shell">
+        <aside className="compliance-nav">
+          <strong>{tenant}</strong>
+          <RailNav active="Settings" />
+          <section aria-label="Role and budget">
+            <span>Role and budget</span>
+            <p>Compliance admin / budget releases require approval notes</p>
+          </section>
+        </aside>
+
+        <section className="compliance-review" aria-label="Dashboard command surface">
+          <div className="compliance-score">
+            <span>Risk queue</span>
+            <strong>7 approvals before next broadcast.</strong>
+            <p>Consent evidence, quiet hours, opt-out language, and audience source are checked together.</p>
+          </div>
+          <div className="compliance-table" aria-label="Campaigns subscribers broadcast monitor analytics">
+            {auditRows.map(([label, title, detail]) => (
+              <article key={title}>
+                <span>{label}</span>
+                <strong>{title}</strong>
+                <p>{detail}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <aside className="compliance-ledger" aria-label="Settings team budget compliance">
+          <section>
+            <span>Compliance</span>
+            <strong>Consent ledger</strong>
+            <p>Double opt-in, company-provided, opt-out, and unknown source cohorts are separated.</p>
+          </section>
+          <section>
+            <span>Team</span>
+            <strong>Approval chain</strong>
+            <p>Legal reviewer, company owner, and internal admin escalation are recorded.</p>
+          </section>
+          <section>
+            <span>Budget</span>
+            <strong>Hold 2250 credits</strong>
+            <p>Credits unlock only after the risk queue clears.</p>
+          </section>
+        </aside>
+      </section>
+    </main>
+  )
+}
+
+function AgencyMultiTenantConsole() {
+  const tenants = [
+    ['Demo Retail Co', 'Live', '1.36M reach'],
+    ['Acme Retail', 'Draft', '50k limit'],
+    ['North Market', 'Review', '83k reach'],
+  ]
+
+  return (
+    <main className="app-design app-design-agency">
+      <header className="agency-topbar">
+        <div>
+          <span>Agency operator</span>
+          <h1>Agency Multi-tenant Console</h1>
+        </div>
+        <AppDesignResourceLinks tone="dark" />
+      </header>
+
+      <section className="agency-shell">
+        <aside className="agency-tenants">
+          <div className="agency-identity" aria-label="Role and budget">
+            <span>Role and budget</span>
+            <strong>Agency admin</strong>
+            <p>12 customer tenants / pooled 8.4M credits / internal operator access</p>
+          </div>
+          <nav aria-label="Tenant switcher">
+            {tenants.map(([name, status, detail], index) => (
+              <span className={index === 0 ? 'active' : ''} key={name}>
+                <b>{name}</b>
+                <small>
+                  {status} / {detail}
+                </small>
+              </span>
+            ))}
+          </nav>
+        </aside>
+
+        <section className="agency-command" aria-label="Dashboard command surface">
+          <div className="agency-client-header">
+            <span>Selected tenant</span>
+            <strong>{tenant}</strong>
+            <p>Switch accounts, inspect broadcasts, and rebalance customer budgets from one operator surface.</p>
+          </div>
+
+          <div className="agency-grid">
+            <section aria-label="Campaigns live broadcast monitor">
+              <span>Campaigns / broadcast monitor</span>
+              <strong>Summer Preview live</strong>
+              <p>947k sent / 412 retries / ETA 18m / escalation owner assigned.</p>
+            </section>
+            <section aria-label="Subscribers segments">
+              <span>Subscribers</span>
+              <strong>2.65M modeled</strong>
+              <p>VIP Customers, West Region, loyalty import, and opt-in cohorts.</p>
+            </section>
+            <section aria-label="Analytics reporting">
+              <span>Analytics</span>
+              <strong>Cross-tenant report</strong>
+              <p>Delivery, clicks, redemptions, credit burn, and margin by client.</p>
+            </section>
+            <section aria-label="Settings team budget compliance">
+              <span>Settings</span>
+              <strong>Tenant budget controls</strong>
+              <p>Invite codes, agency seats, compliance notes, and monthly send limits.</p>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+  )
+}
+
 export function AppDesignExploration({ id }: { id: AppDesignId }) {
   if (id === '1') return <OperatorConsole />
   if (id === '2') return <ExecutiveSaas />
   if (id === '3') return <CampaignStudio />
   if (id === '4') return <DataCommandCenter />
-  return <RetailOpsWorkspace />
+  if (id === '5') return <RetailOpsWorkspace />
+  if (id === '6') return <MinimalEnterpriseWorkspace />
+  if (id === '7') return <RealtimeBroadcastWarRoom />
+  if (id === '8') return <MobileRegionalManager />
+  if (id === '9') return <ComplianceConsentCenter />
+  return <AgencyMultiTenantConsole />
 }

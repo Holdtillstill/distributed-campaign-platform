@@ -3662,6 +3662,762 @@ textarea {
   font-size: 1.4rem;
 }
 
+.app-design-minimal {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  background: #f7f7f4;
+  color: #1f2429;
+}
+
+.minimal-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  min-height: 100vh;
+  border-right: 1px solid #deded8;
+  background: #fbfbf8;
+  padding: 22px 16px;
+}
+
+.minimal-brand,
+.minimal-sidebar section,
+.minimal-command,
+.minimal-list article,
+.minimal-inspector section {
+  display: grid;
+  gap: 8px;
+}
+
+.minimal-brand span,
+.minimal-sidebar section span,
+.minimal-topbar span,
+.minimal-command span,
+.minimal-list span,
+.minimal-inspector span {
+  color: #697177;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.minimal-brand strong,
+.minimal-sidebar section strong {
+  overflow-wrap: anywhere;
+}
+
+.minimal-sidebar p,
+.minimal-command p,
+.minimal-list p,
+.minimal-inspector p,
+.agency-client-header p {
+  color: #697177;
+  line-height: 1.55;
+}
+
+.minimal-workspace {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 22px;
+}
+
+.minimal-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #deded8;
+  padding-bottom: 16px;
+}
+
+.minimal-topbar h1 {
+  margin-top: 6px;
+  color: #111416;
+  font-size: clamp(2rem, 4vw, 4.2rem);
+  line-height: 1;
+}
+
+.minimal-command {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.44fr);
+  align-items: end;
+  border-bottom: 1px solid #deded8;
+  padding: 28px 0;
+}
+
+.minimal-command strong {
+  display: block;
+  max-width: 760px;
+  color: #111416;
+  font-size: clamp(2rem, 4vw, 4.8rem);
+  line-height: 0.98;
+}
+
+.minimal-command dl {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  background: #deded8;
+  margin: 0;
+}
+
+.minimal-command dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.minimal-command dt,
+.minimal-command dd {
+  margin: 0;
+}
+
+.minimal-command dd {
+  color: #0f766e;
+  font-weight: 900;
+}
+
+.minimal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+.minimal-list {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  background: #deded8;
+}
+
+.minimal-list article {
+  grid-template-columns: minmax(140px, 0.24fr) minmax(180px, 0.32fr) minmax(0, 1fr);
+  align-items: center;
+  background: #ffffff;
+  padding: 17px;
+}
+
+.minimal-list p {
+  justify-self: end;
+  text-align: right;
+}
+
+.minimal-inspector {
+  display: grid;
+  gap: 12px;
+}
+
+.minimal-inspector section {
+  border: 1px solid #deded8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.app-design-warroom {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  background:
+    radial-gradient(circle at 70% 8%, rgba(248, 113, 113, 0.16), transparent 26%),
+    #08090d;
+  color: #f8fafc;
+}
+
+.warroom-rail {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  min-height: 100vh;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 22px 16px;
+}
+
+.warroom-rail > div,
+.warroom-rail section,
+.warroom-bottom section,
+.warroom-stages article {
+  display: grid;
+  gap: 8px;
+}
+
+.warroom-rail span,
+.warroom-rail section span,
+.warroom-header span,
+.warroom-monitor span,
+.warroom-stages span,
+.warroom-bottom span {
+  color: #fb7185;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.warroom-rail p,
+.warroom-monitor p,
+.warroom-bottom p {
+  color: #aeb7c5;
+  line-height: 1.5;
+}
+
+.warroom-rail nav span.active {
+  background: rgba(251, 113, 133, 0.16);
+  color: #fecdd3;
+}
+
+.warroom-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px;
+}
+
+.warroom-header,
+.compliance-topbar,
+.agency-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.warroom-header h1,
+.compliance-topbar h1,
+.agency-topbar h1 {
+  margin-top: 6px;
+  font-size: clamp(2.1rem, 4vw, 4.4rem);
+  line-height: 0.98;
+}
+
+.warroom-monitor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.36fr);
+  gap: 18px;
+  min-height: 360px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(251, 113, 133, 0.18), transparent 48%),
+    #111827;
+  padding: 24px;
+}
+
+.warroom-monitor > div:first-child {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+}
+
+.warroom-monitor strong {
+  max-width: 900px;
+  font-size: clamp(2.5rem, 5vw, 6rem);
+  line-height: 0.92;
+}
+
+.warroom-radar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: 260px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #05070a;
+}
+
+.warroom-radar b {
+  position: relative;
+  z-index: 1;
+  color: #bbf7d0;
+  font-size: 2rem;
+}
+
+.warroom-radar i {
+  position: absolute;
+  width: 46%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 999px;
+  animation: app-design-radar 2.8s ease-out infinite;
+}
+
+.warroom-radar i:nth-child(3) {
+  animation-delay: 0.7s;
+}
+
+.warroom-radar i:nth-child(4) {
+  animation-delay: 1.4s;
+}
+
+.warroom-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.warroom-stages article,
+.warroom-bottom section {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.78);
+  padding: 16px;
+}
+
+.warroom-stages article div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.warroom-stages strong {
+  font-size: 1.5rem;
+}
+
+.warroom-stages i {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fb7185, #facc15, #22c55e);
+}
+
+.warroom-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.warroom-bottom strong {
+  color: #ffffff;
+  font-size: 1.25rem;
+}
+
+.app-design-mobile {
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) minmax(280px, 0.7fr);
+  gap: 34px;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(135deg, rgba(14, 116, 144, 0.14), transparent 38%),
+    #f4f8fb;
+  color: #152238;
+  padding: 28px;
+}
+
+.mobile-device {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 430px);
+  min-height: 720px;
+  border: 12px solid #111827;
+  border-radius: 34px;
+  background: #ffffff;
+  box-shadow: 0 26px 80px rgba(21, 34, 56, 0.22);
+  padding: 18px;
+}
+
+.mobile-statusbar,
+.mobile-tabs,
+.mobile-companion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-statusbar {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.mobile-hero,
+.mobile-live-card,
+.mobile-stack article,
+.mobile-companion > div {
+  display: grid;
+  gap: 8px;
+}
+
+.mobile-hero {
+  border-radius: 8px;
+  background: #0f766e;
+  color: #ffffff;
+  padding: 18px;
+}
+
+.mobile-hero span,
+.mobile-live-card span,
+.mobile-stack span,
+.mobile-companion span {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mobile-hero h1 {
+  font-size: 2.25rem;
+  line-height: 0.98;
+}
+
+.mobile-hero p,
+.mobile-live-card p,
+.mobile-stack p,
+.mobile-companion p {
+  line-height: 1.45;
+}
+
+.mobile-tabs {
+  overflow-x: auto;
+}
+
+.mobile-tabs span {
+  min-width: max-content;
+  border-radius: 999px;
+  background: #eef3f7;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 850;
+  padding: 9px 12px;
+}
+
+.mobile-tabs span.active {
+  background: #111827;
+  color: #ffffff;
+}
+
+.mobile-live-card {
+  border: 1px solid #cfe0e7;
+  border-radius: 8px;
+  background: #f8fbfd;
+  padding: 16px;
+}
+
+.mobile-live-card strong {
+  color: #111827;
+  font-size: 1.5rem;
+}
+
+.mobile-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-stack article {
+  border: 1px solid #dbe5eb;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.mobile-stack article:nth-child(2) {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.mobile-stack article:nth-child(3) {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.mobile-companion {
+  align-items: stretch;
+  flex-direction: column;
+  max-width: 460px;
+  border: 1px solid #d7e2ea;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 22px;
+}
+
+.mobile-companion strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.app-design-compliance {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  background: #f5f1ea;
+  color: #1f2933;
+  padding: 22px;
+}
+
+.compliance-topbar {
+  border-bottom: 1px solid #d6cdc0;
+  padding-bottom: 16px;
+}
+
+.compliance-topbar span,
+.compliance-nav span,
+.compliance-score span,
+.compliance-table span,
+.compliance-ledger span {
+  color: #9a3412;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compliance-shell {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 310px;
+  gap: 16px;
+}
+
+.compliance-nav,
+.compliance-review,
+.compliance-ledger {
+  border: 1px solid #d6cdc0;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.compliance-nav,
+.compliance-ledger {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 18px;
+}
+
+.compliance-nav nav span.active {
+  background: #7c2d12;
+  color: #ffedd5;
+}
+
+.compliance-nav p,
+.compliance-score p,
+.compliance-table p,
+.compliance-ledger p {
+  color: #6b5f52;
+  line-height: 1.5;
+}
+
+.compliance-review {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.compliance-score {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  min-height: 250px;
+  border-radius: 8px;
+  background: #402218;
+  color: #fff7ed;
+  padding: 22px;
+}
+
+.compliance-score strong {
+  max-width: 760px;
+  font-size: clamp(2.2rem, 4.4vw, 5rem);
+  line-height: 0.96;
+}
+
+.compliance-score p {
+  color: #fed7aa;
+}
+
+.compliance-table {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #d6cdc0;
+  border-radius: 8px;
+  background: #d6cdc0;
+}
+
+.compliance-table article {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.25fr) minmax(180px, 0.3fr) minmax(0, 1fr);
+  gap: 12px;
+  background: #fffdfa;
+  padding: 15px;
+}
+
+.compliance-ledger section {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid #e5d9ca;
+  padding-bottom: 16px;
+}
+
+.compliance-ledger section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.compliance-ledger strong {
+  color: #7c2d12;
+  font-size: 1.25rem;
+}
+
+.app-design-agency {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 100vh;
+  background:
+    linear-gradient(120deg, rgba(45, 212, 191, 0.14), transparent 36%),
+    #10151f;
+  color: #f8fafc;
+  padding: 22px;
+}
+
+.agency-topbar {
+  align-items: center;
+}
+
+.agency-topbar span,
+.agency-identity span,
+.agency-client-header span,
+.agency-grid span {
+  color: #67e8f9;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agency-shell {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.agency-tenants {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 620px;
+}
+
+.agency-identity,
+.agency-tenants nav span,
+.agency-client-header,
+.agency-grid section {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agency-identity {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.agency-identity p {
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.agency-tenants nav {
+  display: grid;
+  gap: 8px;
+}
+
+.agency-tenants nav span {
+  display: grid;
+  gap: 6px;
+  color: #f8fafc;
+  padding: 14px;
+}
+
+.agency-tenants nav span.active {
+  border-color: #67e8f9;
+  background: rgba(8, 145, 178, 0.28);
+}
+
+.agency-tenants small {
+  color: #cbd5e1;
+  font-weight: 750;
+}
+
+.agency-command {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.agency-client-header {
+  display: grid;
+  gap: 10px;
+  min-height: 260px;
+  align-content: center;
+  background:
+    linear-gradient(135deg, rgba(103, 232, 249, 0.18), transparent 54%),
+    rgba(255, 255, 255, 0.08);
+  padding: 24px;
+}
+
+.agency-client-header strong {
+  font-size: clamp(3rem, 6vw, 6.8rem);
+  line-height: 0.9;
+}
+
+.agency-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agency-grid section {
+  display: grid;
+  gap: 8px;
+  min-height: 150px;
+  padding: 18px;
+}
+
+.agency-grid section:nth-child(1) {
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.agency-grid section:nth-child(2) {
+  border-color: rgba(45, 212, 191, 0.45);
+}
+
+.agency-grid section:nth-child(3) {
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.agency-grid section:nth-child(4) {
+  border-color: rgba(244, 114, 182, 0.45);
+}
+
+.agency-grid strong {
+  color: #ffffff;
+  font-size: 1.55rem;
+}
+
+.agency-grid p {
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+@keyframes app-design-radar {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.35);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2.35);
+  }
+}
+
 @keyframes app-design-pulse {
   0%,
   100% {
@@ -3696,7 +4452,12 @@ textarea {
   .studio-hero,
   .data-main-grid,
   .studio-shell,
-  .retail-layout {
+  .retail-layout,
+  .app-design-minimal,
+  .app-design-warroom,
+  .app-design-mobile,
+  .compliance-shell,
+  .agency-shell {
     grid-template-columns: 1fr;
   }
 
@@ -3718,7 +4479,10 @@ textarea {
   .executive-kpis,
   .operator-lower-grid,
   .command-metrics,
-  .retail-operations {
+  .retail-operations,
+  .warroom-stages,
+  .warroom-bottom,
+  .agency-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -3753,8 +4517,18 @@ textarea {
   .executive-main,
   .executive-grid,
   .operator-monitor,
+  .minimal-command,
+  .minimal-layout,
+  .minimal-list article,
+  .warroom-monitor,
+  .warroom-stages,
+  .warroom-bottom,
   .studio-builder,
   .command-grid,
+  .compliance-shell,
+  .compliance-table article,
+  .agency-shell,
+  .agency-grid,
   .executive-kpis,
   .operator-lower-grid,
   .command-metrics,
@@ -3838,6 +4612,10 @@ textarea {
   .premium-nav,
   .studio-nav,
   .operator-topbar,
+  .minimal-topbar,
+  .warroom-header,
+  .compliance-topbar,
+  .agency-topbar,
   .command-header,
   .retail-top,
   .studio-shell-top,
@@ -3862,6 +4640,21 @@ textarea {
   .story-copy {
     width: min(100% - 32px, 900px);
     margin: 0 auto;
+  }
+
+  .minimal-sidebar,
+  .warroom-rail,
+  .agency-tenants {
+    min-height: auto;
+  }
+
+  .minimal-list p {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .mobile-device {
+    min-height: auto;
   }
 
   .story-hero::after {

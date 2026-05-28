@@ -851,6 +851,64 @@ describe('App', () => {
     expect(renderedHeadings.size).toBe(5)
   })
 
+  it('renders five more unique authenticated app design explorations on /app-designs/6 through /app-designs/10', () => {
+    const appDesigns = [
+      {
+        route: '/app-designs/6',
+        heading: 'Minimal Enterprise Workspace',
+        keyContent: [/Today needs one broadcast approval/i, /Consent guardrails active/i],
+      },
+      {
+        route: '/app-designs/7',
+        heading: 'Realtime Broadcast War Room',
+        keyContent: [/Summer Preview is moving at 41.8k\/min/i, /Escalation policy/i],
+      },
+      {
+        route: '/app-designs/8',
+        heading: 'Regional Manager Mobile Console',
+        keyContent: [/Southwest market/i, /Store leaderboard/i],
+      },
+      {
+        route: '/app-designs/9',
+        heading: 'Compliance Consent Command Center',
+        keyContent: [/7 approvals before next broadcast/i, /Consent ledger/i],
+      },
+      {
+        route: '/app-designs/10',
+        heading: 'Agency Multi-tenant Console',
+        keyContent: [/12 customer tenants/i, /Cross-tenant report/i],
+      },
+    ]
+
+    const renderedHeadings = new Set<string>()
+
+    for (const design of appDesigns) {
+      window.history.pushState(null, '', design.route)
+      const { unmount } = render(<App />)
+
+      expect(screen.getByRole('heading', { name: design.heading })).toBeInTheDocument()
+      renderedHeadings.add(design.heading)
+      expect(screen.getAllByText(/Role and budget/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Campaigns/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Broadcast monitor/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Subscribers/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Analytics/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Settings/i).length).toBeGreaterThan(0)
+      for (const content of design.keyContent) {
+        expect(screen.getAllByText(content).length).toBeGreaterThan(0)
+      }
+      expect(screen.getByRole('link', { name: /^Open app$/i })).toHaveAttribute('href', '/app')
+      expect(screen.getByRole('link', { name: /^Open monitor$/i })).toHaveAttribute('href', '/monitor')
+      expect(screen.getByRole('link', { name: /^Features$/i })).toHaveAttribute('href', '/features')
+      expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
+      expect(screen.getByRole('link', { name: /^Internal admin$/i })).toHaveAttribute('href', '/internal')
+
+      unmount()
+    }
+
+    expect(renderedHeadings.size).toBe(5)
+  })
+
   it('shows company login and signup choices from the customer app surface', async () => {
     mockFetch()
     const user = userEvent.setup()
