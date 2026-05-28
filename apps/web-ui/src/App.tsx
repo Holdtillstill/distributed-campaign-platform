@@ -5,18 +5,32 @@ import { AppShell } from './components/AppShell'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
 import { InternalLoginPage } from './pages/InternalLoginPage'
 import { MarketingPage } from './pages/MarketingPage'
+import { AppDesignExploration, routeToAppDesign } from './pages/AppDesignExplorations'
 import { DesignExploration, routeToExploration } from './pages/DesignExplorations'
 import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
-import type { AdminPage, CompanyPage, Membership, Session, Surface } from './types'
+import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
+
+function companyPageFromLocation(): CompanyPage {
+  return window.location.pathname.startsWith('/app/monitor') || window.location.pathname.startsWith('/monitor')
+    ? 'campaigns'
+    : 'dashboard'
+}
+
+function campaignSubpageFromLocation(): CampaignSubpage | undefined {
+  return window.location.pathname.startsWith('/app/monitor') || window.location.pathname.startsWith('/monitor')
+    ? 'monitor'
+    : undefined
+}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => loadStoredSession())
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
   const [designExploration, setDesignExploration] = useState(() => routeToExploration(window.location.pathname))
+  const [appDesignExploration, setAppDesignExploration] = useState(() => routeToAppDesign(window.location.pathname))
   const [adminPage, setAdminPage] = useState<AdminPage>('dashboard')
-  const [companyPage, setCompanyPage] = useState<CompanyPage>('dashboard')
+  const [companyPage, setCompanyPage] = useState<CompanyPage>(() => companyPageFromLocation())
   const [authMessage, setAuthMessage] = useState<string | null>(null)
   const [adminEmail, setAdminEmail] = useState('')
   const [loginEmail, setLoginEmail] = useState('')
@@ -35,6 +49,8 @@ export default function App() {
     const handlePopState = () => {
       setSurface(surfaceFromLocation())
       setDesignExploration(routeToExploration(window.location.pathname))
+      setAppDesignExploration(routeToAppDesign(window.location.pathname))
+      setCompanyPage(companyPageFromLocation())
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -107,7 +123,7 @@ export default function App() {
       creditsUsed: result.credits_used ?? 0,
     })
     setSurface('app')
-    setCompanyPage('dashboard')
+    setCompanyPage(companyPageFromLocation())
   }
 
   function openMembership(membership: Membership) {
@@ -120,7 +136,7 @@ export default function App() {
       creditLimit: membership.credit_limit,
       creditsUsed: membership.credits_used ?? 0,
     })
-    setCompanyPage('dashboard')
+    setCompanyPage(companyPageFromLocation())
   }
 
   const customerAccess = (
@@ -143,6 +159,10 @@ export default function App() {
 
   if (designExploration) {
     return <DesignExploration id={designExploration} />
+  }
+
+  if (appDesignExploration) {
+    return <AppDesignExploration id={appDesignExploration} />
   }
 
   if (!session) {
@@ -183,7 +203,12 @@ export default function App() {
       {session.role === 'internal_admin' ? (
         <AdminWorkspace page={adminPage} />
       ) : (
-        <CompanyWorkspace page={companyPage} session={session} onNavigate={setCompanyPage} />
+        <CompanyWorkspace
+          page={companyPage}
+          session={session}
+          initialCampaignSubpage={campaignSubpageFromLocation()}
+          onNavigate={setCompanyPage}
+        />
       )}
     </AppShell>
   )

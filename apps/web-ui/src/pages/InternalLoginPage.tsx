@@ -21,6 +21,7 @@ export function InternalLoginPage({
           <span>Internal team</span>
           <strong>Admin access</strong>
         </div>
+        <p className="helper-text">Demo login: use ops@example.test. No password is required in this demo flow.</p>
         <label>
           Admin email
           <input

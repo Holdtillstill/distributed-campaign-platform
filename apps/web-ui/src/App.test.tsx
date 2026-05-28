@@ -23,7 +23,22 @@ const notFoundJson = (body: unknown) =>
     json: () => Promise.resolve(body),
   } as Response)
 
-function mockFetch() {
+function failedJson(body: unknown, status = 503) {
+  return Promise.resolve({
+    ok: false,
+    status,
+    statusText: 'Service Unavailable',
+    json: () => Promise.resolve(body),
+  } as Response)
+}
+
+function mockFetch({
+  companyCampaigns,
+  monitorError = false,
+}: {
+  companyCampaigns?: unknown[]
+  monitorError?: boolean
+} = {}) {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method ?? 'GET'
@@ -199,6 +214,7 @@ function mockFetch() {
     }
 
     if (url.endsWith('/companies/company-1/campaigns')) {
+      if (companyCampaigns) return okJson(companyCampaigns)
       return okJson([
         {
           id: 'campaign-upcoming',
@@ -381,6 +397,20 @@ function mockFetch() {
           region: 'West',
           created_at: '2026-05-21T15:00:00Z',
         },
+        ...Array.from({ length: 10 }, (_, index) => {
+          const suffix = String(index + 3).padStart(2, '0')
+          return {
+            id: `subscriber-vip-${suffix}`,
+            company_id: 'company-1',
+            phone_number: `+155500010${suffix}`,
+            marketing_status: 'confirmed',
+            consent_status: 'double_opt_in_confirmed',
+            list_id: 'list-vip',
+            source: 'loyalty',
+            region: 'Phoenix',
+            created_at: '2026-05-22T15:00:00Z',
+          }
+        }),
       ].filter((row) => {
         if (listId && row.list_id !== listId) return false
         if (consentStatus && row.consent_status !== consentStatus) return false
@@ -459,6 +489,7 @@ function mockFetch() {
     }
 
     if (url.endsWith('/campaigns/campaign-upcoming/broadcast-monitor') && method === 'GET') {
+      if (monitorError) return failedJson({ detail: 'monitor offline' })
       return okJson({
         campaign_id: 'campaign-upcoming',
         company_id: 'company-1',
@@ -692,6 +723,60 @@ describe('App', () => {
     expect(renderedHeadings.size).toBe(5)
   })
 
+  it('renders five unique full-app design explorations on /app-designs/1 through /app-designs/5', () => {
+    const appDesigns = [
+      {
+        route: '/app-designs/1',
+        heading: 'Operator Console',
+        activeSurface: /Realtime Broadcast Monitor/i,
+      },
+      {
+        route: '/app-designs/2',
+        heading: 'Executive SaaS Dashboard',
+        activeSurface: /Role and budget/i,
+      },
+      {
+        route: '/app-designs/3',
+        heading: 'Campaign Studio Workspace',
+        activeSurface: /Campaign builder/i,
+      },
+      {
+        route: '/app-designs/4',
+        heading: 'Data Command Center',
+        activeSurface: /Active sends/i,
+      },
+      {
+        route: '/app-designs/5',
+        heading: 'Retail Ops Workspace',
+        activeSurface: /3 sends need review/i,
+      },
+    ]
+
+    const renderedHeadings = new Set<string>()
+
+    for (const design of appDesigns) {
+      window.history.pushState(null, '', design.route)
+      const { unmount } = render(<App />)
+
+      expect(screen.getByRole('heading', { name: design.heading })).toBeInTheDocument()
+      renderedHeadings.add(design.heading)
+      expect(screen.getAllByText(/Dashboard/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Campaigns/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Broadcast monitor/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Subscribers/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Analytics/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Settings/i).length).toBeGreaterThan(0)
+      expect(screen.getByText(design.activeSurface)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /open customer app/i })).toHaveAttribute('href', '/app')
+      expect(screen.getByRole('link', { name: /open real-time monitor/i })).toHaveAttribute('href', '/app/monitor')
+      expect(screen.getByRole('link', { name: /internal admin/i })).toHaveAttribute('href', '/internal')
+
+      unmount()
+    }
+
+    expect(renderedHeadings.size).toBe(5)
+  })
+
   it('shows company login and signup choices from the customer app surface', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -704,6 +789,16 @@ describe('App', () => {
     expect(screen.getByText(/invite-based workspace access/i)).toBeInTheDocument()
     expect(screen.getByText(/owner@demo-retail.test/i)).toBeInTheDocument()
     expect(screen.getByText(/DEMORETA-E568C9/i)).toBeInTheDocument()
+  })
+
+  it('shows customer access first when the monitor deep link is opened signed out', () => {
+    mockFetch()
+
+    window.history.pushState(null, '', '/app/monitor')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /sign in to your campaign workspace/i })).toBeInTheDocument()
+    expect(screen.getByText(/owner@demo-retail.test/i)).toBeInTheDocument()
   })
 
   it('explains invite workspace access and renders membership role plus budget cards', async () => {
@@ -743,6 +838,7 @@ describe('App', () => {
 
     window.history.pushState(null, '', '/internal')
     render(<App />)
+    expect(screen.getByText(/No password is required in this demo flow/i)).toBeInTheDocument()
     await loginAsInternalAdmin(user)
 
     expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument()
@@ -902,6 +998,22 @@ describe('App', () => {
     })
   })
 
+  it('lands on Campaigns Monitor after company login from the /app/monitor deep link', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app/monitor')
+    render(<App />)
+    await signupAsCompanyUser(user)
+
+    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^monitor$/i })).toHaveClass('active')
+    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByText('30/min')).toBeInTheDocument()
+    expect(await screen.findAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
+    expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
+  })
+
   it('shows quota bar and quick actions on company dashboard without Not set', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -916,7 +1028,32 @@ describe('App', () => {
     expect(screen.getByText(/create campaign/i)).toBeInTheDocument()
     expect(screen.getByText(/import subscribers/i)).toBeInTheDocument()
     expect(screen.getByText(/upload media/i)).toBeInTheDocument()
+    expect(screen.getByText(/open broadcast monitor/i)).toBeInTheDocument()
     expect(screen.getByText(/view analytics/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /create campaign/i }))
+    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /builder/i })).toHaveClass('active')
+
+    await user.click(screen.getByRole('button', { name: /^dashboard$/i }))
+    await user.click(screen.getByRole('button', { name: /import subscribers/i }))
+    expect(await screen.findByRole('heading', { name: /subscribers/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^dashboard$/i }))
+    await user.click(screen.getByRole('button', { name: /upload media/i }))
+    expect(await screen.findByRole('heading', { name: /content library/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^dashboard$/i }))
+    await user.click(screen.getByRole('button', { name: /view analytics/i }))
+    expect(await screen.findByRole('heading', { name: /analytics/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^dashboard$/i }))
+    await user.click(screen.getByRole('button', { name: /open broadcast monitor/i }))
+    expect(window.location.pathname).toBe('/app/monitor')
+    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^monitor$/i })).toHaveClass('active')
+    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByText('30/min')).toBeInTheDocument()
   })
 
   it('logs company users in by email membership lookup', async () => {
@@ -1072,6 +1209,12 @@ describe('App', () => {
     window.history.pushState(null, '', '/app')
     render(<App />)
 
+    expect(await screen.findByRole('button', { name: /create campaign/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /import subscribers/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /upload media/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /view analytics/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /open broadcast monitor/i })).toBeEnabled()
+
     await user.click(await screen.findByRole('button', { name: /campaigns/i }))
     await user.click(screen.getByRole('button', { name: /builder/i }))
 
@@ -1125,15 +1268,15 @@ describe('App', () => {
     expect(screen.getByText(/Cart Rescue/i)).toBeInTheDocument()
   })
 
-  it('renders live broadcast monitor with modeled audience and sample throughput', async () => {
-    mockFetch()
+  it('renders live broadcast monitor with modeled audience, sample throughput, and manual refresh', async () => {
+    const fetchMock = mockFetch()
     const user = userEvent.setup()
 
     window.history.pushState(null, '', '/app')
     render(<App />)
     await signupAsCompanyUser(user)
     await user.click(screen.getByRole('button', { name: /campaigns/i }))
-    await user.click(await screen.findByRole('button', { name: /monitor/i }))
+    await user.click(await screen.findByRole('button', { name: /^monitor$/i }))
 
     expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
@@ -1141,6 +1284,39 @@ describe('App', () => {
     expect(screen.getByText(/2 local sample messages/i)).toBeInTheDocument()
     expect(screen.getByText(/projected\/sample/i)).toBeInTheDocument()
     expect(screen.getByText('30/min')).toBeInTheDocument()
+
+    const countMonitorCalls = () =>
+      fetchMock.mock.calls.filter(([request]) => String(request).endsWith('/campaigns/campaign-upcoming/broadcast-monitor'))
+        .length
+    const callsBeforeRefresh = countMonitorCalls()
+    await user.click(screen.getByRole('button', { name: /refresh monitor/i }))
+    await waitFor(() => expect(countMonitorCalls()).toBeGreaterThan(callsBeforeRefresh))
+  })
+
+  it('shows monitor empty and error states without hiding the monitor controls', async () => {
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    mockFetch({ companyCampaigns: [] })
+    const { unmount } = render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    await user.click(await screen.findByRole('button', { name: /^monitor$/i }))
+
+    expect(await screen.findByText(/No campaigns to monitor/i)).toBeInTheDocument()
+    expect(screen.getByText(/Create or seed a campaign before viewing broadcast throughput/i)).toBeInTheDocument()
+
+    unmount()
+    window.localStorage.clear()
+    window.history.pushState(null, '', '/app')
+    mockFetch({ monitorError: true })
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    await user.click(await screen.findByRole('button', { name: /^monitor$/i }))
+
+    expect(await screen.findByText(/Monitor unavailable: 503/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /refresh monitor/i })).toBeInTheDocument()
   })
 
   it('shows subscriber segment cards, a selected subscriber table, and imports pasted CSV rows', async () => {
@@ -1155,7 +1331,17 @@ describe('App', () => {
     expect(await screen.findAllByText(/VIP Customers/i)).not.toHaveLength(0)
     expect(screen.getByRole('table', { name: /subscriber directory/i })).toBeInTheDocument()
     expect(screen.getByText('+15550001001')).toBeInTheDocument()
-    expect(screen.getByText(/double_opt_in_confirmed/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/double_opt_in_confirmed/i)).not.toHaveLength(0)
+
+    await user.selectOptions(screen.getByLabelText(/page size/i), '10')
+    expect(await screen.findByText(/Page 1 of 2/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([request]) => String(request).includes('limit=10&offset=10'))).toBe(true)
+    })
+    expect(await screen.findByText('+15550001012')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /previous/i }))
+    expect(await screen.findByText('+15550001001')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText(/search subscribers/i), 'csv')
     await waitFor(() => {

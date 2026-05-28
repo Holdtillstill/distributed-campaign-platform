@@ -73,10 +73,12 @@ const contentTemplates = [
 export function CompanyWorkspace({
   page,
   session,
+  initialCampaignSubpage,
   onNavigate,
 }: {
   page: CompanyPage
   session: Extract<Session, { role: 'company_user' }>
+  initialCampaignSubpage?: CampaignSubpage
   onNavigate: (page: CompanyPage) => void
 }) {
   const companyId = session.companyId
@@ -84,7 +86,7 @@ export function CompanyWorkspace({
   const [campaignName, setCampaignName] = useState('Memorial Day VIP Weekend')
   const [messageBody, setMessageBody] = useState('Memorial Day starts now: take 30% off summer favorites through Monday. Use code MEMORIAL30 in-store or online.')
   const [messageType, setMessageType] = useState<'regular' | 'smart'>('regular')
-  const [campaignSubpage, setCampaignSubpage] = useState<CampaignSubpage>('overview')
+  const [campaignSubpage, setCampaignSubpage] = useState<CampaignSubpage>(initialCampaignSubpage ?? 'overview')
   const [scheduledAt, setScheduledAt] = useState('2026-05-25T16:00')
   const [smartMediaAssetId, setSmartMediaAssetId] = useState('')
   const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
@@ -222,6 +224,10 @@ export function CompanyWorkspace({
   }, [companyId])
 
   useEffect(() => {
+    if (initialCampaignSubpage) setCampaignSubpage(initialCampaignSubpage)
+  }, [initialCampaignSubpage])
+
+  useEffect(() => {
     async function loadCampaignPlanningData() {
       const [listsResponse, campaignsResponse, mediaResponse, remindersResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
@@ -347,6 +353,12 @@ export function CompanyWorkspace({
     setSmartMediaAssetId(template.messageType === 'smart' ? mediaAsset?.id ?? '' : '')
     setCampaignSubpage('create')
     setContentFeedback(`${template.title} loaded into Campaign Builder`)
+    onNavigate('campaigns')
+  }
+
+  function openBroadcastMonitor() {
+    window.history.pushState(null, '', '/app/monitor')
+    setCampaignSubpage('monitor')
     onNavigate('campaigns')
   }
 
@@ -736,6 +748,9 @@ export function CompanyWorkspace({
             </button>
             <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('content')}>
               Upload media
+            </button>
+            <button className="secondary" onClick={openBroadcastMonitor}>
+              Open broadcast monitor
             </button>
             <button className="secondary" onClick={() => onNavigate('analytics')}>
               View analytics

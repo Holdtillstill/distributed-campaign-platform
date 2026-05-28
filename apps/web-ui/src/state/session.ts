@@ -18,7 +18,7 @@ export function surfaceFromLocation(): Surface {
   const host = window.location.hostname.toLowerCase()
   const path = window.location.pathname
   if (host.startsWith('admin.') || host.startsWith('ops.') || path.startsWith('/internal')) return 'internal'
-  if (path.startsWith('/app')) return 'app'
+  if (path.startsWith('/app') || path.startsWith('/monitor')) return 'app'
   return 'marketing'
 }
 
