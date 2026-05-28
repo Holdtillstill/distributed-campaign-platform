@@ -5,6 +5,7 @@ import { AppShell } from './components/AppShell'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
 import { InternalLoginPage } from './pages/InternalLoginPage'
 import { MarketingPage } from './pages/MarketingPage'
+import { DesignExploration, routeToExploration } from './pages/DesignExplorations'
 import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
@@ -13,6 +14,7 @@ import type { AdminPage, CompanyPage, Membership, Session, Surface } from './typ
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => loadStoredSession())
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
+  const [designExploration, setDesignExploration] = useState(() => routeToExploration(window.location.pathname))
   const [adminPage, setAdminPage] = useState<AdminPage>('dashboard')
   const [companyPage, setCompanyPage] = useState<CompanyPage>('dashboard')
   const [authMessage, setAuthMessage] = useState<string | null>(null)
@@ -30,7 +32,10 @@ export default function App() {
   }
 
   useEffect(() => {
-    const handlePopState = () => setSurface(surfaceFromLocation())
+    const handlePopState = () => {
+      setSurface(surfaceFromLocation())
+      setDesignExploration(routeToExploration(window.location.pathname))
+    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
@@ -129,6 +134,10 @@ export default function App() {
       onOpenMembership={openMembership}
     />
   )
+
+  if (designExploration) {
+    return <DesignExploration id={designExploration} />
+  }
 
   if (!session) {
     if (surface === 'marketing') {

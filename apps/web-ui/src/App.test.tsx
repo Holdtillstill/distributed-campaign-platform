@@ -641,6 +641,56 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
   })
 
+  it('renders five unique portfolio-grade design explorations on /1 through /5', () => {
+    const explorations = [
+      {
+        route: '/1',
+        heading: 'Revenue-grade SMS, modeled before it moves.',
+        keyContent: [/Demo Retail Co/i, /2.65M modeled subscribers/i, /Tempo \+ Grafana/i],
+      },
+      {
+        route: '/2',
+        heading: 'The live send floor for SMS operators.',
+        keyContent: [/Demo Retail Co/i, /41.8k\/min/i, /live broadcast monitor/i],
+      },
+      {
+        route: '/3',
+        heading: 'Millions of messages. One composed release.',
+        keyContent: [/CampaignOS for Demo Retail Co/i, /2.65M/i, /Tempo traces/i],
+      },
+      {
+        route: '/4',
+        heading: 'Build the campaign before the clock starts.',
+        keyContent: [/Demo Retail Co/i, /media library/i, /subscriber pagination/i],
+      },
+      {
+        route: '/5',
+        heading: 'Command every tenant, risk, and broadcast.',
+        keyContent: [/Demo Retail Co/i, /2,650,000/i, /Tempo\/Grafana/i],
+      },
+    ]
+
+    const renderedHeadings = new Set<string>()
+
+    for (const exploration of explorations) {
+      window.history.pushState(null, '', exploration.route)
+      const { unmount } = render(<App />)
+
+      expect(screen.getByRole('heading', { name: exploration.heading })).toBeInTheDocument()
+      renderedHeadings.add(exploration.heading)
+      for (const content of exploration.keyContent) {
+        expect(screen.getAllByText(content).length).toBeGreaterThan(0)
+      }
+      expect(screen.getByRole('link', { name: /open customer app/i })).toHaveAttribute('href', '/app')
+      expect(screen.getByRole('link', { name: /internal console/i })).toHaveAttribute('href', '/internal')
+      expect(screen.getByRole('link', { name: /api docs/i })).toHaveAttribute('href', '/api/docs')
+
+      unmount()
+    }
+
+    expect(renderedHeadings.size).toBe(5)
+  })
+
   it('shows company login and signup choices from the customer app surface', async () => {
     mockFetch()
     const user = userEvent.setup()
