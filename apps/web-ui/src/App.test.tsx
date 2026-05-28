@@ -203,6 +203,7 @@ function mockFetch() {
           id: 'campaign-upcoming',
           company_id: 'company-1',
           name: 'Memorial Day Promo',
+          body: 'Memorial Day discount copy with MEMORIAL30 for weekend shoppers.',
           message_type: 'smart',
           status: 'scheduled',
           scheduled_at: '2026-05-25T16:00:00Z',
@@ -215,6 +216,7 @@ function mockFetch() {
           id: 'campaign-past',
           company_id: 'company-1',
           name: 'Spring Launch',
+          body: 'Spring clearance launch copy for loyalty members.',
           message_type: 'regular',
           status: 'sent',
           scheduled_at: '2026-05-20T16:00:00Z',
@@ -222,6 +224,19 @@ function mockFetch() {
           message_count: 10,
           credit_cost: 10,
           reminder_count: 1,
+        },
+        {
+          id: 'campaign-cart',
+          company_id: 'company-1',
+          name: 'Cart Rescue',
+          body: 'Abandoned cart reminder with free shipping today.',
+          message_type: 'regular',
+          status: 'queued',
+          scheduled_at: null,
+          created_at: '2026-05-23T15:00:00Z',
+          message_count: 8,
+          credit_cost: 8,
+          reminder_count: 0,
         },
       ])
     }
@@ -232,6 +247,7 @@ function mockFetch() {
           id: 'demo-upcoming',
           company_id: 'company-demo',
           name: 'Summer Preview',
+          body: 'Summer preview copy for Demo Retail Co.',
           message_type: 'smart',
           status: 'scheduled',
           scheduled_at: '2026-06-01T17:30:00Z',
@@ -244,6 +260,7 @@ function mockFetch() {
           id: 'demo-past',
           company_id: 'company-demo',
           name: 'Spring Clearance',
+          body: 'Spring clearance copy for Demo Retail Co.',
           message_type: 'regular',
           status: 'sent',
           scheduled_at: '2026-05-18T18:00:00Z',
@@ -820,6 +837,50 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /follow-ups/i }))
 
     expect(screen.getByLabelText(/follow-up source campaign/i)).toBeInTheDocument()
+  })
+
+  it('filters campaigns by search, status, scheduled date, and clears filters', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+
+    expect(await screen.findByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.getByText(/Spring Launch/i)).toBeInTheDocument()
+    expect(screen.getByText(/Cart Rescue/i)).toBeInTheDocument()
+    expect(screen.getByText(/Showing 3 of 3 campaigns/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/search campaigns/i), 'abandoned')
+
+    expect(screen.getByText(/Cart Rescue/i)).toBeInTheDocument()
+    expect(screen.getByText(/Showing 1 of 3 campaigns/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Memorial Day Promo/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Spring Launch/i)).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText(/search campaigns/i))
+    await user.selectOptions(screen.getByLabelText(/campaign status/i), 'sent')
+
+    expect(screen.getByText(/Spring Launch/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Memorial Day Promo/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Cart Rescue/i)).not.toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText(/campaign status/i), 'all')
+    await user.type(screen.getByLabelText(/scheduled\/created from/i), '2026-05-24T00:00')
+    await user.type(screen.getByLabelText(/scheduled\/created to/i), '2026-05-26T00:00')
+
+    expect(screen.getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Spring Launch/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Cart Rescue/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /clear filters/i }))
+
+    expect(screen.getByText(/Showing 3 of 3 campaigns/i)).toBeInTheDocument()
+    expect(screen.getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.getByText(/Spring Launch/i)).toBeInTheDocument()
+    expect(screen.getByText(/Cart Rescue/i)).toBeInTheDocument()
   })
 
   it('shows subscriber segment cards, a selected subscriber table, and imports pasted CSV rows', async () => {

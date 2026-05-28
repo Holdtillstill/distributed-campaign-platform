@@ -190,6 +190,7 @@ export type CampaignListItem = {
   id: string
   company_id: string
   name: string
+  body?: string | null
   message_type: 'regular' | 'smart'
   status: string
   scheduled_at?: string | null

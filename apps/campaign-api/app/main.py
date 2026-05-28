@@ -200,6 +200,7 @@ class CampaignListItemResponse(BaseModel):
     id: str
     company_id: str
     name: str
+    body: str | None = None
     message_type: str
     status: str
     scheduled_at: Any | None = None

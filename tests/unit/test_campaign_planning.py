@@ -159,6 +159,7 @@ class FakePlanningRepository:
                 "id": "campaign-upcoming",
                 "company_id": company_id,
                 "name": "Memorial Day Promo",
+                "body": "Memorial Day discount copy",
                 "message_type": "smart",
                 "status": "scheduled",
                 "scheduled_at": "2026-05-25T16:00:00Z",
@@ -171,6 +172,7 @@ class FakePlanningRepository:
                 "id": "campaign-past",
                 "company_id": company_id,
                 "name": "Spring Launch",
+                "body": "Spring launch copy",
                 "message_type": "regular",
                 "status": "sent",
                 "scheduled_at": "2026-05-20T16:00:00Z",
@@ -279,6 +281,7 @@ def test_customer_can_list_upcoming_and_past_campaigns(campaign_module, fake_rep
         "campaign-past",
     ]
     assert response.json()[0]["status"] == "scheduled"
+    assert response.json()[0]["body"] == "Memorial Day discount copy"
     assert response.json()[1]["reminder_count"] == 1
 
 

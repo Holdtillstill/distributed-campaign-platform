@@ -89,6 +89,10 @@ export function CompanyWorkspace({
   const [selectedListIds, setSelectedListIds] = useState<string[]>([])
   const [selectedSubscriberIds, setSelectedSubscriberIds] = useState<string[]>([])
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([])
+  const [campaignSearch, setCampaignSearch] = useState('')
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState('all')
+  const [campaignDateFrom, setCampaignDateFrom] = useState('')
+  const [campaignDateTo, setCampaignDateTo] = useState('')
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [listName, setListName] = useState('VIP List')
   const [subscriberList, setSubscriberList] = useState<SubscriberListResult | null>(null)
@@ -136,8 +140,24 @@ export function CompanyWorkspace({
     return listSubscriberCount + selectedSubscriberIds.length
   }, [selectedListIds, selectedSubscriberIds.length, subscriberLists])
 
-  const upcomingCampaigns = campaigns.filter((item) => item.status === 'scheduled')
-  const pastCampaigns = campaigns.filter((item) => item.status !== 'scheduled')
+  const campaignStatusOptions = useMemo(
+    () => Array.from(new Set(campaigns.map((item) => item.status).filter(Boolean))).sort(),
+    [campaigns],
+  )
+  const filteredCampaigns = useMemo(
+    () => filterCampaigns(campaigns, {
+      search: campaignSearch,
+      status: campaignStatusFilter,
+      from: campaignDateFrom,
+      to: campaignDateTo,
+    }),
+    [campaignDateFrom, campaignDateTo, campaignSearch, campaignStatusFilter, campaigns],
+  )
+  const hasCampaignFilters =
+    campaignSearch.trim() !== '' || campaignStatusFilter !== 'all' || campaignDateFrom !== '' || campaignDateTo !== ''
+  const upcomingCampaigns = filteredCampaigns.filter((item) => item.status === 'scheduled')
+  const pastCampaigns = filteredCampaigns.filter((item) => item.status !== 'scheduled')
+  const directSubscriberPicklist = subscribers.slice(0, 50)
   const selectedSubscriberList = subscriberLists.find((list) => list.id === selectedSubscriberListId)
   const visibleSubscribers =
     selectedSubscriberListId === 'all'
@@ -229,6 +249,7 @@ export function CompanyWorkspace({
         id: result.id,
         company_id: result.company_id,
         name: result.name,
+        body: messageBody,
         message_type: result.message_type,
         status: result.status,
         scheduled_at: result.scheduled_at,
@@ -596,6 +617,70 @@ export function CompanyWorkspace({
           ))}
         </div>
 
+        {campaignSubpage === 'overview' || campaignSubpage === 'scheduled' || campaignSubpage === 'past' ? (
+          <section className="panel campaign-filters" aria-label="Campaign filters">
+            <div className="section-heading">
+              <span>Filters</span>
+              <strong>
+                Showing {formatNumber(filteredCampaigns.length)} of {formatNumber(campaigns.length)} campaigns
+              </strong>
+            </div>
+            <div className="form-grid">
+              <label>
+                Search campaigns
+                <input
+                  value={campaignSearch}
+                  onChange={(event) => setCampaignSearch(event.target.value)}
+                  placeholder="Name or message body"
+                />
+              </label>
+              <label>
+                Campaign status
+                <select value={campaignStatusFilter} onChange={(event) => setCampaignStatusFilter(event.target.value)}>
+                  <option value="all">All statuses</option>
+                  {campaignStatusOptions.map((status) => (
+                    <option value={status} key={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Scheduled/created from
+                <input
+                  type="datetime-local"
+                  value={campaignDateFrom}
+                  onChange={(event) => setCampaignDateFrom(event.target.value)}
+                />
+              </label>
+              <label>
+                Scheduled/created to
+                <input
+                  type="datetime-local"
+                  value={campaignDateTo}
+                  onChange={(event) => setCampaignDateTo(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="filter-actions">
+              <span>Scheduled/created date window</span>
+              <button
+                className="secondary"
+                disabled={!hasCampaignFilters}
+                type="button"
+                onClick={() => {
+                  setCampaignSearch('')
+                  setCampaignStatusFilter('all')
+                  setCampaignDateFrom('')
+                  setCampaignDateTo('')
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         {campaignSubpage === 'overview' ? (
           <>
             <div className="metric-grid spaced">
@@ -613,21 +698,41 @@ export function CompanyWorkspace({
               />
             </div>
             <div className="campaign-board">
-              <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns.slice(0, 5)} onEdit={() => setCampaignSubpage('create')} />
-              <CampaignColumn title="Past" campaigns={pastCampaigns.slice(0, 5)} onEdit={() => setCampaignSubpage('create')} />
+              <CampaignColumn
+                title="Upcoming"
+                campaigns={upcomingCampaigns.slice(0, 5)}
+                emptyText={hasCampaignFilters ? 'No upcoming campaigns match the current filters.' : undefined}
+                onEdit={() => setCampaignSubpage('create')}
+              />
+              <CampaignColumn
+                title="Past"
+                campaigns={pastCampaigns.slice(0, 5)}
+                emptyText={hasCampaignFilters ? 'No past campaigns match the current filters.' : undefined}
+                onEdit={() => setCampaignSubpage('create')}
+              />
             </div>
           </>
         ) : null}
 
         {campaignSubpage === 'scheduled' ? (
           <div className="campaign-board single">
-            <CampaignColumn title="Upcoming" campaigns={upcomingCampaigns} onEdit={() => setCampaignSubpage('create')} />
+            <CampaignColumn
+              title="Upcoming"
+              campaigns={upcomingCampaigns}
+              emptyText={hasCampaignFilters ? 'No scheduled campaigns match the current filters.' : undefined}
+              onEdit={() => setCampaignSubpage('create')}
+            />
           </div>
         ) : null}
 
         {campaignSubpage === 'past' ? (
           <div className="campaign-board single">
-            <CampaignColumn title="Past" campaigns={pastCampaigns} onEdit={() => setCampaignSubpage('create')} />
+            <CampaignColumn
+              title="Past"
+              campaigns={pastCampaigns}
+              emptyText={hasCampaignFilters ? 'No sent, queued, or cancelled campaigns match the current filters.' : undefined}
+              onEdit={() => setCampaignSubpage('create')}
+            />
           </div>
         ) : null}
 
@@ -659,16 +764,24 @@ export function CompanyWorkspace({
                 <div>
                   <h2>Audience members</h2>
                   {subscribers.length ? (
-                    subscribers.map((subscriber) => (
-                      <label className="check-row" key={subscriber.id}>
-                        <input
-                          type="checkbox"
-                          checked={selectedSubscriberIds.includes(subscriber.id)}
-                          onChange={() => setSelectedSubscriberIds((current) => toggleValue(current, subscriber.id))}
-                        />
-                        {subscriber.phone_number} ({subscriber.consent_status})
-                      </label>
-                    ))
+                    <>
+                      {directSubscriberPicklist.map((subscriber) => (
+                        <label className="check-row" key={subscriber.id}>
+                          <input
+                            type="checkbox"
+                            checked={selectedSubscriberIds.includes(subscriber.id)}
+                            onChange={() => setSelectedSubscriberIds((current) => toggleValue(current, subscriber.id))}
+                          />
+                          {subscriber.phone_number} ({subscriber.consent_status})
+                        </label>
+                      ))}
+                      {subscribers.length > directSubscriberPicklist.length ? (
+                        <p className="muted">
+                          Showing {formatNumber(directSubscriberPicklist.length)} of {formatNumber(subscribers.length)} direct
+                          subscribers. Use segments for broad sends.
+                        </p>
+                      ) : null}
+                    </>
                   ) : (
                     <p className="muted">Import or confirm subscribers first.</p>
                   )}
@@ -1294,10 +1407,12 @@ export function CompanyWorkspace({
 function CampaignColumn({
   title,
   campaigns,
+  emptyText = 'No campaigns yet.',
   onEdit,
 }: {
   title: string
   campaigns: CampaignListItem[]
+  emptyText?: string
   onEdit?: (campaign: CampaignListItem) => void
 }) {
   return (
@@ -1309,8 +1424,10 @@ function CampaignColumn({
             <li key={campaign.id}>
               <strong>{campaign.name}</strong>
               <small className="subtle-id">Campaign ID: {campaign.id}</small>
+              {campaign.body ? <span>Copy: {campaign.body}</span> : null}
               <span>{campaign.status}</span>
               <span>Scheduled: {formatLocalDateTime(campaign.scheduled_at)}</span>
+              <span>Created: {formatLocalDateTime(campaign.created_at)}</span>
               <span>Messages: {formatNumber(campaign.message_count)}</span>
               <span>Credits: {formatNumber(campaign.credit_cost)}</span>
               <span>Follow-ups: {formatNumber(campaign.reminder_count)}</span>
@@ -1323,8 +1440,44 @@ function CampaignColumn({
           ))}
         </ul>
       ) : (
-        <p className="muted">No campaigns yet.</p>
+        <p className="muted">{emptyText}</p>
       )}
     </section>
   )
+}
+
+function filterCampaigns(
+  campaigns: CampaignListItem[],
+  filters: {
+    search: string
+    status: string
+    from: string
+    to: string
+  },
+) {
+  const search = filters.search.trim().toLowerCase()
+  const fromTime = parseFilterDateTime(filters.from)
+  const toTime = parseFilterDateTime(filters.to)
+
+  return campaigns.filter((campaign) => {
+    const searchable = `${campaign.name ?? ''} ${campaign.body ?? ''}`.toLowerCase()
+    if (search && !searchable.includes(search)) return false
+    if (filters.status !== 'all' && campaign.status !== filters.status) return false
+
+    const campaignTime = parseCampaignDateTime(campaign)
+    if (fromTime !== null && (campaignTime === null || campaignTime < fromTime)) return false
+    if (toTime !== null && (campaignTime === null || campaignTime > toTime)) return false
+
+    return true
+  })
+}
+
+function parseCampaignDateTime(campaign: CampaignListItem): number | null {
+  return parseFilterDateTime(campaign.scheduled_at ?? campaign.created_at ?? '')
+}
+
+function parseFilterDateTime(value: string): number | null {
+  if (!value) return null
+  const parsed = new Date(value).getTime()
+  return Number.isNaN(parsed) ? null : parsed
 }

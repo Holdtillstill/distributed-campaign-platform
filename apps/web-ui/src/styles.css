@@ -785,6 +785,23 @@ textarea {
   align-items: start;
 }
 
+.campaign-filters {
+  margin-top: 18px;
+}
+
+.campaign-filters .form-grid {
+  max-width: none;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  color: #64748b;
+}
+
 .campaign-board.single {
   grid-template-columns: 1fr;
 }
@@ -1111,5 +1128,10 @@ textarea {
   .inline-action {
     display: block;
     margin: 10px 0 0;
+  }
+
+  .filter-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
