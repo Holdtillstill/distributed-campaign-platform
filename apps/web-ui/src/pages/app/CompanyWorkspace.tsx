@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { MetricCard as Metric } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
 import { QuotaBar } from '../../components/QuotaBar'
+import { getRoleMeta, roleOptions } from '../../roles'
 import type {
   AccessCodeResult,
   BroadcastMonitor,
@@ -147,6 +148,16 @@ export function CompanyWorkspace({
   const [editUserRole, setEditUserRole] = useState('campaign_manager')
   const [editCreditLimit, setEditCreditLimit] = useState('2000')
   const [error, setError] = useState<string | null>(null)
+  const roleMeta = getRoleMeta(session.membershipRole)
+  const availableRoles = roleOptions()
+  const isReadOnly = roleMeta.isReadOnly
+  const canCreateCampaign = roleMeta.canCreateCampaign
+  const canInvite = roleMeta.canInvite
+  const canManageBudget = roleMeta.canManageBudget
+  const userBudgetLimit = session.creditLimit
+  const userCreditsUsed = session.creditsUsed ?? 0
+  const hasUserBudget = userBudgetLimit !== null && userBudgetLimit !== undefined
+  const userBudgetRemaining = hasUserBudget ? Math.max(0, userBudgetLimit - userCreditsUsed) : null
 
   const selectedModeledAudienceCount = useMemo(() => {
     const listSubscriberCount = subscriberLists
@@ -192,6 +203,15 @@ export function CompanyWorkspace({
     () => new Map(subscriberLists.map((list) => [list.id, list.name])),
     [subscriberLists],
   )
+  const campaignCreditMultiplier = messageType === 'smart' ? 2 : 1
+  const projectedSampleCreditCost = selectedSampleAudienceCount * campaignCreditMultiplier
+  const projectedModeledCreditCost = selectedModeledAudienceCount * campaignCreditMultiplier
+  const budgetExceeded =
+    hasUserBudget && userBudgetRemaining !== null && projectedSampleCreditCost > userBudgetRemaining
+  const canSubmitCampaign = canCreateCampaign && selectedSampleAudienceCount > 0 && !budgetExceeded
+  const restrictionCopy = isReadOnly
+    ? `${roleMeta.label} access is reporting-only. Operational actions are disabled for this workspace.`
+    : `${roleMeta.label} access is scoped to ${roleMeta.marketScope.toLowerCase()}.`
 
   useEffect(() => {
     async function loadDashboardSummary() {
@@ -289,6 +309,10 @@ export function CompanyWorkspace({
     }
   }, [campaignSubpage, monitorRefreshTick, page, selectedMonitorCampaignId])
 
+  useEffect(() => {
+    if (page === 'settings') void refreshTeamUsers()
+  }, [companyId, page])
+
   function toggleValue(current: string[], value: string): string[] {
     return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
   }
@@ -312,6 +336,10 @@ export function CompanyWorkspace({
   }
 
   function applyTemplate(template: (typeof contentTemplates)[number]) {
+    if (!canCreateCampaign) {
+      setContentFeedback(`${roleMeta.label} access cannot create campaigns from templates.`)
+      return
+    }
     const mediaAsset = findTemplateMediaAsset(template)
     setCampaignName(template.title)
     setMessageBody(template.copy)
@@ -330,6 +358,14 @@ export function CompanyWorkspace({
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    if (!canCreateCampaign) {
+      setError(`${roleMeta.label} members cannot schedule campaigns. Ask an owner or campaign manager to send this broadcast.`)
+      return
+    }
+    if (budgetExceeded) {
+      setError('Projected sample send exceeds your remaining budget allocation.')
+      return
+    }
     const response = await fetch(`${API_BASE_URL}/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Company-Id': companyId, 'X-User-Email': session.email },
@@ -385,6 +421,7 @@ export function CompanyWorkspace({
 
   async function createSubscriberList(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -395,6 +432,7 @@ export function CompanyWorkspace({
 
   async function importSubscriber(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -427,6 +465,7 @@ export function CompanyWorkspace({
 
   async function importCsvSubscribers(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const rows = parseCsvRows(csvImportText)
     const importedSubscribers: SubscriberResult[] = []
     const createdLists = new Map(subscriberLists.map((list) => [list.name.toLowerCase(), list]))
@@ -485,6 +524,7 @@ export function CompanyWorkspace({
 
   async function startOptIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/public/opt-ins`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -499,12 +539,14 @@ export function CompanyWorkspace({
 
   async function confirmOptIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/public/opt-ins/${confirmToken}/confirm`, { method: 'POST' })
     if (response.ok) setConfirmResult(await response.json())
   }
 
   async function addMediaAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -534,6 +576,7 @@ export function CompanyWorkspace({
 
   async function createTrackedLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-links`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -566,6 +609,7 @@ export function CompanyWorkspace({
 
   async function createReminder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!canCreateCampaign) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -584,6 +628,7 @@ export function CompanyWorkspace({
 
   async function createTeamAccessCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!canInvite) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/access-codes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -602,6 +647,7 @@ export function CompanyWorkspace({
 
   async function updateTeamUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!canManageBudget) return
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/users/${encodeURIComponent(editUserEmail)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -625,8 +671,31 @@ export function CompanyWorkspace({
         <PageHeader
           eyebrow="Company workspace"
           title="Company dashboard"
-          description={`Active company: ${session.companyName} (${companyId})`}
+          description={`Active company: ${session.companyName} (${companyId}). ${roleMeta.permissionSummary}`}
         />
+        <section className="role-aware-banner" aria-label="Workspace access summary">
+          <div>
+            <span className="eyebrow">Workspace role</span>
+            <strong>{roleMeta.label}</strong>
+            <p>{roleMeta.description}</p>
+          </div>
+          <div>
+            <span>Market scope</span>
+            <strong>{roleMeta.marketScope}</strong>
+            <p>Phase 1 models this ownership in the UI. Segment-level ACL enforcement is a backend follow-up.</p>
+          </div>
+          <div>
+            <span>User allocation</span>
+            <strong>
+              {hasUserBudget ? `${formatNumber(userBudgetRemaining)} remaining` : 'Company pooled budget'}
+            </strong>
+            <p>
+              {hasUserBudget
+                ? `${formatNumber(userCreditsUsed)} used of ${formatNumber(userBudgetLimit)} assigned credits.`
+                : 'This membership does not have a separate user credit limit.'}
+            </p>
+          </div>
+        </section>
         <div className="metric-grid">
           <Metric label="Subscribers" value={formatCount(dashboardSummary?.subscriber_count)} trend="Confirmed and imported audience" />
           <Metric label="Campaigns" value={formatCount(dashboardSummary?.campaign_count)} trend="Scheduled or sent" />
@@ -654,6 +723,7 @@ export function CompanyWorkspace({
               <strong>Quick actions</strong>
             </div>
             <button
+              disabled={!canCreateCampaign}
               onClick={() => {
                 setCampaignSubpage('create')
                 onNavigate('campaigns')
@@ -661,15 +731,16 @@ export function CompanyWorkspace({
             >
               Create campaign
             </button>
-            <button className="secondary" onClick={() => onNavigate('subscribers')}>
+            <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('subscribers')}>
               Import subscribers
             </button>
-            <button className="secondary" onClick={() => onNavigate('content')}>
+            <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('content')}>
               Upload media
             </button>
             <button className="secondary" onClick={() => onNavigate('analytics')}>
               View analytics
             </button>
+            {!canCreateCampaign ? <p className="helper-text wide">{restrictionCopy}</p> : null}
           </section>
         </div>
         <div className="dashboard-grid">
@@ -712,8 +783,33 @@ export function CompanyWorkspace({
         <PageHeader
           title="Campaigns"
           description="Plan broadcasts, review scheduled and sent campaigns, and build follow-up automations in their own workspace."
-          action={<button onClick={() => setCampaignSubpage('create')}>Create campaign</button>}
+          action={
+            <button disabled={!canCreateCampaign} onClick={() => setCampaignSubpage('create')}>
+              Create campaign
+            </button>
+          }
         />
+        <section className="budget-context" aria-label="Campaign budget and permission context">
+          <div>
+            <span>Permission</span>
+            <strong>{canCreateCampaign ? 'Campaign creation enabled' : 'Read-only campaign access'}</strong>
+            <p>{roleMeta.permissionSummary}</p>
+          </div>
+          <div>
+            <span>Market scope</span>
+            <strong>{roleMeta.marketScope}</strong>
+            <p>Campaigns should use lists within this assigned scope until segment ACLs are enforced server-side.</p>
+          </div>
+          <div>
+            <span>Budget</span>
+            <strong>{hasUserBudget ? `${formatNumber(userBudgetRemaining)} user credits` : `${formatNumber(dashboardSummary?.credit_balance)} company credits`}</strong>
+            <p>
+              {hasUserBudget
+                ? `${formatNumber(userCreditsUsed)} used from ${formatNumber(userBudgetLimit)} allocated credits.`
+                : 'No user-level limit; campaign cost draws from the company balance.'}
+            </p>
+          </div>
+        </section>
         <div className="segmented-control" aria-label="Campaign sections">
           {campaignTabs.map((tab) => (
             <button
@@ -811,13 +907,13 @@ export function CompanyWorkspace({
                 title="Upcoming"
                 campaigns={upcomingCampaigns.slice(0, 5)}
                 emptyText={hasCampaignFilters ? 'No upcoming campaigns match the current filters.' : undefined}
-                onEdit={() => setCampaignSubpage('create')}
+                onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
               />
               <CampaignColumn
                 title="Past"
                 campaigns={pastCampaigns.slice(0, 5)}
                 emptyText={hasCampaignFilters ? 'No past campaigns match the current filters.' : undefined}
-                onEdit={() => setCampaignSubpage('create')}
+                onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
               />
             </div>
           </>
@@ -829,7 +925,7 @@ export function CompanyWorkspace({
               title="Upcoming"
               campaigns={upcomingCampaigns}
               emptyText={hasCampaignFilters ? 'No scheduled campaigns match the current filters.' : undefined}
-              onEdit={() => setCampaignSubpage('create')}
+              onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
             />
           </div>
         ) : null}
@@ -840,7 +936,7 @@ export function CompanyWorkspace({
               title="Past"
               campaigns={pastCampaigns}
               emptyText={hasCampaignFilters ? 'No sent, queued, or cancelled campaigns match the current filters.' : undefined}
-              onEdit={() => setCampaignSubpage('create')}
+              onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
             />
           </div>
         ) : null}
@@ -848,6 +944,12 @@ export function CompanyWorkspace({
         {campaignSubpage === 'create' ? (
           <>
             <form className="campaign-builder" onSubmit={createCampaign}>
+              {!canCreateCampaign ? (
+                <section className="permission-callout" aria-label="Read-only campaign restriction">
+                  <strong>Campaign scheduling is disabled for {roleMeta.label}</strong>
+                  <p>{restrictionCopy}</p>
+                </section>
+              ) : null}
               <section className="builder-step" aria-label="Audience step">
                 <div className="section-heading">
                   <span>Step 1</span>
@@ -965,17 +1067,43 @@ export function CompanyWorkspace({
                   <span>Step 4</span>
                   <strong>Review/estimate</strong>
                 </div>
-                <p className="estimate">
-                  Local sample cost: {formatNumber(selectedSampleAudienceCount * (messageType === 'smart' ? 2 : 1))} credits
-                </p>
+                <div className="estimate-grid" aria-label="Campaign credit estimate">
+                  <div>
+                    <span>Modeled audience</span>
+                    <strong>{formatNumber(selectedModeledAudienceCount)}</strong>
+                    <small>{formatNumber(selectedSampleAudienceCount)} loaded sample rows</small>
+                  </div>
+                  <div>
+                    <span>Campaign credit cost</span>
+                    <strong>{formatNumber(projectedSampleCreditCost)}</strong>
+                    <small>Local sample cost at {formatNumber(campaignCreditMultiplier)} credit/message</small>
+                  </div>
+                  <div>
+                    <span>Company balance</span>
+                    <strong>{formatNumber(dashboardSummary?.credit_balance)}</strong>
+                    <small>Current tenant credit balance</small>
+                  </div>
+                  <div>
+                    <span>User allocation</span>
+                    <strong>{hasUserBudget ? formatNumber(userBudgetRemaining) : 'Pooled'}</strong>
+                    <small>
+                      {hasUserBudget
+                        ? `${formatNumber(userCreditsUsed)} used of ${formatNumber(userBudgetLimit)}`
+                        : 'No user-level budget limit'}
+                    </small>
+                  </div>
+                </div>
                 <p className="muted">
-                  {formatNumber(selectedModeledAudienceCount)} modeled audience / {formatNumber(selectedSampleAudienceCount)} sample
-                  messages selected for {messageType === 'smart' ? 'Smart SMS' : 'Regular SMS'}.
+                  {formatNumber(projectedModeledCreditCost)} credits would be required for the full modeled audience;
+                  this demo schedules against loaded sample rows while preserving the modeled audience count.
                 </p>
                 {selectedSampleAudienceCount === 0 ? (
                   <p className="helper-text">Select at least one segment or subscriber before scheduling.</p>
                 ) : null}
-                <button disabled={selectedSampleAudienceCount === 0}>Schedule campaign</button>
+                {budgetExceeded ? (
+                  <p className="warning-text">Projected sample send exceeds your remaining budget allocation.</p>
+                ) : null}
+                <button disabled={!canSubmitCampaign}>Schedule campaign</button>
               </section>
             </form>
             {campaign ? (
@@ -1115,8 +1243,9 @@ export function CompanyWorkspace({
                 Follow-up copy
                 <textarea value={reminderMessageBody ?? ''} onChange={(event) => setReminderMessageBody(event.target.value)} />
               </label>
-              <button disabled={!reminderSourceCampaignId}>Create follow-up reminder</button>
+              <button disabled={!canCreateCampaign || !reminderSourceCampaignId}>Create follow-up reminder</button>
               {!reminderSourceCampaignId ? <p className="helper-text wide">Choose a source campaign before creating a follow-up.</p> : null}
+              {!canCreateCampaign ? <p className="helper-text wide">{restrictionCopy}</p> : null}
             </form>
             {reminderCampaign ? (
               <div className="result-strip">
@@ -1164,8 +1293,22 @@ export function CompanyWorkspace({
       <>
         <PageHeader
           title="Subscribers"
-          description="Manage audience lists, regional segments, consent status, and CSV imports."
+          description={`Manage audience lists, regional segments, consent status, and CSV imports. Scope: ${roleMeta.marketScope}.`}
         />
+        {isReadOnly ? (
+          <section className="permission-callout" aria-label="Read-only subscriber restriction">
+            <strong>Audience changes are disabled for {roleMeta.label}</strong>
+            <p>{restrictionCopy}</p>
+          </section>
+        ) : (
+          <section className="scope-note" aria-label="Market segment ownership">
+            <strong>{roleMeta.marketScope}</strong>
+            <p>
+              Regional ownership is represented by list and segment selection in Phase 1. Backend segment ACLs
+              should attach these lists to memberships in a later slice.
+            </p>
+          </section>
+        )}
         <div className="metric-grid spaced">
           <button
             className={`segment-card ${selectedSubscriberListId === 'all' ? 'active' : ''}`}
@@ -1298,7 +1441,7 @@ export function CompanyWorkspace({
               Subscriber list name
               <input value={listName ?? ''} onChange={(event) => setListName(event.target.value)} />
             </label>
-            <button>Create list</button>
+            <button disabled={isReadOnly}>Create list</button>
             {subscriberList ? <p className="muted">List id: {subscriberList.id}</p> : null}
           </form>
           <form className="panel" onSubmit={importCsvSubscribers}>
@@ -1315,7 +1458,7 @@ export function CompanyWorkspace({
               Paste CSV subscribers
               <textarea value={csvImportText ?? ''} onChange={(event) => setCsvImportText(event.target.value)} />
             </label>
-            <button>Import CSV</button>
+            <button disabled={isReadOnly}>Import CSV</button>
             {csvImportResult ? <p className="muted">{csvImportResult}</p> : null}
           </form>
         </div>
@@ -1334,7 +1477,7 @@ export function CompanyWorkspace({
               Subscriber source
               <input value={subscriberSource ?? ''} onChange={(event) => setSubscriberSource(event.target.value)} />
             </label>
-            <button>Import subscriber</button>
+            <button disabled={isReadOnly}>Import subscriber</button>
             {subscriber ? <p className="muted">{subscriber.consent_status}</p> : null}
           </form>
           <div className="panel">
@@ -1351,7 +1494,7 @@ export function CompanyWorkspace({
                 Opt-in source
                 <input value={optInSource ?? ''} onChange={(event) => setOptInSource(event.target.value)} />
               </label>
-              <button>Start opt-in</button>
+              <button disabled={isReadOnly}>Start opt-in</button>
             </form>
             {optIn ? <p className="muted">Token: {optIn.confirmation_token}</p> : null}
             <form className="stacked-form" onSubmit={confirmOptIn}>
@@ -1359,7 +1502,7 @@ export function CompanyWorkspace({
                 Confirmation token
                 <input value={confirmToken ?? ''} onChange={(event) => setConfirmToken(event.target.value)} />
               </label>
-              <button>Confirm opt-in</button>
+              <button disabled={isReadOnly}>Confirm opt-in</button>
             </form>
             {confirmResult ? <p className="muted">{confirmResult.status}</p> : null}
           </div>
@@ -1373,8 +1516,14 @@ export function CompanyWorkspace({
       <>
         <PageHeader
           title="Content Library"
-          description="Store media, offer destinations, and tracked assets for Smart SMS campaigns."
+          description={`Store media, offer destinations, and tracked assets for Smart SMS campaigns. ${roleMeta.permissionSummary}`}
         />
+        {isReadOnly ? (
+          <section className="permission-callout" aria-label="Read-only content restriction">
+            <strong>Content changes are disabled for {roleMeta.label}</strong>
+            <p>{restrictionCopy}</p>
+          </section>
+        ) : null}
         <section className="panel">
           <div className="section-heading">
             <span>Templates</span>
@@ -1392,13 +1541,13 @@ export function CompanyWorkspace({
                   <p>{template.copy}</p>
                 </div>
                 <div className="template-actions">
-                  <button type="button" onClick={() => applyTemplate(template)}>
+                  <button type="button" disabled={!canCreateCampaign} onClick={() => applyTemplate(template)}>
                     Use template
                   </button>
                   <button className="secondary" type="button" onClick={() => copyTemplateCopy(template)}>
                     Copy copy
                   </button>
-                  <button className="secondary" type="button" onClick={() => applyTemplate(template)}>
+                  <button className="secondary" type="button" disabled={!canCreateCampaign} onClick={() => applyTemplate(template)}>
                     Create campaign
                   </button>
                 </div>
@@ -1433,7 +1582,7 @@ export function CompanyWorkspace({
               Media url
               <input value={mediaUrl ?? ''} onChange={(event) => setMediaUrl(event.target.value)} />
             </label>
-            <button>Add URL media</button>
+            <button disabled={isReadOnly}>Add URL media</button>
             <button className="secondary inline-action" type="button" onClick={() => void refreshMediaAssets()}>
               Refresh media assets
             </button>
@@ -1492,7 +1641,7 @@ export function CompanyWorkspace({
                 Destination url
                 <input value={destinationUrl ?? ''} onChange={(event) => setDestinationUrl(event.target.value)} />
               </label>
-              <button>Create tracked link</button>
+              <button disabled={isReadOnly}>Create tracked link</button>
               <button className="secondary inline-action" type="button" onClick={() => void refreshCampaignLinks()}>
                 Refresh tracked links
               </button>
@@ -1529,9 +1678,13 @@ export function CompanyWorkspace({
       <>
         <PageHeader
           title="Analytics"
-          description="Review campaign performance, tracked links, redemptions, and quota consumption."
+          description={`Review campaign performance, tracked links, redemptions, and quota consumption. ${roleMeta.label} can view this reporting surface.`}
           action={<button onClick={() => void refreshPerformance()}>Refresh performance</button>}
         />
+        <section className="scope-note" aria-label="Analytics permission scope">
+          <strong>{roleMeta.canViewAnalytics ? 'Analytics access enabled' : 'Analytics access limited'}</strong>
+          <p>{roleMeta.permissionSummary}</p>
+        </section>
         <div className="metric-grid spaced">
           <Metric label="Scheduled reach" value={formatNumber(scheduledReach)} trend="Modeled recipients in upcoming campaigns" />
           <Metric label="Campaign count" value={formatNumber(campaigns.length || dashboardSummary?.campaign_count)} trend="Loaded campaign history" />
@@ -1592,84 +1745,162 @@ export function CompanyWorkspace({
 
   return (
     <>
-      <PageHeader title="Settings" description="Manage tenant identity, team access, roles, and regional credit budgets." />
-      <div className="result-strip">
-        <strong>{session.companyName}</strong>
-        <span>{companyId}</span>
-        <span>{session.membershipRole ?? 'company_user'}</span>
-        <span>Credits: {formatNumber(dashboardSummary?.credit_balance)}</span>
-      </div>
-      <div className="split-layout two-column settings-grid">
-        <form className="panel" onSubmit={createTeamAccessCode}>
-          <div className="section-heading">
-            <span>Invite</span>
-            <strong>Access code</strong>
-          </div>
-          <label>
-            Invite role
-            <select value={inviteRole ?? ''} onChange={(event) => setInviteRole(event.target.value)}>
-              <option value="customer_admin">Company admin</option>
-              <option value="campaign_manager">Campaign manager</option>
-              <option value="regional_manager">Regional manager</option>
-              <option value="analyst">Analyst</option>
-              <option value="viewer">Viewer</option>
-            </select>
-          </label>
-          <label>
-            User credit limit
-            <input value={inviteCreditLimit ?? ''} onChange={(event) => setInviteCreditLimit(event.target.value)} />
-          </label>
-          <button>Create user access code</button>
-          {accessCodeResult ? (
-            <p className="notice">
-              Code {accessCodeResult.code} grants {accessCodeResult.role} with{' '}
-              {formatNumber(accessCodeResult.credit_limit)} credits.
-            </p>
-          ) : null}
-        </form>
+      <PageHeader title="Settings" description="Manage tenant identity, team access, roles, invites, and regional credit budgets." />
+      <section className="settings-summary" aria-label="Tenant access summary">
+        <div>
+          <span>Company</span>
+          <strong>{session.companyName}</strong>
+          <p>{companyId}</p>
+        </div>
+        <div>
+          <span>Your role</span>
+          <strong>{roleMeta.label}</strong>
+          <p>{roleMeta.permissionSummary}</p>
+        </div>
+        <div>
+          <span>Company credits</span>
+          <strong>{formatNumber(dashboardSummary?.credit_balance)}</strong>
+          <p>{hasUserBudget ? `${formatNumber(userBudgetRemaining)} remaining in your allocation.` : 'No separate user allocation.'}</p>
+        </div>
+      </section>
 
-        <form className="panel" onSubmit={updateTeamUser}>
-          <div className="section-heading">
-            <span>Permissions</span>
-            <strong>Adjust user</strong>
-          </div>
-          <label>
-            User email
-            <input value={editUserEmail ?? ''} onChange={(event) => setEditUserEmail(event.target.value)} />
-          </label>
-          <label>
-            User role
-            <select value={editUserRole ?? ''} onChange={(event) => setEditUserRole(event.target.value)}>
-              <option value="customer_admin">Company admin</option>
-              <option value="campaign_manager">Campaign manager</option>
-              <option value="regional_manager">Regional manager</option>
-              <option value="analyst">Analyst</option>
-              <option value="viewer">Viewer</option>
-            </select>
-          </label>
-          <label>
-            User credit limit
-            <input value={editCreditLimit ?? ''} onChange={(event) => setEditCreditLimit(event.target.value)} />
-          </label>
-          <button>Update user permissions</button>
-          <button className="secondary inline-action" type="button" onClick={() => void refreshTeamUsers()}>
-            Refresh team
-          </button>
-        </form>
-      </div>
-      {teamUsers.length ? (
-        <ul className="compact-list">
-          {teamUsers.map((user) => (
-            <li key={user.user_id}>
-              <strong>{user.email}</strong>
-              <span>{user.role}</span>
-              <span>
-                Budget: {formatNumber(user.credits_used)} used / {formatNumber(user.credit_limit)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {canInvite ? (
+        <div className="split-layout two-column settings-grid">
+          <form className="panel" onSubmit={createTeamAccessCode}>
+            <div className="section-heading">
+              <span>Invite</span>
+              <strong>Access code</strong>
+            </div>
+            <p className="helper-text">
+              Generate a code for a teammate. When they join, the selected role and credit limit become their
+              membership allocation.
+            </p>
+            <label>
+              Invite role
+              <select value={inviteRole ?? ''} onChange={(event) => setInviteRole(event.target.value)}>
+                {availableRoles.map((role) => (
+                  <option value={role.value} key={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              User credit limit
+              <input value={inviteCreditLimit ?? ''} onChange={(event) => setInviteCreditLimit(event.target.value)} />
+            </label>
+            <button>Create user access code</button>
+            {accessCodeResult ? (
+              <p className="notice">
+                Generated access code {accessCodeResult.code} grants {getRoleMeta(accessCodeResult.role).label} with{' '}
+                {formatNumber(accessCodeResult.credit_limit)} credits.
+              </p>
+            ) : null}
+          </form>
+
+          <form className="panel" onSubmit={updateTeamUser}>
+            <div className="section-heading">
+              <span>Permissions</span>
+              <strong>Adjust user</strong>
+            </div>
+            <p className="helper-text">
+              Update an existing member role or budget. Use this for regional owners, campaign managers, and
+              reporting-only stakeholders.
+            </p>
+            <label>
+              User email
+              <input value={editUserEmail ?? ''} onChange={(event) => setEditUserEmail(event.target.value)} />
+            </label>
+            <label>
+              User role
+              <select value={editUserRole ?? ''} onChange={(event) => setEditUserRole(event.target.value)}>
+                {availableRoles.map((role) => (
+                  <option value={role.value} key={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              User credit limit
+              <input value={editCreditLimit ?? ''} onChange={(event) => setEditCreditLimit(event.target.value)} />
+            </label>
+            <button>Update user permissions</button>
+            <button className="secondary inline-action" type="button" onClick={() => void refreshTeamUsers()}>
+              Refresh team
+            </button>
+          </form>
+        </div>
+      ) : (
+        <section className="permission-callout" aria-label="Read-only team permissions">
+          <strong>Team and budget controls are restricted</strong>
+          <p>
+            {roleMeta.label} members cannot invite users, issue access codes, or change credit allocations.
+            Ask a company owner or admin to update access.
+          </p>
+        </section>
+      )}
+
+      <section className="panel table-panel">
+        <div className="section-heading">
+          <span>Team</span>
+          <strong>Roles, access, and budgets</strong>
+        </div>
+        <DataTable
+          ariaLabel="Team roles and budgets"
+          rows={teamUsers}
+          getRowKey={(user) => user.user_id}
+          empty={
+            <EmptyState
+              title="Team members have not been loaded"
+              description="Refresh team to load users, roles, and credit allocations from the company membership API."
+            />
+          }
+          columns={[
+            {
+              key: 'member',
+              header: 'Member',
+              render: (user) => (
+                <div className="table-primary-cell">
+                  <strong>{user.display_name ?? user.email}</strong>
+                  <span>{user.email}</span>
+                </div>
+              ),
+            },
+            { key: 'role', header: 'Role', render: (user) => getRoleMeta(user.role).label },
+            { key: 'used', header: 'Used', render: (user) => formatNumber(user.credits_used) },
+            { key: 'limit', header: 'Credit limit', render: (user) => formatNumber(user.credit_limit) },
+            {
+              key: 'remaining',
+              header: 'Remaining',
+              render: (user) =>
+                user.credit_limit !== null && user.credit_limit !== undefined
+                  ? formatNumber(Math.max(0, user.credit_limit - user.credits_used))
+                  : 'Pooled',
+            },
+            {
+              key: 'actions',
+              header: 'Actions',
+              render: (user) =>
+                canManageBudget ? (
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => {
+                      setEditUserEmail(user.email)
+                      setEditUserRole(user.role)
+                      setEditCreditLimit(user.credit_limit !== null && user.credit_limit !== undefined ? String(user.credit_limit) : '')
+                    }}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <span className="muted">Read-only</span>
+                ),
+            },
+          ]}
+        />
+      </section>
     </>
   )
 }

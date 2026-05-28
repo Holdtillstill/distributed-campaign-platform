@@ -13,6 +13,8 @@ export type Session =
       companyId: string
       companyName: string
       membershipRole?: string
+      creditLimit?: number | null
+      creditsUsed?: number
     }
 
 export type Membership = {

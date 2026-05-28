@@ -1,6 +1,8 @@
 import type { FormEvent } from 'react'
 
+import { getRoleMeta } from '../roles'
 import type { Membership } from '../types'
+import { formatNumber } from '../utils'
 
 export function CustomerAccessPage({
   signupEmail,
@@ -33,18 +35,85 @@ export function CustomerAccessPage({
 }) {
   return (
     <main className="auth-screen">
-      <section className="auth-hero">
-        <p className="eyebrow">Customer access</p>
-        <h1>Sign in to your campaign workspace</h1>
-        <p>New user? Sign up with an access code. Existing user? Find your workspace by email.</p>
+      <section className="auth-hero workspace-access-hero">
+        <div>
+          <p className="eyebrow">Invite-based workspace access</p>
+          <h1>Sign in to your campaign workspace</h1>
+          <p>
+            Existing invited users enter their email to choose a workspace. New teammates join with the
+            access code issued by a company owner or admin.
+          </p>
+        </div>
+        <aside className="demo-helper" aria-label="Demo credentials">
+          <span>Demo workspace</span>
+          <strong>Demo Retail Co</strong>
+          <p>
+            Evaluators can look up <b>owner@demo-retail.test</b> or join with access code <b>DEMORETA-E568C9</b>.
+          </p>
+        </aside>
       </section>
 
       <section className="auth-grid" aria-label="Authentication choices">
-        <form className="panel" onSubmit={onSignup}>
+        <form className="panel access-panel" onSubmit={onLookup}>
           <div className="section-heading">
-            <span>New user?</span>
-            <strong>Sign up with access code</strong>
+            <span>Existing invited user</span>
+            <strong>Find your workspace</strong>
           </div>
+          <p className="helper-text">
+            We match your email against active company memberships, then show the role and allocation before
+            opening the workspace.
+          </p>
+          <label>
+            Login email
+            <input
+              type="email"
+              value={loginEmail}
+              onChange={(event) => onLoginEmail(event.target.value)}
+              placeholder="you@company.com"
+            />
+          </label>
+          <button>Find my companies</button>
+          {memberships.length ? (
+            <ul className="compact-list membership-list">
+              {memberships.map((membership) => {
+                const roleMeta = getRoleMeta(membership.role)
+                const remaining =
+                  membership.credit_limit !== null && membership.credit_limit !== undefined
+                    ? Math.max(0, membership.credit_limit - (membership.credits_used ?? 0))
+                    : null
+
+                return (
+                  <li aria-label={membership.company_name} key={membership.company_id}>
+                    <div>
+                      <strong>{membership.company_name}</strong>
+                      <span>{roleMeta.label}</span>
+                      <small>{roleMeta.permissionSummary}</small>
+                      <small>
+                        Budget:{' '}
+                        {membership.credit_limit !== null && membership.credit_limit !== undefined
+                          ? `${formatNumber(remaining)} remaining of ${formatNumber(membership.credit_limit)}`
+                          : 'company pooled budget'}
+                      </small>
+                    </div>
+                    <button className="secondary" type="button" onClick={() => onOpenMembership(membership)}>
+                      Open {membership.company_name}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+        </form>
+
+        <form className="panel access-panel" onSubmit={onSignup}>
+          <div className="section-heading">
+            <span>New invited teammate</span>
+            <strong>Join with access code</strong>
+          </div>
+          <p className="helper-text">
+            Owners and admins generate role-specific codes in Settings. The code carries the role and user
+            credit limit for this demo workspace access flow.
+          </p>
           <label>
             Work email
             <input
@@ -67,38 +136,6 @@ export function CustomerAccessPage({
             />
           </label>
           <button>Sign up with access code</button>
-        </form>
-
-        <form className="panel" onSubmit={onLookup}>
-          <div className="section-heading">
-            <span>Existing user?</span>
-            <strong>Find your workspace</strong>
-          </div>
-          <label>
-            Login email
-            <input
-              type="email"
-              value={loginEmail}
-              onChange={(event) => onLoginEmail(event.target.value)}
-              placeholder="you@company.com"
-            />
-          </label>
-          <button>Find my companies</button>
-          {memberships.length ? (
-            <ul className="compact-list membership-list">
-              {memberships.map((membership) => (
-                <li aria-label={membership.company_name} key={membership.company_id}>
-                  <div>
-                    <strong>{membership.company_name}</strong>
-                    <span>{membership.role}</span>
-                  </div>
-                  <button className="secondary" type="button" onClick={() => onOpenMembership(membership)}>
-                    Open {membership.company_name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </form>
       </section>
       {authMessage ? <p className="notice">{authMessage}</p> : null}

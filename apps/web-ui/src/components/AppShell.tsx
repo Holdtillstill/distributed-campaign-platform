@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 
+import { getRoleMeta } from '../roles'
 import type { AdminPage, CompanyPage, NavItem, Session } from '../types'
+import { formatNumber } from '../utils'
 
 const adminNav: NavItem<AdminPage>[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -37,6 +39,11 @@ export function AppShell({
   const isAdmin = session.role === 'internal_admin'
   const nav = isAdmin ? adminNav : companyNav
   const activePage = isAdmin ? adminPage : companyPage
+  const roleMeta = session.role === 'company_user' ? getRoleMeta(session.membershipRole) : null
+  const remainingBudget =
+    session.role === 'company_user' && session.creditLimit !== null && session.creditLimit !== undefined
+      ? Math.max(0, session.creditLimit - (session.creditsUsed ?? 0))
+      : null
 
   return (
     <main className={isAdmin ? 'app-frame admin-frame' : 'app-frame company-frame'}>
@@ -45,6 +52,32 @@ export function AppShell({
           <span>CampaignOS</span>
           <strong>{isAdmin ? 'Internal' : session.companyName}</strong>
         </div>
+        {session.role === 'company_user' && roleMeta ? (
+          <div className="sidebar-context" aria-label="Workspace role and budget">
+            <span className="context-kicker">{roleMeta.label}</span>
+            <strong>{session.email}</strong>
+            <p>{roleMeta.permissionSummary}</p>
+            <div className="sidebar-budget">
+              <span>Budget</span>
+              <strong>
+                {session.creditLimit !== null && session.creditLimit !== undefined
+                  ? `${formatNumber(remainingBudget)} remaining`
+                  : 'Company pooled'}
+              </strong>
+              <small>
+                {session.creditLimit !== null && session.creditLimit !== undefined
+                  ? `${formatNumber(session.creditsUsed ?? 0)} used of ${formatNumber(session.creditLimit)}`
+                  : 'No individual allocation on this membership'}
+              </small>
+            </div>
+          </div>
+        ) : (
+          <div className="sidebar-context" aria-label="Internal role">
+            <span className="context-kicker">Internal operator</span>
+            <strong>{session.email}</strong>
+            <p>Tenant setup, quota visibility, usage reporting, and platform observability.</p>
+          </div>
+        )}
         <nav>
           {nav.map((item) => (
             <button
@@ -60,7 +93,7 @@ export function AppShell({
           ))}
         </nav>
         <div className="sidebar-footer">
-          <span>{session.email}</span>
+          <span>{isAdmin ? 'Internal console' : roleMeta?.marketScope ?? 'Workspace access'}</span>
           <button className="secondary" onClick={onLogout}>
             Logout
           </button>

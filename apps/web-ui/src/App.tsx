@@ -94,6 +94,8 @@ export default function App() {
       company_id: string
       company_name: string
       membership_role: string
+      credit_limit?: number | null
+      credits_used?: number
     }
     persistSession({
       role: 'company_user',
@@ -101,6 +103,8 @@ export default function App() {
       companyId: result.company_id,
       companyName: result.company_name,
       membershipRole: result.membership_role,
+      creditLimit: result.credit_limit,
+      creditsUsed: result.credits_used ?? 0,
     })
     setSurface('app')
     setCompanyPage('dashboard')
@@ -113,6 +117,8 @@ export default function App() {
       companyId: membership.company_id,
       companyName: membership.company_name,
       membershipRole: membership.role,
+      creditLimit: membership.credit_limit,
+      creditsUsed: membership.credits_used ?? 0,
     })
     setCompanyPage('dashboard')
   }

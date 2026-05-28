@@ -130,7 +130,8 @@ function mockFetch() {
           company_id: 'company-1',
           company_name: 'Acme Retail',
           membership_role: 'customer_admin',
-          credit_limit: null,
+          credit_limit: 50000,
+          credits_used: 125,
         },
         201,
       )
@@ -700,6 +701,28 @@ describe('App', () => {
 
     expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /find my companies/i })).toBeInTheDocument()
+    expect(screen.getByText(/invite-based workspace access/i)).toBeInTheDocument()
+    expect(screen.getByText(/owner@demo-retail.test/i)).toBeInTheDocument()
+    expect(screen.getByText(/DEMORETA-E568C9/i)).toBeInTheDocument()
+  })
+
+  it('explains invite workspace access and renders membership role plus budget cards', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    expect(screen.getAllByText(/Existing invited user/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/New invited teammate/i)).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText(/login email/i))
+    await user.type(screen.getByLabelText(/login email/i), 'owner@acme.test')
+    await user.click(screen.getByRole('button', { name: /find my companies/i }))
+
+    const membership = await screen.findByRole('listitem', { name: /acme retail/i })
+    expect(within(membership).getByText(/Company admin/i)).toBeInTheDocument()
+    expect(within(membership).getByText(/Full workspace control/i)).toBeInTheDocument()
+    expect(within(membership).getByText(/50,000 remaining of 50,000/i)).toBeInTheDocument()
   })
 
   it('shows customer access on /app even with an internal admin session', async () => {
@@ -910,6 +933,11 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
     expect(screen.getByText(/owner@acme.test/)).toBeInTheDocument()
+    const shellContext = screen.getByLabelText(/workspace role and budget/i)
+    expect(within(shellContext).getByText(/Company admin/i)).toBeInTheDocument()
+    expect(within(shellContext).getByText(/Full workspace control/i)).toBeInTheDocument()
+    expect(within(shellContext).getByText(/50,000 remaining/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/workspace access summary/i)).toHaveTextContent(/All company markets and segments/i)
   })
 
   it('shows a helpful login message when no memberships exist', async () => {
@@ -972,6 +1000,12 @@ describe('App', () => {
     await user.selectOptions(screen.getByLabelText(/smart sms media/i), 'media-1')
     await user.click(screen.getByLabelText(/VIP Customers/i))
     await user.click(screen.getByLabelText(/\+15550001002/i))
+    const estimate = screen.getByLabelText(/campaign credit estimate/i)
+    expect(within(estimate).getByText(/Modeled audience/i)).toBeInTheDocument()
+    expect(within(estimate).getByText(/Campaign credit cost/i)).toBeInTheDocument()
+    expect(within(estimate).getByText(/Company balance/i)).toBeInTheDocument()
+    expect(within(estimate).getByText(/User allocation/i)).toBeInTheDocument()
+    expect(within(estimate).getByText('6')).toBeInTheDocument()
     await user.clear(screen.getByLabelText(/schedule date and time/i))
     await user.type(screen.getByLabelText(/schedule date and time/i), '2026-05-25T16:00')
     await user.click(screen.getByRole('button', { name: /schedule campaign/i }))
@@ -1017,6 +1051,34 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /follow-ups/i }))
 
     expect(screen.getByLabelText(/follow-up source campaign/i)).toBeInTheDocument()
+  })
+
+  it('shows campaign builder budget context and disables scheduling for read-only roles', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        role: 'company_user',
+        email: 'analyst@acme.test',
+        companyId: 'company-1',
+        companyName: 'Acme Retail',
+        membershipRole: 'analyst',
+        creditLimit: 1000,
+        creditsUsed: 250,
+      }),
+    )
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /campaigns/i }))
+    await user.click(screen.getByRole('button', { name: /builder/i }))
+
+    expect(screen.getByText(/Campaign scheduling is disabled for Analyst/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/campaign credit estimate/i)).toHaveTextContent(/Company balance/i)
+    expect(screen.getByLabelText(/campaign credit estimate/i)).toHaveTextContent(/User allocation/i)
+    expect(screen.getByRole('button', { name: /schedule campaign/i })).toBeDisabled()
   })
 
   it('filters campaigns by search, status, scheduled date, and clears filters', async () => {
@@ -1254,6 +1316,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /create user access code/i }))
 
     expect(await screen.findByText(/ACME-MGR1/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Campaign manager/i)).not.toHaveLength(0)
+    expect(screen.getByText(/2,000 credits/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /refresh team/i }))
     expect(await screen.findAllByText(/owner@acme.test/)).not.toHaveLength(0)
@@ -1264,7 +1328,9 @@ describe('App', () => {
     await user.type(screen.getAllByLabelText(/user credit limit/i)[1], '2500')
     await user.click(screen.getByRole('button', { name: /update user permissions/i }))
 
-    expect(await screen.findByText(/regional_manager/)).toBeInTheDocument()
+    const teamTable = await screen.findByRole('table', { name: /team roles and budgets/i })
+    expect(within(teamTable).getByText(/Regional manager/)).toBeInTheDocument()
+    expect(within(teamTable).getByText('2,375')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/companies/company-1/access-codes',
       expect.objectContaining({
@@ -1279,6 +1345,34 @@ describe('App', () => {
         body: JSON.stringify({ role: 'regional_manager', credit_limit: 2500 }),
       }),
     )
+  })
+
+  it('shows read-only settings for non-admin roles without invite controls', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        role: 'company_user',
+        email: 'viewer@acme.test',
+        companyId: 'company-1',
+        companyName: 'Acme Retail',
+        membershipRole: 'viewer',
+        creditLimit: 1000,
+        creditsUsed: 200,
+      }),
+    )
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /settings/i }))
+
+    expect(screen.getByText(/Team and budget controls are restricted/i)).toBeInTheDocument()
+    expect(screen.getByText(/cannot invite users, issue access codes, or change credit allocations/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/invite role/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create user access code/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /team roles and budgets/i })).toBeInTheDocument()
   })
 
   it('clears the local session on logout', async () => {

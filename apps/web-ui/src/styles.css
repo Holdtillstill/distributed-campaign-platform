@@ -47,6 +47,17 @@ button:hover,
   transform: translateY(-1px);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+button:disabled:hover {
+  box-shadow: none;
+  transform: none;
+}
+
 button.secondary,
 .secondary-link {
   background: #eef2f7;
@@ -258,6 +269,51 @@ button.ghost {
   font-size: 1.1rem;
 }
 
+.workspace-access-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 24px;
+  align-items: end;
+}
+
+.demo-helper {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.07);
+}
+
+.demo-helper span {
+  color: #9a3412;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.demo-helper strong {
+  color: #111827;
+  font-size: 1.1rem;
+}
+
+.demo-helper p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.demo-helper b {
+  color: #0f4f49;
+  font-weight: 850;
+}
+
+.access-panel {
+  min-height: 360px;
+}
+
 .auth-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -308,6 +364,52 @@ button.ghost {
 .sidebar nav {
   display: grid;
   gap: 6px;
+}
+
+.sidebar-context {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  margin-bottom: 18px;
+  padding: 14px;
+}
+
+.sidebar-context .context-kicker {
+  color: #7dd3fc;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-context strong {
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-context p {
+  margin: 0;
+  color: #b6c3d4;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.sidebar-budget {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+
+.sidebar-budget span,
+.sidebar-budget small {
+  color: #94a3b8;
+}
+
+.sidebar-budget strong {
+  color: #bbf7d0;
 }
 
 .nav-item {
@@ -397,6 +499,79 @@ button.ghost {
 .panel,
 .empty-state {
   padding: 20px;
+}
+
+.role-aware-banner,
+.budget-context,
+.settings-summary {
+  display: grid;
+  grid-template-columns: 1.08fr 1fr 1fr;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #d9e2ef;
+  margin-bottom: 20px;
+}
+
+.role-aware-banner div,
+.budget-context div,
+.settings-summary div {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.role-aware-banner span:not(.eyebrow),
+.budget-context span,
+.settings-summary span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.role-aware-banner strong,
+.budget-context strong,
+.settings-summary strong,
+.scope-note strong,
+.permission-callout strong {
+  color: #111827;
+}
+
+.role-aware-banner p,
+.budget-context p,
+.settings-summary p,
+.scope-note p,
+.permission-callout p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.scope-note,
+.permission-callout {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #ffffff;
+  margin: 0 0 18px;
+  padding: 16px 18px;
+}
+
+.permission-callout {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.warning-text {
+  margin: 0;
+  color: #b45309;
+  font-weight: 800;
 }
 
 .section-heading {
@@ -745,6 +920,39 @@ textarea {
   font-weight: 750;
 }
 
+.estimate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.estimate-grid div {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.estimate-grid span {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.estimate-grid strong {
+  color: #111827;
+  font-size: 1.25rem;
+}
+
+.estimate-grid small,
+.table-primary-cell span {
+  color: #64748b;
+}
+
 .audience-picker,
 .campaign-board {
   display: grid;
@@ -1061,6 +1269,15 @@ textarea {
 
 .data-table td {
   overflow-wrap: normal;
+}
+
+.table-primary-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.table-primary-cell strong {
+  color: #111827;
 }
 
 .health-quota {
@@ -2338,6 +2555,7 @@ textarea {
 
 @media (max-width: 920px) {
   .auth-grid,
+  .workspace-access-hero,
   .marketing-hero,
   .marketing-band,
   .pricing-section,
@@ -2352,6 +2570,13 @@ textarea {
   .campaign-board,
   .form-grid,
   .toolbar-form {
+    grid-template-columns: 1fr;
+  }
+
+  .role-aware-banner,
+  .budget-context,
+  .settings-summary,
+  .estimate-grid {
     grid-template-columns: 1fr;
   }
 
