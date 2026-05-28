@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from opentelemetry import trace
 from prometheus_client import CollectorRegistry, Info, generate_latest
 from prometheus_client.exposition import CONTENT_TYPE_LATEST
 from starlette.responses import Response
@@ -27,3 +28,16 @@ def add_platform_endpoints(app, *, service_name: str) -> None:
     @app.get("/metrics")
     def metrics() -> Response:
         return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
+
+    @app.get("/observability/trace-smoke")
+    def trace_smoke() -> dict[str, bool | str | None]:
+        tracer = trace.get_tracer(f"{service_name}.observability")
+        with tracer.start_as_current_span("observability.trace_smoke") as span:
+            context = span.get_span_context()
+            return {
+                "status": "ok",
+                "service": service_name,
+                "trace_id": f"{context.trace_id:032x}" if context.is_valid else None,
+                "span_id": f"{context.span_id:016x}" if context.is_valid else None,
+                "sampled": bool(context.trace_flags & trace.TraceFlags.SAMPLED),
+            }

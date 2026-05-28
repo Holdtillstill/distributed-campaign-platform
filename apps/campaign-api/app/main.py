@@ -17,7 +17,9 @@ from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints
 from campaign_common.tracing import get_tracer, inject_trace_context, instrument_fastapi_app
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi.openapi.docs import get_swagger_ui_html
 from pydantic import BaseModel, Field
+from starlette.responses import HTMLResponse
 
 SERVICE_NAME = "campaign-api"
 DEFAULT_BODY = "Hello from distributed campaign platform"
@@ -820,7 +822,28 @@ async def lifespan(app_instance: FastAPI):
         await pool.close()
 
 
-app = FastAPI(title="Campaign API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Campaign API", version="0.1.0", lifespan=lifespan, docs_url=None)
+
+
+def openapi_url_for_request(request: Request) -> str:
+    prefix = request.headers.get("x-forwarded-prefix") or request.scope.get("root_path") or ""
+    openapi_path = app.openapi_url or "/openapi.json"
+    prefix = prefix.strip()
+    if not prefix or prefix == "/":
+        return openapi_path
+    if not prefix.startswith("/"):
+        prefix = f"/{prefix}"
+    return f"{prefix.rstrip('/')}{openapi_path}"
+
+
+@app.get("/docs", include_in_schema=False)
+def swagger_docs(request: Request) -> HTMLResponse:
+    return get_swagger_ui_html(
+        openapi_url=openapi_url_for_request(request),
+        title=f"{app.title} - Swagger UI",
+    )
+
+
 instrument_fastapi_app(app, SERVICE_NAME)
 add_platform_endpoints(app, service_name=SERVICE_NAME)
 

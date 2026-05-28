@@ -94,3 +94,30 @@ def test_services_expose_prometheus_metrics(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
     assert f'{service_name}_service_info{{service="{service_name}"}} 1.0' in response.text
+
+
+@pytest.mark.parametrize(
+    "module_fixture,service_name",
+    [
+        ("campaign_module", "campaign-api"),
+        ("provider_module", "provider-simulator"),
+        ("dispatcher_module", "dispatcher"),
+    ],
+)
+def test_services_expose_trace_smoke_endpoint(
+    request,
+    module_fixture: str,
+    service_name: str,
+) -> None:
+    module = request.getfixturevalue(module_fixture)
+    client = TestClient(module.app)
+
+    response = client.get("/observability/trace-smoke")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["service"] == service_name
+    assert "trace_id" in body
+    assert "span_id" in body
+    assert isinstance(body["sampled"], bool)

@@ -63,7 +63,6 @@ After installing `kube-prometheus-stack`, re-enable the app ServiceMonitors:
 helm upgrade --install campaign-platform deploy/helm/campaign-platform \
   --namespace campaign-platform \
   --set observability.serviceMonitor.enabled=true \
-  --set networkPolicy.enabled=false \
   --set campaignApi.service.port=8080
 ```
 
@@ -72,6 +71,14 @@ Prometheus should then show the app targets as `up`:
 - `campaign-platform-campaign-api`
 - `campaign-platform-dispatcher`
 - `campaign-platform-provider-simulator`
+
+Generate a trace that does not require seed data:
+
+```bash
+curl -i http://127.0.0.1:18080/api/observability/trace-smoke
+```
+
+Then open Grafana Explore, select the Tempo data source, and search for `service.name = campaign-api` over the last 15 minutes. See [`docs/runbooks/observability.md`](../../docs/runbooks/observability.md) for the full trace troubleshooting flow.
 
 ## Essential Grafana dashboards
 

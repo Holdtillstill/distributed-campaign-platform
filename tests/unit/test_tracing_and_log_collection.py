@@ -50,6 +50,33 @@ def test_campaign_platform_chart_sets_otel_env_for_python_services() -> None:
     assert "OTEL_EXPORTER_OTLP_ENDPOINT" not in _container_env(deployments["web-ui"])
 
 
+def test_network_policy_allows_observability_namespace_for_metrics_and_traces() -> None:
+    rendered = _helm_template(CHART_DIR)
+    policies = {
+        item["metadata"]["name"]: item
+        for item in rendered
+        if item and item.get("kind") == "NetworkPolicy"
+    }
+    app_policy = policies["campaign-platform-app-dependencies"]
+
+    observability_ingress_ports = [
+        port["port"]
+        for rule in app_policy["spec"]["ingress"]
+        if _has_observability_namespace_selector(rule)
+        for port in rule.get("ports", [])
+    ]
+    observability_egress_ports = [
+        port["port"]
+        for rule in app_policy["spec"]["egress"]
+        if _has_observability_namespace_selector(rule)
+        for port in rule.get("ports", [])
+    ]
+
+    assert 8080 in observability_ingress_ports
+    assert 4317 in observability_egress_ports
+    assert 4318 in observability_egress_ports
+
+
 def test_alloy_values_collect_kubernetes_pod_logs_to_loki() -> None:
     values = yaml.safe_load((OBS_DIR / "alloy-values.yaml").read_text())
     config = values["alloy"]["configMap"]["content"]
@@ -75,9 +102,12 @@ def test_grafana_datasources_include_loki_and_tempo() -> None:
     by_name = {datasource["name"]: datasource for datasource in datasources}
 
     assert by_name["Loki"]["type"] == "loki"
+    assert by_name["Loki"]["uid"] == "loki"
     assert by_name["Loki"]["url"] == "http://loki-gateway.observability.svc.cluster.local"
     assert by_name["Tempo"]["type"] == "tempo"
+    assert by_name["Tempo"]["uid"] == "tempo"
     assert by_name["Tempo"]["url"] == "http://tempo.observability.svc.cluster.local:3200"
+    assert by_name["Tempo"]["jsonData"]["tracesToLogsV2"]["datasourceUid"] == "loki"
 
 
 def test_python_service_dockerfiles_install_otel_dependencies() -> None:
@@ -107,3 +137,12 @@ def _helm_template(chart_dir: Path) -> list[dict]:
 def _container_env(deployment: dict) -> dict[str, str]:
     container = deployment["spec"]["template"]["spec"]["containers"][0]
     return {item["name"]: item["value"] for item in container.get("env", [])}
+
+
+def _has_observability_namespace_selector(rule: dict) -> bool:
+    peers = rule.get("from", []) + rule.get("to", [])
+    return any(
+        peer.get("namespaceSelector", {}).get("matchLabels", {}).get("kubernetes.io/metadata.name")
+        == "observability"
+        for peer in peers
+    )

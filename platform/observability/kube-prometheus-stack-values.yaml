@@ -9,16 +9,18 @@ grafana:
       enabled: true
   additionalDataSources:
     - name: Loki
+      uid: loki
       type: loki
       access: proxy
       url: http://loki-gateway.observability.svc.cluster.local
     - name: Tempo
+      uid: tempo
       type: tempo
       access: proxy
       url: http://tempo.observability.svc.cluster.local:3200
       jsonData:
         tracesToLogsV2:
-          datasourceUid: Loki
+          datasourceUid: loki
           spanStartTimeShift: -5m
           spanEndTimeShift: 5m
           tags: [{ key: service.name, value: service }]

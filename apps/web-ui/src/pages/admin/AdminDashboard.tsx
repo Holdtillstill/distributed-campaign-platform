@@ -130,9 +130,22 @@ export function AdminDashboard({
           <span>Platform</span>
           <strong>System status</strong>
         </div>
-        <button className="secondary" onClick={onRefreshSystemStatus}>
-          Refresh checks
-        </button>
+        <div className="status-actions">
+          <button className="secondary" onClick={onRefreshSystemStatus}>
+            Refresh checks
+          </button>
+          <div className="observability-links" aria-label="Observability links">
+            <a className="docs-link secondary-link" href="http://127.0.0.1:3000" target="_blank" rel="noreferrer">
+              Grafana
+            </a>
+            <a className="docs-link secondary-link" href="http://127.0.0.1:3000/explore" target="_blank" rel="noreferrer">
+              Tempo Explore
+            </a>
+            <a className="docs-link secondary-link" href="http://127.0.0.1:9090" target="_blank" rel="noreferrer">
+              Prometheus
+            </a>
+          </div>
+        </div>
         <ul className="compact-list">
           {systemChecks.map((check) => (
             <li className={check.state} key={check.path}>

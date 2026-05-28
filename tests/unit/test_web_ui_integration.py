@@ -57,6 +57,13 @@ def test_nginx_proxies_public_tracking_links_to_api() -> None:
     assert "proxy_pass ${CAMPAIGN_API_UPSTREAM}/r/" in nginx_template
 
 
+def test_nginx_passes_api_prefix_for_swagger_docs() -> None:
+    nginx_template = (WEB_UI_DIR / "nginx.conf.template").read_text()
+
+    assert "location /api/" in nginx_template
+    assert "proxy_set_header X-Forwarded-Prefix /api;" in nginx_template
+
+
 def test_compose_exposes_web_ui_on_localhost_8080() -> None:
     compose = yaml.safe_load((REPO_ROOT / "compose.yaml").read_text())
     web_ui = compose["services"]["web-ui"]

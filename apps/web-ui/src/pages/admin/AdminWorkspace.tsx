@@ -33,6 +33,7 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
     { path: '/healthz', label: 'Campaign API liveness', state: 'checking', detail: 'Not checked yet' },
     { path: '/readyz', label: 'Campaign API readiness', state: 'checking', detail: 'Not checked yet' },
     { path: '/metrics', label: 'Prometheus metrics', state: 'checking', detail: 'Not checked yet' },
+    { path: '/observability/trace-smoke', label: 'Trace smoke', state: 'checking', detail: 'Not checked yet' },
   ])
 
   useEffect(() => {
@@ -82,6 +83,9 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
       fetch(`${API_BASE_URL}/healthz`).then((response) => toSystemCheck(response, '/healthz', 'Campaign API liveness')),
       fetch(`${API_BASE_URL}/readyz`).then((response) => toSystemCheck(response, '/readyz', 'Campaign API readiness')),
       fetch(`${API_BASE_URL}/metrics`).then((response) => toSystemCheck(response, '/metrics', 'Prometheus metrics')),
+      fetch(`${API_BASE_URL}/observability/trace-smoke`).then((response) =>
+        toSystemCheck(response, '/observability/trace-smoke', 'Trace smoke'),
+      ),
     ])
     setSystemChecks(checks)
   }

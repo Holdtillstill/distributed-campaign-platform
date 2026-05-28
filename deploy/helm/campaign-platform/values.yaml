@@ -94,6 +94,7 @@ webUi:
     minAvailable: 1
 
 observability:
+  namespace: observability
   serviceMonitor:
     enabled: true
     interval: 15s

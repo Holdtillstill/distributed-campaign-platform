@@ -1,0 +1,44 @@
+flowchart LR
+  reviewer[Reviewer Browser] --> web[Web UI\nNginx + React]
+  web -->|/api/* with X-Forwarded-Prefix: /api| api[Campaign API\nFastAPI]
+  web -->|/r/*| api
+
+  api --> pg[(PostgreSQL)]
+  api --> redis[(Redis)]
+  api --> nats[(NATS JetStream)]
+  nats --> dispatcher[Dispatcher Worker]
+  dispatcher --> provider[Provider Simulator]
+  dispatcher --> pg
+  dispatcher --> nats
+
+  api -->|OTLP gRPC| otel[OpenTelemetry Collector]
+  dispatcher -->|OTLP gRPC| otel
+  provider -->|OTLP gRPC| otel
+  otel --> tempo[Tempo]
+
+  prometheus[Prometheus] -->|/metrics| api
+  prometheus -->|/metrics| dispatcher
+  prometheus -->|/metrics| provider
+  alloy[Alloy] --> loki[Loki]
+  grafana[Grafana] --> prometheus
+  grafana --> tempo
+  grafana --> loki
+
+  subgraph campaign_platform_namespace[campaign-platform namespace]
+    web
+    api
+    dispatcher
+    provider
+    pg
+    redis
+    nats
+  end
+
+  subgraph observability_namespace[observability namespace]
+    prometheus
+    grafana
+    loki
+    tempo
+    otel
+    alloy
+  end

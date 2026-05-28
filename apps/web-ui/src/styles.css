@@ -805,6 +805,19 @@ textarea {
   margin-top: 20px;
 }
 
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.observability-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .template-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

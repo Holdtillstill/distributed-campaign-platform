@@ -95,6 +95,33 @@ function mockFetch() {
       })
     }
 
+    if (url.endsWith('/healthz')) {
+      return okJson({ status: 'ok', service: 'campaign-api' })
+    }
+
+    if (url.endsWith('/readyz')) {
+      return okJson({ status: 'ready', service: 'campaign-api' })
+    }
+
+    if (url.endsWith('/metrics')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: () => Promise.resolve('campaign_api_service_info 1'),
+      } as Response)
+    }
+
+    if (url.endsWith('/observability/trace-smoke')) {
+      return okJson({
+        status: 'ok',
+        service: 'campaign-api',
+        trace_id: '0'.repeat(32),
+        span_id: '0'.repeat(16),
+        sampled: false,
+      })
+    }
+
     if (url.endsWith('/signup/access-code') && method === 'POST') {
       return okJson(
         {
@@ -535,6 +562,24 @@ describe('App', () => {
     expect(screen.getAllByText('1,200')).not.toHaveLength(0)
     expect(screen.getAllByText('850')).not.toHaveLength(0)
     expect(screen.getByText('ACME-1234')).toBeInTheDocument()
+  })
+
+  it('surfaces observability links and a trace smoke check for internal admins', async () => {
+    const fetchMock = mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+    await loginAsInternalAdmin(user)
+
+    expect(await screen.findByRole('link', { name: /grafana/i })).toHaveAttribute('href', 'http://127.0.0.1:3000')
+    expect(screen.getByRole('link', { name: /tempo/i })).toHaveAttribute('href', 'http://127.0.0.1:3000/explore')
+    expect(screen.getByRole('link', { name: /prometheus/i })).toHaveAttribute('href', 'http://127.0.0.1:9090')
+
+    await user.click(screen.getByRole('button', { name: /refresh checks/i }))
+
+    expect(await screen.findByText('/observability/trace-smoke responded 200')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/observability/trace-smoke')
   })
 
   it('shows internal admin layout and company health table scaffold', async () => {

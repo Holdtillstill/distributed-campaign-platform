@@ -63,6 +63,16 @@ tests/load/            k6 load tests and incident simulations
 scripts/               Bootstrap, local dev, validation, teardown helpers
 ```
 
+## Documentation
+
+- [Product doc](docs/product/sms-saas-product-doc.md)
+- [Architecture](docs/architecture/architecture.md)
+- [Architecture diagram](docs/architecture/architecture-diagram.mmd)
+- [Local demo runbook](docs/runbooks/local-demo.md)
+- [Observability runbook](docs/runbooks/observability.md)
+- [Customer user guide](docs/kb/customer-user-guide.md)
+- [Internal admin guide](docs/kb/internal-admin-guide.md)
+
 ## Development modes
 
 1. **Local app mode**: Docker Compose for PostgreSQL, Redis, NATS, and services.
