@@ -88,6 +88,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
     message_type TEXT NOT NULL DEFAULT 'regular' CHECK (message_type IN ('regular', 'smart')),
     status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'scheduled', 'sent', 'cancelled')),
     scheduled_at TIMESTAMPTZ,
+    modeled_audience_count INTEGER NOT NULL DEFAULT 0 CHECK (modeled_audience_count >= 0),
+    audience_mode TEXT NOT NULL DEFAULT 'actual' CHECK (audience_mode IN ('actual', 'projected_sample')),
     credit_cost INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -122,6 +124,34 @@ ALTER TABLE campaigns
 ALTER TABLE campaigns
     ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
 
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS modeled_audience_count INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS audience_mode TEXT NOT NULL DEFAULT 'actual';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'campaigns_modeled_audience_count_check'
+    ) THEN
+        ALTER TABLE campaigns
+            ADD CONSTRAINT campaigns_modeled_audience_count_check
+            CHECK (modeled_audience_count >= 0);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'campaigns_audience_mode_check'
+    ) THEN
+        ALTER TABLE campaigns
+            ADD CONSTRAINT campaigns_audience_mode_check
+            CHECK (audience_mode IN ('actual', 'projected_sample'));
+    END IF;
+END $$;
+
 ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS company_id TEXT NOT NULL DEFAULT 'demo-company' REFERENCES companies(id) ON DELETE RESTRICT;
 
@@ -129,9 +159,26 @@ CREATE TABLE IF NOT EXISTS subscriber_lists (
     id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    estimated_subscriber_count INTEGER NOT NULL DEFAULT 0 CHECK (estimated_subscriber_count >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (company_id, name)
 );
+
+ALTER TABLE subscriber_lists
+    ADD COLUMN IF NOT EXISTS estimated_subscriber_count INTEGER NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'subscriber_lists_estimated_subscriber_count_check'
+    ) THEN
+        ALTER TABLE subscriber_lists
+            ADD CONSTRAINT subscriber_lists_estimated_subscriber_count_check
+            CHECK (estimated_subscriber_count >= 0);
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS subscribers (
     id TEXT PRIMARY KEY,
@@ -232,6 +279,10 @@ CREATE TABLE IF NOT EXISTS reminder_campaigns (
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscribers_company_phone ON subscribers(company_id, phone_number);
+CREATE INDEX IF NOT EXISTS idx_subscribers_company_created ON subscribers(company_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_subscribers_company_consent_status ON subscribers(company_id, consent_status);
+CREATE INDEX IF NOT EXISTS idx_subscriber_list_memberships_subscriber_created ON subscriber_list_memberships(subscriber_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_subscriber_list_memberships_list_subscriber ON subscriber_list_memberships(subscriber_list_id, subscriber_id);
 CREATE INDEX IF NOT EXISTS idx_consent_events_subscriber_created ON consent_events(subscriber_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_double_opt_in_tokens_subscriber ON double_opt_in_tokens(subscriber_id);
 CREATE INDEX IF NOT EXISTS idx_media_assets_company_id ON media_assets(company_id);

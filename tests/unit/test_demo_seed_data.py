@@ -30,6 +30,14 @@ def test_demo_retail_seed_defines_large_diverse_subscriber_base() -> None:
     assert seed.COMPANY_ID == "52570648-211f-4cbf-8920-2157ad3953f1"
     assert len(subscribers) == 1100
     assert len(list_counts) == 7
+    assert (
+        sum(subscriber_list.estimated_count for subscriber_list in seed.DEMO_SUBSCRIBER_LISTS)
+        == 2_650_000
+    )
+    assert (
+        min(subscriber_list.estimated_count for subscriber_list in seed.DEMO_SUBSCRIBER_LISTS)
+        >= 185_000
+    )
     assert min(list_counts.values()) >= 110
     assert {
         "Portland Weekend Shoppers",
@@ -51,7 +59,17 @@ def test_demo_retail_seed_campaigns_create_meaningful_scheduled_reach() -> None:
     counts = seed.expected_seed_counts()
 
     assert counts["subscriber_count"] == 1100
+    assert counts["modeled_subscriber_count"] == 2_650_000
     assert counts["campaign_count"] == 6
     assert counts["message_count"] == 950
     assert counts["scheduled_reach"] == 560
+    assert counts["modeled_scheduled_reach"] == 1_360_000
     assert counts["credit_cost"] == 1440
+
+
+def test_demo_retail_seed_upserts_scale_metadata_idempotently() -> None:
+    seed_source = SEED_SCRIPT.read_text()
+
+    assert "estimated_subscriber_count = EXCLUDED.estimated_subscriber_count" in seed_source
+    assert "modeled_audience_count = EXCLUDED.modeled_audience_count" in seed_source
+    assert "audience_mode = EXCLUDED.audience_mode" in seed_source

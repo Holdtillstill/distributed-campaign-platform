@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 from contextlib import suppress
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -78,6 +79,8 @@ class FakeRepository:
             "status": "queued",
             "scheduled_at": scheduled_at,
             "audience_count": len(self.created_messages),
+            "sample_message_count": len(self.created_messages),
+            "audience_mode": "actual",
             "message_count": len(self.created_messages),
             "credit_cost": len(self.created_messages),
             "remaining_credits": 997,
@@ -93,6 +96,32 @@ class FakeRepository:
             "company_id": self.created_campaign["company_id"],
             "name": self.created_campaign["name"],
             "status_counts": self.status_counts,
+        }
+
+    async def get_broadcast_monitor(self, campaign_id: str) -> dict[str, object] | None:
+        if self.created_campaign is None or campaign_id != self.created_campaign["id"]:
+            return None
+        return {
+            "campaign_id": self.created_campaign["id"],
+            "company_id": self.created_campaign["company_id"],
+            "campaign_name": self.created_campaign["name"],
+            "status": "queued",
+            "total_audience": len(self.created_messages),
+            "modeled_audience": len(self.created_messages),
+            "sample_message_count": len(self.created_messages),
+            "mode": "actual",
+            "queued": self.status_counts["queued"],
+            "sent": self.status_counts["sent"],
+            "failed": self.status_counts["failed"],
+            "retried": self.status_counts["retried"],
+            "dead_lettered": self.status_counts["dead_lettered"],
+            "percent_complete": 0.0,
+            "throughput_per_second": 0.0,
+            "messages_per_minute": 0.0,
+            "eta_seconds": None,
+            "projected_completion_at": None,
+            "started_at": None,
+            "last_updated": None,
         }
 
 
@@ -132,6 +161,8 @@ def test_post_campaign_creates_campaign_with_synthetic_recipients(
         "status": "queued",
         "scheduled_at": None,
         "audience_count": 3,
+        "sample_message_count": 3,
+        "audience_mode": "actual",
         "message_count": 3,
         "credit_cost": 3,
         "remaining_credits": 997,
@@ -193,6 +224,50 @@ def test_get_campaign_status_returns_aggregate_counts(campaign_module, fake_repo
             "dead_lettered": 0,
         },
     }
+
+
+def test_get_broadcast_monitor_returns_live_counts(campaign_module, fake_repo) -> None:
+    client = TestClient(campaign_module.app)
+    client.post("/campaigns", json={"name": "launch", "recipients": ["+155****9999"]})
+
+    response = client.get("/campaigns/campaign-test-1/broadcast-monitor")
+
+    assert response.status_code == 200
+    assert response.json()["campaign_id"] == "campaign-test-1"
+    assert response.json()["queued"] == 1
+    assert response.json()["mode"] == "actual"
+
+
+def test_broadcast_monitor_calculates_projected_sample_eta(campaign_module) -> None:
+    started_at = datetime(2026, 5, 28, 12, 0, tzinfo=UTC)
+    last_updated = started_at + timedelta(minutes=2)
+
+    monitor = campaign_module.db.calculate_broadcast_monitor(
+        campaign_id="campaign-1",
+        company_id="company-1",
+        campaign_name="Scale send",
+        status="queued",
+        modeled_audience_count=1_000_000,
+        audience_mode="projected_sample",
+        created_at=started_at,
+        campaign_updated_at=last_updated,
+        first_message_created_at=started_at,
+        last_message_updated_at=last_updated,
+        sample_message_count=100,
+        status_counts={
+            "queued": 25,
+            "sent": 70,
+            "failed": 3,
+            "retried": 2,
+            "dead_lettered": 2,
+        },
+    )
+
+    assert monitor["mode"] == "projected/sample"
+    assert monitor["total_audience"] == 1_000_000
+    assert monitor["percent_complete"] == 75.0
+    assert monitor["messages_per_minute"] == 37.5
+    assert monitor["eta_seconds"] is not None
 
 
 def test_aggregate_status_counts_includes_zero_for_missing_statuses(campaign_module) -> None:

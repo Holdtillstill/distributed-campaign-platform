@@ -4,7 +4,7 @@
 
 CampaignOS is a multi-tenant SMS campaign SaaS for contracted brands, retail operators, and regional marketing teams. The product models tenant onboarding, credit limits, subscriber consent, media-backed smart SMS campaigns, tracked links, follow-up campaigns, and cross-tenant usage review.
 
-The current portfolio implementation is local-first and simulator-backed. It does not send real SMS traffic or integrate with paid provider APIs. Provider delivery is represented by the provider simulator and dispatcher status transitions.
+The current portfolio implementation is local-first and simulator-backed. It does not send real SMS traffic or integrate with paid provider APIs. Provider delivery is represented by the provider simulator and dispatcher status transitions. Demo Retail Co uses a scale-aware audience model: local Postgres stores searchable sample subscribers and message rows, while subscriber lists and campaigns store modeled audience counts for million-scale product surfaces.
 
 ## Personas
 
@@ -27,11 +27,12 @@ The current portfolio implementation is local-first and simulator-backed. It doe
 3. Company admin signs up with the access code and lands in the company workspace.
 4. Company admin creates subscriber lists and imports subscribers from CSV-style inputs.
 5. Company admin uploads or registers media assets for smart SMS campaigns.
-6. Company admin creates regular or smart campaigns with selected subscribers, lists, or default demo recipients.
-7. Campaign API writes messages, calculates credit cost, and publishes dispatch jobs when NATS is configured.
+6. Company admin searches/paginates subscriber samples or selects modeled lists for regular or smart campaigns.
+7. Campaign API writes local sample messages, stores modeled audience metadata, calculates local sample credit cost, and publishes dispatch jobs when NATS is configured.
 8. Dispatcher sends jobs to the provider simulator and updates status to sent, retried, failed, or dead-lettered.
-9. Company users review campaign analytics, tracked links, redemptions, and follow-up candidates.
-10. Internal operators review tenant health, credit risk, scheduled reach, and platform readiness.
+9. Company users monitor active/recent broadcasts with actual message status counts, local sample progress, modeled audience reach, throughput, and ETA.
+10. Company users review campaign analytics, tracked links, redemptions, and follow-up candidates.
+11. Internal operators review tenant health, credit risk, modeled scheduled reach, and platform readiness.
 
 ## Compliance And Consent Assumptions
 
@@ -49,9 +50,19 @@ The current model tracks:
 
 - Company dashboard summary: subscribers, campaigns, messages, credits used, clicks, and redemptions.
 - Campaign status counts: queued, sent, failed, retried, and dead-lettered.
+- Broadcast monitor: modeled audience, local sample message count, mode, status counts, percent complete, throughput, ETA, started time, and last updated time.
 - Campaign performance: media assets, tracked links, clicks, redemptions, and reminder campaigns.
 - Admin usage: campaign count, message count, media count, tracked link count, clicks, redemptions, and reminders by tenant.
 - Admin health: subscriber count, scheduled reach, credits remaining, monthly send limit, quota usage, and active access code.
+
+## Scale Semantics
+
+- `subscriber_lists.estimated_subscriber_count` is the durable modeled audience size for a list.
+- `subscriber_count` in list responses is product-facing and uses the larger of modeled audience or loaded sample count.
+- `sample_subscriber_count` preserves the actual local membership rows available for search, imports, and local campaign fan-out.
+- `campaigns.modeled_audience_count` stores the modeled total audience at campaign creation or seed time.
+- `messages` remains the source of truth for actual queued/sent/failed/retried/dead-lettered delivery rows.
+- Broadcast monitor `mode` is `actual` when modeled and sample counts match, or `projected/sample` when the local demo processes a sample while presenting million-scale reach.
 
 ## Roadmap
 

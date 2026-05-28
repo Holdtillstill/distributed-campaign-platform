@@ -28,6 +28,7 @@ MESSAGE_CREDIT_COSTS = {"regular": 1, "smart": 2}
 class DemoListDefinition:
     name: str
     count: int
+    estimated_count: int
     region: str
     area_codes: tuple[str, ...]
     sources: tuple[str, ...]
@@ -58,6 +59,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="Portland Weekend Shoppers",
         count=180,
+        estimated_count=420_000,
         region="Portland",
         area_codes=("503", "971"),
         sources=("pos", "weekend_event", "loyalty_export", "qr_storefront"),
@@ -65,6 +67,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="Seattle VIP Customers",
         count=140,
+        estimated_count=275_000,
         region="Seattle",
         area_codes=("206", "425"),
         sources=("vip_event", "loyalty_export", "clienteling", "pos"),
@@ -72,6 +75,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="Lapsed Loyalty Members",
         count=160,
+        estimated_count=515_000,
         region="Southwest",
         area_codes=("602", "480"),
         sources=("lapsed_customer_export", "service_recovery", "loyalty_export"),
@@ -79,6 +83,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="Online Cart Abandoners",
         count=120,
+        estimated_count=360_000,
         region="Online",
         area_codes=("253", "360"),
         sources=("cart_recovery", "checkout_capture", "browse_abandonment"),
@@ -86,6 +91,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="New Opt-ins",
         count=150,
+        estimated_count=230_000,
         region="Arizona",
         area_codes=("623", "520"),
         sources=("landing_page", "qr_receipt", "popup_opt_in", "instagram_lead"),
@@ -93,6 +99,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="High Value Repeat Buyers",
         count=110,
+        estimated_count=185_000,
         region="Bay Area",
         area_codes=("415", "628"),
         sources=("loyalty_tier_export", "vip_event", "concierge_signup"),
@@ -100,6 +107,7 @@ DEMO_SUBSCRIBER_LISTS: tuple[DemoListDefinition, ...] = (
     DemoListDefinition(
         name="Holiday Promo Audience",
         count=240,
+        estimated_count=665_000,
         region="Mountain West",
         area_codes=("702", "725", "775"),
         sources=("holiday_landing_page", "gift_guide_signup", "seasonal_csv_import", "pos"),
@@ -217,9 +225,18 @@ def expected_seed_counts() -> dict[str, int]:
         subscriber_list.name: subscriber_list.count
         for subscriber_list in DEMO_SUBSCRIBER_LISTS
     }
+    modeled_list_counts = {
+        subscriber_list.name: subscriber_list.estimated_count
+        for subscriber_list in DEMO_SUBSCRIBER_LISTS
+    }
     message_count = sum(list_counts[campaign.list_name] for campaign in DEMO_CAMPAIGNS)
     scheduled_reach = sum(
         list_counts[campaign.list_name]
+        for campaign in DEMO_CAMPAIGNS
+        if campaign.status == "scheduled"
+    )
+    modeled_scheduled_reach = sum(
+        modeled_list_counts[campaign.list_name]
         for campaign in DEMO_CAMPAIGNS
         if campaign.status == "scheduled"
     )
@@ -229,10 +246,12 @@ def expected_seed_counts() -> dict[str, int]:
     )
     return {
         "subscriber_count": sum(list_counts.values()),
+        "modeled_subscriber_count": sum(modeled_list_counts.values()),
         "list_count": len(DEMO_SUBSCRIBER_LISTS),
         "campaign_count": len(DEMO_CAMPAIGNS),
         "message_count": message_count,
         "scheduled_reach": scheduled_reach,
+        "modeled_scheduled_reach": modeled_scheduled_reach,
         "credit_cost": credit_cost,
     }
 
@@ -248,14 +267,20 @@ def print_seed_summary(*, dry_run: bool) -> None:
     print(f"Access code: {ACCESS_CODE}")
     print(
         "Planned counts: "
-        f"{counts['subscriber_count']} subscribers, "
+        f"{counts['subscriber_count']} sample subscribers, "
+        f"{counts['modeled_subscriber_count']} modeled audience, "
         f"{counts['list_count']} lists, "
         f"{counts['campaign_count']} campaigns, "
-        f"{counts['message_count']} messages, "
-        f"{counts['scheduled_reach']} scheduled reach"
+        f"{counts['message_count']} sample messages, "
+        f"{counts['scheduled_reach']} sample scheduled reach, "
+        f"{counts['modeled_scheduled_reach']} modeled scheduled reach"
     )
+    modeled_counts = {
+        subscriber_list.name: subscriber_list.estimated_count
+        for subscriber_list in DEMO_SUBSCRIBER_LISTS
+    }
     for list_name, count in sorted(list_counts.items()):
-        print(f"- {list_name}: {count}")
+        print(f"- {list_name}: {count} sample / {modeled_counts[list_name]} modeled")
 
 
 async def seed_company(connection: asyncpg.Connection) -> None:
@@ -277,7 +302,7 @@ async def seed_company(connection: asyncpg.Connection) -> None:
     await connection.execute(
         """
         INSERT INTO companies (id, name, slug, monthly_send_limit, credit_balance)
-        VALUES ($1, 'Demo Retail Co', $2, 50000, 48000)
+        VALUES ($1, 'Demo Retail Co', $2, 3000000, 4800000)
         ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
             slug = EXCLUDED.slug,
@@ -327,14 +352,17 @@ async def seed_subscriber_lists(connection: asyncpg.Connection) -> dict[str, str
     for subscriber_list in DEMO_SUBSCRIBER_LISTS:
         list_id = await connection.fetchval(
             """
-            INSERT INTO subscriber_lists (id, company_id, name)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (company_id, name) DO UPDATE SET name = EXCLUDED.name
+            INSERT INTO subscriber_lists (id, company_id, name, estimated_subscriber_count)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (company_id, name) DO UPDATE SET
+                name = EXCLUDED.name,
+                estimated_subscriber_count = EXCLUDED.estimated_subscriber_count
             RETURNING id
             """,
             stable_id("subscriber-list", f"{COMPANY_ID}/{subscriber_list.name}"),
             COMPANY_ID,
             subscriber_list.name,
+            subscriber_list.estimated_count,
         )
         list_ids[subscriber_list.name] = list_id
     return list_ids
@@ -442,6 +470,10 @@ async def seed_media_assets(connection: asyncpg.Connection) -> None:
 
 async def seed_campaigns(connection: asyncpg.Connection, list_ids: dict[str, str]) -> None:
     now = datetime.now(UTC).replace(microsecond=0)
+    modeled_count_by_list = {
+        subscriber_list.name: subscriber_list.estimated_count
+        for subscriber_list in DEMO_SUBSCRIBER_LISTS
+    }
     for campaign in DEMO_CAMPAIGNS:
         campaign_id = stable_id("campaign", f"{COMPANY_ID}/{campaign.name}")
         scheduled_at = (
@@ -463,6 +495,8 @@ async def seed_campaigns(connection: asyncpg.Connection, list_ids: dict[str, str
         )
         unit_cost = MESSAGE_CREDIT_COSTS[campaign.message_type]
         credit_cost = len(rows) * unit_cost
+        modeled_audience_count = max(modeled_count_by_list[campaign.list_name], len(rows))
+        audience_mode = "projected_sample" if modeled_audience_count > len(rows) else "actual"
         await connection.execute(
             """
             INSERT INTO campaigns (
@@ -473,15 +507,19 @@ async def seed_campaigns(connection: asyncpg.Connection, list_ids: dict[str, str
                 message_type,
                 status,
                 scheduled_at,
+                modeled_audience_count,
+                audience_mode,
                 credit_cost
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 body = EXCLUDED.body,
                 message_type = EXCLUDED.message_type,
                 status = EXCLUDED.status,
                 scheduled_at = EXCLUDED.scheduled_at,
+                modeled_audience_count = EXCLUDED.modeled_audience_count,
+                audience_mode = EXCLUDED.audience_mode,
                 credit_cost = EXCLUDED.credit_cost,
                 updated_at = NOW()
             """,
@@ -492,6 +530,8 @@ async def seed_campaigns(connection: asyncpg.Connection, list_ids: dict[str, str
             campaign.message_type,
             campaign.status,
             scheduled_at,
+            modeled_audience_count,
+            audience_mode,
             credit_cost,
         )
         message_status = "sent" if campaign.status == "sent" else "queued"

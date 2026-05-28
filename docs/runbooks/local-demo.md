@@ -44,6 +44,26 @@ python scripts/local/seed-demo-data.py
 
 The script prints the Demo Retail Co company id, customer email, and access code. Keep those values for the customer login flow.
 
+Current seeded customer access:
+
+- Email: `owner@demo-retail.test`
+- Access code: `DEMORETA-E568C9`
+
+The seed is scale-aware. It inserts 1,100 physical subscriber sample rows for fast local search and campaign fan-out, then stores modeled list audience counts totaling 2,650,000 subscribers. Seeded scheduled campaigns keep local message rows small while showing 1,360,000 modeled scheduled reach in customer/admin product surfaces.
+
+Preview the deterministic counts without connecting to Postgres:
+
+```bash
+python scripts/local/seed-demo-data.py --dry-run
+```
+
+Expected summary:
+
+- 1,100 sample subscribers across 7 lists.
+- 2,650,000 modeled audience across those lists.
+- 950 sample campaign messages.
+- 560 sample scheduled reach and 1,360,000 modeled scheduled reach.
+
 ## Internal Admin Flow
 
 1. Open <http://127.0.0.1:8080/internal>.
@@ -63,7 +83,19 @@ The script prints the Demo Retail Co company id, customer email, and access code
 4. Open Subscribers and add lists or imported subscribers.
 5. Open Content Library and add media assets.
 6. Open Campaigns and create a regular or smart campaign.
-7. Review Campaign status, Analytics, Follow-ups, and Settings.
+7. Open Campaigns -> Monitor to watch modeled audience, local sample progress, actual queued/sent/failed/retried/dead-lettered rows, throughput, and ETA.
+8. Review Analytics, Follow-ups, and Settings.
+
+## Broadcast Monitor Checks
+
+Use the UI Monitor tab for the normal demo. For API verification, first get a campaign id from the company campaign list, then call:
+
+```bash
+curl -s http://127.0.0.1:8081/companies/52570648-211f-4cbf-8920-2157ad3953f1/campaigns
+curl -s http://127.0.0.1:8081/campaigns/<campaign-id>/broadcast-monitor
+```
+
+The monitor uses actual rows in `messages` for queued, sent, failed, retried, and dead-lettered counts. When a campaign targets a modeled million-scale list, `mode` is `projected/sample`: the local sample is processed, while the total/modelled audience communicates the larger SaaS-scale reach.
 
 ## kind Demo
 

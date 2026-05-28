@@ -99,6 +99,8 @@ export type Campaign = {
   scheduled_at?: string | null
   audience_count: number
   message_count: number
+  sample_message_count?: number
+  audience_mode?: string
   credit_cost: number
   remaining_credits: number
   tracked_links?: Pick<CampaignLink, 'subscriber_id' | 'media_asset_id' | 'public_url'>[]
@@ -126,6 +128,8 @@ export type SubscriberListResult = {
   company_id?: string
   name: string
   subscriber_count?: number
+  sample_subscriber_count?: number
+  estimated_subscriber_count?: number
 }
 
 export type SubscriberResult = {
@@ -138,6 +142,36 @@ export type SubscriberResult = {
   source?: string
   region?: string
   created_at?: string | null
+}
+
+export type SubscriberSearchResult = {
+  rows: SubscriberResult[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type BroadcastMonitor = {
+  campaign_id: string
+  company_id: string
+  campaign_name: string
+  status: string
+  total_audience: number
+  modeled_audience: number
+  sample_message_count: number
+  mode: 'actual' | 'projected/sample' | string
+  queued: number
+  sent: number
+  failed: number
+  retried: number
+  dead_lettered: number
+  percent_complete: number
+  throughput_per_second: number
+  messages_per_minute: number
+  eta_seconds?: number | null
+  projected_completion_at?: string | null
+  started_at?: string | null
+  last_updated?: string | null
 }
 
 export type OptInResult = {
@@ -196,11 +230,13 @@ export type CampaignListItem = {
   scheduled_at?: string | null
   created_at?: string | null
   message_count: number
+  audience_count?: number
+  audience_mode?: string
   credit_cost: number
   reminder_count: number
 }
 
-export type CampaignSubpage = 'overview' | 'scheduled' | 'past' | 'create' | 'followups'
+export type CampaignSubpage = 'overview' | 'scheduled' | 'past' | 'create' | 'followups' | 'monitor'
 
 export type SystemCheck = {
   path: string

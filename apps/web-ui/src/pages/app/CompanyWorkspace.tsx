@@ -8,6 +8,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { QuotaBar } from '../../components/QuotaBar'
 import type {
   AccessCodeResult,
+  BroadcastMonitor,
   Campaign,
   CampaignLink,
   CampaignListItem,
@@ -22,6 +23,7 @@ import type {
   Session,
   SubscriberListResult,
   SubscriberResult,
+  SubscriberSearchResult,
 } from '../../types'
 import { formatActivity, formatCount, formatLocalDateTime, formatNumber } from '../../utils'
 
@@ -86,6 +88,14 @@ export function CompanyWorkspace({
   const [smartMediaAssetId, setSmartMediaAssetId] = useState('')
   const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
   const [subscribers, setSubscribers] = useState<SubscriberResult[]>([])
+  const [subscriberTotal, setSubscriberTotal] = useState(0)
+  const [subscriberLimit, setSubscriberLimit] = useState(25)
+  const [subscriberOffset, setSubscriberOffset] = useState(0)
+  const [subscriberSearch, setSubscriberSearch] = useState('')
+  const [subscriberConsentFilter, setSubscriberConsentFilter] = useState('all')
+  const [directSubscriberSearch, setDirectSubscriberSearch] = useState('')
+  const [directSubscriberRows, setDirectSubscriberRows] = useState<SubscriberResult[]>([])
+  const [directSubscriberTotal, setDirectSubscriberTotal] = useState(0)
   const [selectedListIds, setSelectedListIds] = useState<string[]>([])
   const [selectedSubscriberIds, setSelectedSubscriberIds] = useState<string[]>([])
   const [campaigns, setCampaigns] = useState<CampaignListItem[]>([])
@@ -94,6 +104,11 @@ export function CompanyWorkspace({
   const [campaignDateFrom, setCampaignDateFrom] = useState('')
   const [campaignDateTo, setCampaignDateTo] = useState('')
   const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [selectedMonitorCampaignId, setSelectedMonitorCampaignId] = useState('')
+  const [broadcastMonitor, setBroadcastMonitor] = useState<BroadcastMonitor | null>(null)
+  const [monitorLoading, setMonitorLoading] = useState(false)
+  const [monitorError, setMonitorError] = useState<string | null>(null)
+  const [monitorRefreshTick, setMonitorRefreshTick] = useState(0)
   const [listName, setListName] = useState('VIP List')
   const [subscriberList, setSubscriberList] = useState<SubscriberListResult | null>(null)
   const [subscriberPhone, setSubscriberPhone] = useState('+15550001010')
@@ -133,11 +148,17 @@ export function CompanyWorkspace({
   const [editCreditLimit, setEditCreditLimit] = useState('2000')
   const [error, setError] = useState<string | null>(null)
 
-  const selectedAudienceCount = useMemo(() => {
+  const selectedModeledAudienceCount = useMemo(() => {
     const listSubscriberCount = subscriberLists
       .filter((list) => selectedListIds.includes(list.id))
       .reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
     return listSubscriberCount + selectedSubscriberIds.length
+  }, [selectedListIds, selectedSubscriberIds.length, subscriberLists])
+  const selectedSampleAudienceCount = useMemo(() => {
+    const listSampleCount = subscriberLists
+      .filter((list) => selectedListIds.includes(list.id))
+      .reduce((total, list) => total + (list.sample_subscriber_count ?? list.subscriber_count ?? 0), 0)
+    return listSampleCount + selectedSubscriberIds.length
   }, [selectedListIds, selectedSubscriberIds.length, subscriberLists])
 
   const campaignStatusOptions = useMemo(
@@ -157,12 +178,16 @@ export function CompanyWorkspace({
     campaignSearch.trim() !== '' || campaignStatusFilter !== 'all' || campaignDateFrom !== '' || campaignDateTo !== ''
   const upcomingCampaigns = filteredCampaigns.filter((item) => item.status === 'scheduled')
   const pastCampaigns = filteredCampaigns.filter((item) => item.status !== 'scheduled')
-  const directSubscriberPicklist = subscribers.slice(0, 50)
   const selectedSubscriberList = subscriberLists.find((list) => list.id === selectedSubscriberListId)
-  const visibleSubscribers =
-    selectedSubscriberListId === 'all'
-      ? subscribers
-      : subscribers.filter((subscriberItem) => subscriberItem.list_id === selectedSubscriberListId)
+  const modeledAudienceTotal = subscriberLists.reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
+  const sampleAudienceTotal = subscriberLists.reduce(
+    (total, list) => total + (list.sample_subscriber_count ?? list.subscriber_count ?? 0),
+    0,
+  )
+  const selectedDirectoryModeledAudience =
+    selectedSubscriberListId === 'all' ? modeledAudienceTotal : selectedSubscriberList?.subscriber_count ?? 0
+  const subscriberPage = Math.floor(subscriberOffset / subscriberLimit) + 1
+  const subscriberPageCount = Math.max(1, Math.ceil(subscriberTotal / subscriberLimit))
   const subscriberListNameById = useMemo(
     () => new Map(subscriberLists.map((list) => [list.id, list.name])),
     [subscriberLists],
@@ -178,24 +203,104 @@ export function CompanyWorkspace({
 
   useEffect(() => {
     async function loadCampaignPlanningData() {
-      const [listsResponse, subscribersResponse, campaignsResponse, mediaResponse, remindersResponse] = await Promise.all([
+      const [listsResponse, campaignsResponse, mediaResponse, remindersResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
-        fetch(`${API_BASE_URL}/companies/${companyId}/subscribers`),
         fetch(`${API_BASE_URL}/companies/${companyId}/campaigns`),
         fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`),
         fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`),
       ])
       if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
-      if (subscribersResponse.ok) setSubscribers(await subscribersResponse.json())
-      if (campaignsResponse.ok) setCampaigns(await campaignsResponse.json())
+      if (campaignsResponse.ok) {
+        const loadedCampaigns = (await campaignsResponse.json()) as CampaignListItem[]
+        setCampaigns(loadedCampaigns)
+        setSelectedMonitorCampaignId((current) => current || loadedCampaigns[0]?.id || '')
+      }
       if (mediaResponse.ok) setMediaAssets(await mediaResponse.json())
       if (remindersResponse.ok) setReminderCampaigns(await remindersResponse.json())
     }
     void loadCampaignPlanningData()
   }, [companyId])
 
+  useEffect(() => {
+    async function loadSubscriberDirectory() {
+      const response = await fetch(
+        subscriberSearchUrl({
+          companyId,
+          q: subscriberSearch,
+          listId: selectedSubscriberListId,
+          consentStatus: subscriberConsentFilter,
+          limit: subscriberLimit,
+          offset: subscriberOffset,
+        }),
+      )
+      if (response.ok) {
+        const result = (await response.json()) as SubscriberSearchResult
+        setSubscribers(result.rows)
+        setSubscriberTotal(result.total)
+        setSubscriberLimit(result.limit)
+        setSubscriberOffset(result.offset)
+      }
+    }
+    void loadSubscriberDirectory()
+  }, [companyId, selectedSubscriberListId, subscriberConsentFilter, subscriberLimit, subscriberOffset, subscriberSearch])
+
+  useEffect(() => {
+    async function loadDirectSubscriberRows() {
+      const response = await fetch(
+        subscriberSearchUrl({
+          companyId,
+          q: directSubscriberSearch,
+          listId: 'all',
+          consentStatus: 'all',
+          limit: 10,
+          offset: 0,
+        }),
+      )
+      if (response.ok) {
+        const result = (await response.json()) as SubscriberSearchResult
+        setDirectSubscriberRows(result.rows)
+        setDirectSubscriberTotal(result.total)
+      }
+    }
+    void loadDirectSubscriberRows()
+  }, [companyId, directSubscriberSearch])
+
+  useEffect(() => {
+    if (page !== 'campaigns' || campaignSubpage !== 'monitor' || !selectedMonitorCampaignId) return undefined
+
+    let cancelled = false
+    async function loadMonitor() {
+      setMonitorLoading(true)
+      setMonitorError(null)
+      const response = await fetch(`${API_BASE_URL}/campaigns/${selectedMonitorCampaignId}/broadcast-monitor`)
+      if (cancelled) return
+      if (response.ok) {
+        setBroadcastMonitor(await response.json())
+      } else {
+        setMonitorError(`Monitor unavailable: ${response.status}`)
+      }
+      setMonitorLoading(false)
+    }
+    void loadMonitor()
+    const interval = window.setInterval(() => void loadMonitor(), 5000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [campaignSubpage, monitorRefreshTick, page, selectedMonitorCampaignId])
+
   function toggleValue(current: string[], value: string): string[] {
     return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
+  }
+
+  function setSubscriberListFilter(listId: string) {
+    setSelectedSubscriberListId(listId)
+    setSubscriberOffset(0)
+  }
+
+  function setSubscriberConsent(value: string) {
+    setSubscriberConsentFilter(value)
+    setSubscriberOffset(0)
   }
 
   function findTemplateMediaAsset(template: (typeof contentTemplates)[number]) {
@@ -255,6 +360,8 @@ export function CompanyWorkspace({
         scheduled_at: result.scheduled_at,
         created_at: new Date().toISOString(),
         message_count: result.message_count,
+        audience_count: result.audience_count,
+        audience_mode: result.audience_mode ?? 'actual',
         credit_cost: result.credit_cost,
         reminder_count: 0,
       },
@@ -273,6 +380,7 @@ export function CompanyWorkspace({
     )
     setTrackedCampaignId(result.id ?? '')
     setReminderSourceCampaignId(result.id ?? '')
+    setSelectedMonitorCampaignId(result.id ?? '')
   }
 
   async function createSubscriberList(event: FormEvent<HTMLFormElement>) {
@@ -595,6 +703,7 @@ export function CompanyWorkspace({
       { id: 'scheduled', label: 'Scheduled' },
       { id: 'past', label: 'Sent/Past' },
       { id: 'create', label: 'Builder' },
+      { id: 'monitor', label: 'Monitor' },
       { id: 'followups', label: 'Follow-ups' },
     ]
 
@@ -688,8 +797,8 @@ export function CompanyWorkspace({
               <Metric label="Sent/Past" value={formatNumber(pastCampaigns.length)} trend="Completed or cancelled campaigns" />
               <Metric
                 label="Scheduled reach"
-                value={formatNumber(upcomingCampaigns.reduce((total, item) => total + item.message_count, 0))}
-                trend="Recipients in upcoming campaigns"
+                value={formatNumber(upcomingCampaigns.reduce((total, item) => total + (item.audience_count ?? item.message_count), 0))}
+                trend="Modeled recipients in upcoming campaigns"
               />
               <Metric
                 label="Reminder opportunities"
@@ -754,7 +863,8 @@ export function CompanyWorkspace({
                           checked={selectedListIds.includes(list.id)}
                           onChange={() => setSelectedListIds((current) => toggleValue(current, list.id))}
                         />
-                        {list.name} ({formatNumber(list.subscriber_count)})
+                        {list.name} ({formatNumber(list.subscriber_count)} modeled /{' '}
+                        {formatNumber(list.sample_subscriber_count ?? list.subscriber_count)} sample)
                       </label>
                     ))
                   ) : (
@@ -763,9 +873,17 @@ export function CompanyWorkspace({
                 </div>
                 <div>
                   <h2>Audience members</h2>
-                  {subscribers.length ? (
+                  <label>
+                    Search direct subscribers
+                    <input
+                      value={directSubscriberSearch}
+                      onChange={(event) => setDirectSubscriberSearch(event.target.value)}
+                      placeholder="Phone number or source"
+                    />
+                  </label>
+                  {directSubscriberRows.length ? (
                     <>
-                      {directSubscriberPicklist.map((subscriber) => (
+                      {directSubscriberRows.map((subscriber) => (
                         <label className="check-row" key={subscriber.id}>
                           <input
                             type="checkbox"
@@ -775,15 +893,13 @@ export function CompanyWorkspace({
                           {subscriber.phone_number} ({subscriber.consent_status})
                         </label>
                       ))}
-                      {subscribers.length > directSubscriberPicklist.length ? (
-                        <p className="muted">
-                          Showing {formatNumber(directSubscriberPicklist.length)} of {formatNumber(subscribers.length)} direct
-                          subscribers. Use segments for broad sends.
-                        </p>
-                      ) : null}
+                      <p className="muted">
+                        Showing {formatNumber(directSubscriberRows.length)} of {formatNumber(directSubscriberTotal)} matching sample
+                        subscribers. Use segments for modeled broad sends.
+                      </p>
                     </>
                   ) : (
-                    <p className="muted">Import or confirm subscribers first.</p>
+                    <p className="muted">Search by phone or source to add individual sample subscribers.</p>
                   )}
                 </div>
               </section>
@@ -850,15 +966,16 @@ export function CompanyWorkspace({
                   <strong>Review/estimate</strong>
                 </div>
                 <p className="estimate">
-                  Estimated cost: {formatNumber(selectedAudienceCount * (messageType === 'smart' ? 2 : 1))} credits
+                  Local sample cost: {formatNumber(selectedSampleAudienceCount * (messageType === 'smart' ? 2 : 1))} credits
                 </p>
                 <p className="muted">
-                  {formatNumber(selectedAudienceCount)} recipients selected for {messageType === 'smart' ? 'Smart SMS' : 'Regular SMS'}.
+                  {formatNumber(selectedModeledAudienceCount)} modeled audience / {formatNumber(selectedSampleAudienceCount)} sample
+                  messages selected for {messageType === 'smart' ? 'Smart SMS' : 'Regular SMS'}.
                 </p>
-                {selectedAudienceCount === 0 ? (
+                {selectedSampleAudienceCount === 0 ? (
                   <p className="helper-text">Select at least one segment or subscriber before scheduling.</p>
                 ) : null}
-                <button disabled={selectedAudienceCount === 0}>Schedule campaign</button>
+                <button disabled={selectedSampleAudienceCount === 0}>Schedule campaign</button>
               </section>
             </form>
             {campaign ? (
@@ -868,7 +985,9 @@ export function CompanyWorkspace({
                 <span>{campaign.message_type}</span>
                 <span>{campaign.status}</span>
                 <span>Scheduled: {formatLocalDateTime(campaign.scheduled_at)}</span>
-                <span>Messages: {campaign.message_count}</span>
+                <span>Modeled audience: {formatNumber(campaign.audience_count)}</span>
+                <span>Sample messages: {formatNumber(campaign.sample_message_count ?? campaign.message_count)}</span>
+                <span>Mode: {campaign.audience_mode ?? 'actual'}</span>
                 <span>Credits spent: {campaign.credit_cost}</span>
                 <span>Remaining: {formatNumber(campaign.remaining_credits)}</span>
                 <span>Tracked links: {formatNumber(campaign.tracked_links?.length ?? 0)}</span>
@@ -880,6 +999,88 @@ export function CompanyWorkspace({
             ) : null}
             {error ? <p className="error">{error}</p> : null}
           </>
+        ) : null}
+
+        {campaignSubpage === 'monitor' ? (
+          <section className="panel broadcast-monitor" aria-label="Live broadcast monitor">
+            <div className="section-heading">
+              <span>Live monitor</span>
+              <strong>Broadcast throughput</strong>
+            </div>
+            {campaigns.length ? (
+              <>
+                <div className="form-grid monitor-controls">
+                  <label>
+                    Campaign
+                    <select
+                      value={selectedMonitorCampaignId}
+                      onChange={(event) => setSelectedMonitorCampaignId(event.target.value)}
+                    >
+                      {campaigns.map((item) => (
+                        <option value={item.id} key={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="secondary" type="button" onClick={() => setMonitorRefreshTick((value) => value + 1)}>
+                    Refresh monitor
+                  </button>
+                </div>
+                {monitorError ? <p className="error">{monitorError}</p> : null}
+                {broadcastMonitor ? (
+                  <div className="monitor-grid">
+                    <div className="monitor-progress">
+                      <div>
+                        <strong>{broadcastMonitor.campaign_name}</strong>
+                        <span>{broadcastMonitor.status}</span>
+                      </div>
+                      <div className="progress-track" aria-label="Broadcast percent complete">
+                        <span style={{ width: `${Math.min(100, Math.max(0, broadcastMonitor.percent_complete))}%` }} />
+                      </div>
+                      <p className="muted">
+                        {formatNumber(broadcastMonitor.percent_complete)}% complete in local sample. Mode:{' '}
+                        {broadcastMonitor.mode}.
+                      </p>
+                    </div>
+                    <Metric
+                      label="Modeled audience"
+                      value={formatNumber(broadcastMonitor.modeled_audience)}
+                      trend={`${formatNumber(broadcastMonitor.sample_message_count)} local sample messages`}
+                    />
+                    <Metric
+                      label="Throughput"
+                      value={`${formatNumber(broadcastMonitor.messages_per_minute)}/min`}
+                      trend={`${formatNumber(broadcastMonitor.throughput_per_second)} messages/sec`}
+                    />
+                    <Metric label="Queued" value={formatNumber(broadcastMonitor.queued)} trend="Actual message rows" />
+                    <Metric label="Sent" value={formatNumber(broadcastMonitor.sent)} trend="Actual provider outcomes" />
+                    <Metric label="Failed" value={formatNumber(broadcastMonitor.failed)} trend="Actual failed rows" />
+                    <Metric label="Retried" value={formatNumber(broadcastMonitor.retried)} trend="Actual retry rows" />
+                    <Metric label="Dead-lettered" value={formatNumber(broadcastMonitor.dead_lettered)} trend="Actual terminal rows" />
+                    <div className="monitor-meta">
+                      <span>Started: {formatLocalDateTime(broadcastMonitor.started_at)}</span>
+                      <span>Last updated: {formatLocalDateTime(broadcastMonitor.last_updated)}</span>
+                      <span>
+                        ETA:{' '}
+                        {broadcastMonitor.eta_seconds !== null && broadcastMonitor.eta_seconds !== undefined
+                          ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
+                          : 'Waiting for throughput'}
+                      </span>
+                      <span>Projected complete: {formatLocalDateTime(broadcastMonitor.projected_completion_at)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="muted">{monitorLoading ? 'Loading monitor...' : 'Choose a campaign to load monitor data.'}</p>
+                )}
+              </>
+            ) : (
+              <EmptyState
+                title="No campaigns to monitor"
+                description="Create or seed a campaign before viewing broadcast throughput."
+              />
+            )}
+          </section>
         ) : null}
 
         {campaignSubpage === 'followups' ? (
@@ -968,33 +1169,102 @@ export function CompanyWorkspace({
         <div className="metric-grid spaced">
           <button
             className={`segment-card ${selectedSubscriberListId === 'all' ? 'active' : ''}`}
-            onClick={() => setSelectedSubscriberListId('all')}
+            onClick={() => setSubscriberListFilter('all')}
           >
-            <span>All subscribers</span>
-            <strong>{formatNumber(subscribers.length)}</strong>
-            <small>Across all visible lists</small>
+            <span>All modeled audience</span>
+            <strong>{formatNumber(modeledAudienceTotal)}</strong>
+            <small>{formatNumber(sampleAudienceTotal)} loaded sample rows</small>
           </button>
           {subscriberLists.map((list) => (
             <button
               className={`segment-card ${selectedSubscriberListId === list.id ? 'active' : ''}`}
               key={list.id}
-              onClick={() => setSelectedSubscriberListId(list.id)}
+              onClick={() => setSubscriberListFilter(list.id)}
             >
               <span>{list.name}</span>
               <strong>{formatNumber(list.subscriber_count)}</strong>
-              <small>List segment</small>
+              <small>{formatNumber(list.sample_subscriber_count ?? 0)} loaded sample rows</small>
             </button>
           ))}
         </div>
 
+        <section className="panel subscriber-filters" aria-label="Subscriber filters">
+          <div className="section-heading">
+            <span>Search</span>
+            <strong>
+              Loaded {formatNumber(subscribers.length)} of {formatNumber(subscriberTotal)} matching sample rows
+            </strong>
+          </div>
+          <div className="form-grid">
+            <label>
+              Search subscribers
+              <input
+                value={subscriberSearch}
+                onChange={(event) => {
+                  setSubscriberSearch(event.target.value)
+                  setSubscriberOffset(0)
+                }}
+                placeholder="Phone number or source"
+              />
+            </label>
+            <label>
+              Consent status
+              <select value={subscriberConsentFilter} onChange={(event) => setSubscriberConsent(event.target.value)}>
+                <option value="all">All marketable consent</option>
+                <option value="company_provided">Company provided</option>
+                <option value="double_opt_in_confirmed">Double opt-in confirmed</option>
+              </select>
+            </label>
+            <label>
+              Page size
+              <select
+                value={subscriberLimit}
+                onChange={(event) => {
+                  setSubscriberLimit(Number(event.target.value))
+                  setSubscriberOffset(0)
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+          </div>
+          <div className="pagination-actions">
+            <span>
+              Page {formatNumber(subscriberPage)} of {formatNumber(subscriberPageCount)} / modeled audience{' '}
+              {formatNumber(selectedDirectoryModeledAudience)}
+            </span>
+            <div>
+              <button
+                className="secondary"
+                type="button"
+                disabled={subscriberOffset === 0}
+                onClick={() => setSubscriberOffset(Math.max(0, subscriberOffset - subscriberLimit))}
+              >
+                Previous
+              </button>
+              <button
+                className="secondary"
+                type="button"
+                disabled={subscriberOffset + subscriberLimit >= subscriberTotal}
+                onClick={() => setSubscriberOffset(subscriberOffset + subscriberLimit)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section className="panel table-panel">
           <div className="section-heading">
             <span>Directory</span>
-            <strong>{selectedSubscriberList?.name ?? 'All subscribers'}</strong>
+            <strong>{selectedSubscriberList?.name ?? 'All subscribers'} sample</strong>
           </div>
           <DataTable
             ariaLabel="Subscriber directory"
-            rows={visibleSubscribers}
+            rows={subscribers}
             getRowKey={(row) => row.id}
             empty={
               <EmptyState
@@ -1252,7 +1522,7 @@ export function CompanyWorkspace({
   }
 
   if (page === 'analytics') {
-    const scheduledReach = upcomingCampaigns.reduce((total, item) => total + item.message_count, 0)
+    const scheduledReach = upcomingCampaigns.reduce((total, item) => total + (item.audience_count ?? item.message_count), 0)
     const totalListSubscribers = subscriberLists.reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
 
     return (
@@ -1263,7 +1533,7 @@ export function CompanyWorkspace({
           action={<button onClick={() => void refreshPerformance()}>Refresh performance</button>}
         />
         <div className="metric-grid spaced">
-          <Metric label="Scheduled reach" value={formatNumber(scheduledReach)} trend="Recipients in upcoming campaigns" />
+          <Metric label="Scheduled reach" value={formatNumber(scheduledReach)} trend="Modeled recipients in upcoming campaigns" />
           <Metric label="Campaign count" value={formatNumber(campaigns.length || dashboardSummary?.campaign_count)} trend="Loaded campaign history" />
           <Metric label="Message volume" value={formatActivity(dashboardSummary?.message_count)} trend="Campaign delivery volume" />
           <Metric label="Subscriber lists" value={formatNumber(subscriberLists.length)} trend={`${formatNumber(totalListSubscribers)} list memberships`} />
@@ -1428,7 +1698,8 @@ function CampaignColumn({
               <span>{campaign.status}</span>
               <span>Scheduled: {formatLocalDateTime(campaign.scheduled_at)}</span>
               <span>Created: {formatLocalDateTime(campaign.created_at)}</span>
-              <span>Messages: {formatNumber(campaign.message_count)}</span>
+              <span>Modeled audience: {formatNumber(campaign.audience_count ?? campaign.message_count)}</span>
+              <span>Sample messages: {formatNumber(campaign.message_count)}</span>
               <span>Credits: {formatNumber(campaign.credit_cost)}</span>
               <span>Follow-ups: {formatNumber(campaign.reminder_count)}</span>
               {onEdit ? (
@@ -1480,4 +1751,29 @@ function parseFilterDateTime(value: string): number | null {
   if (!value) return null
   const parsed = new Date(value).getTime()
   return Number.isNaN(parsed) ? null : parsed
+}
+
+function subscriberSearchUrl({
+  companyId,
+  q,
+  listId,
+  consentStatus,
+  limit,
+  offset,
+}: {
+  companyId: string
+  q: string
+  listId: string
+  consentStatus: string
+  limit: number
+  offset: number
+}) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  })
+  if (q.trim()) params.set('q', q.trim())
+  if (listId !== 'all') params.set('list_id', listId)
+  if (consentStatus !== 'all') params.set('consent_status', consentStatus)
+  return `${API_BASE_URL}/companies/${companyId}/subscribers/search?${params.toString()}`
 }

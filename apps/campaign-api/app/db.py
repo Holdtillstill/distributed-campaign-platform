@@ -12,6 +12,7 @@ import asyncpg
 DEFAULT_DATABASE_URL = "postgresql://campaign:campaign@localhost:5432/campaign_local"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 MESSAGE_CREDIT_COSTS = {"regular": 1, "smart": 2}
+MESSAGE_STATUS_KEYS = ("queued", "sent", "failed", "retried", "dead_lettered")
 
 
 class InsufficientCreditsError(Exception):
@@ -55,11 +56,16 @@ async def create_campaign_with_messages(
     messages: list[dict[str, Any]],
     media_asset_id: str | None = None,
     scheduled_at: str | None = None,
+    modeled_audience_count: int | None = None,
+    audience_mode: str = "actual",
 ) -> dict[str, Any]:
     unit_cost = MESSAGE_CREDIT_COSTS[message_type]
     credit_cost = unit_cost * len(messages)
     campaign_status = "scheduled" if scheduled_at else "queued"
     scheduled_at_value = _parse_timestamp(scheduled_at)
+    stored_modeled_audience_count = (
+        modeled_audience_count if modeled_audience_count is not None else len(messages)
+    )
     async with pool.acquire() as connection, connection.transaction():
         company = await connection.fetchrow(
             """
@@ -134,9 +140,11 @@ async def create_campaign_with_messages(
                     message_type,
                     status,
                     scheduled_at,
+                    modeled_audience_count,
+                    audience_mode,
                     credit_cost
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8)
+                VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9, $10)
                 """,
             campaign_id,
             company_id,
@@ -145,6 +153,8 @@ async def create_campaign_with_messages(
             message_type,
             campaign_status,
             scheduled_at_value,
+            stored_modeled_audience_count,
+            audience_mode,
             credit_cost,
         )
         await connection.executemany(
@@ -218,7 +228,9 @@ async def create_campaign_with_messages(
         "credit_cost": credit_cost,
         "remaining_credits": remaining_credits,
         "status": campaign_status,
-        "audience_count": len(messages),
+        "audience_count": stored_modeled_audience_count,
+        "sample_message_count": len(messages),
+        "audience_mode": audience_mode,
         "tracked_links": tracked_links,
     }
 
@@ -262,6 +274,70 @@ async def resolve_campaign_audience(
     return [dict(row) for row in rows]
 
 
+async def estimate_campaign_audience(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    subscriber_ids: list[str],
+    subscriber_list_ids: list[str],
+    sample_count: int,
+) -> dict[str, Any]:
+    async with pool.acquire() as connection:
+        audience_estimate = await connection.fetchrow(
+            """
+            WITH list_sample_counts AS (
+                SELECT subscriber_list_id, COUNT(subscriber_id)::int AS sample_count
+                FROM subscriber_list_memberships
+                WHERE subscriber_list_id = ANY($2::text[])
+                GROUP BY subscriber_list_id
+            )
+            SELECT
+                (
+                    SELECT COALESCE(
+                        SUM(
+                            GREATEST(
+                                sl.estimated_subscriber_count,
+                                COALESCE(lsc.sample_count, 0)
+                            )
+                        )::int,
+                        0
+                    )
+                    FROM subscriber_lists sl
+                    LEFT JOIN list_sample_counts lsc ON lsc.subscriber_list_id = sl.id
+                    WHERE sl.company_id = $1
+                      AND sl.id = ANY($2::text[])
+                ) AS modeled_list_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM subscribers s
+                    WHERE s.company_id = $1
+                      AND s.id = ANY($3::text[])
+                      AND s.marketing_status <> 'opted_out'
+                      AND s.consent_status IN (
+                          'company_provided',
+                          'double_opt_in_confirmed'
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM subscriber_list_memberships slm
+                          WHERE slm.subscriber_id = s.id
+                            AND slm.subscriber_list_id = ANY($2::text[])
+                      )
+                ) AS direct_subscriber_count
+            """,
+            company_id,
+            subscriber_list_ids,
+            subscriber_ids,
+        )
+    modeled_list_count = int(audience_estimate["modeled_list_count"] or 0)
+    direct_subscriber_count = int(audience_estimate["direct_subscriber_count"] or 0)
+    modeled_count = max(sample_count, modeled_list_count + direct_subscriber_count)
+    return {
+        "modeled_audience_count": modeled_count,
+        "audience_mode": "projected_sample" if modeled_count > sample_count else "actual",
+    }
+
+
 async def get_campaign_status(pool: asyncpg.Pool, campaign_id: str) -> dict[str, Any] | None:
     async with pool.acquire() as connection:
         campaign = await connection.fetchrow(
@@ -302,6 +378,141 @@ async def get_campaign_status(pool: asyncpg.Pool, campaign_id: str) -> dict[str,
         "company_id": campaign["company_id"],
         "name": campaign["name"],
         "status_counts": counts,
+    }
+
+
+async def get_broadcast_monitor(pool: asyncpg.Pool, campaign_id: str) -> dict[str, Any] | None:
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            SELECT
+                c.id AS campaign_id,
+                c.company_id,
+                c.name AS campaign_name,
+                c.status,
+                c.modeled_audience_count,
+                c.audience_mode,
+                c.created_at,
+                c.updated_at AS campaign_updated_at,
+                COUNT(m.id)::int AS sample_message_count,
+                MIN(m.created_at) AS first_message_created_at,
+                MAX(m.updated_at) AS last_message_updated_at,
+                (COUNT(m.id) FILTER (WHERE m.status = 'queued'))::int AS queued,
+                (COUNT(m.id) FILTER (WHERE m.status = 'sent'))::int AS sent,
+                (COUNT(m.id) FILTER (WHERE m.status = 'failed'))::int AS failed,
+                (COUNT(m.id) FILTER (WHERE m.status = 'retried'))::int AS retried,
+                (COUNT(m.id) FILTER (WHERE m.status = 'dead_lettered'))::int AS dead_lettered
+            FROM campaigns c
+            LEFT JOIN messages m ON m.campaign_id = c.id
+            WHERE c.id = $1
+            GROUP BY
+                c.id,
+                c.company_id,
+                c.name,
+                c.status,
+                c.modeled_audience_count,
+                c.audience_mode,
+                c.created_at,
+                c.updated_at
+            """,
+            campaign_id,
+        )
+    if row is None:
+        return None
+    status_counts = {status: int(row[status] or 0) for status in MESSAGE_STATUS_KEYS}
+    return calculate_broadcast_monitor(
+        campaign_id=row["campaign_id"],
+        company_id=row["company_id"],
+        campaign_name=row["campaign_name"],
+        status=row["status"],
+        modeled_audience_count=row["modeled_audience_count"],
+        audience_mode=row["audience_mode"],
+        created_at=row["created_at"],
+        campaign_updated_at=row["campaign_updated_at"],
+        first_message_created_at=row["first_message_created_at"],
+        last_message_updated_at=row["last_message_updated_at"],
+        sample_message_count=row["sample_message_count"],
+        status_counts=status_counts,
+    )
+
+
+def calculate_broadcast_monitor(
+    *,
+    campaign_id: str,
+    company_id: str,
+    campaign_name: str,
+    status: str,
+    modeled_audience_count: int | None,
+    audience_mode: str | None,
+    created_at: datetime | None,
+    campaign_updated_at: datetime | None,
+    first_message_created_at: datetime | None,
+    last_message_updated_at: datetime | None,
+    sample_message_count: int,
+    status_counts: dict[str, int],
+) -> dict[str, Any]:
+    counts = {
+        status_key: int(status_counts.get(status_key, 0))
+        for status_key in MESSAGE_STATUS_KEYS
+    }
+    sample_count = int(sample_message_count or 0)
+    modeled_count = max(int(modeled_audience_count or 0), sample_count)
+    mode = (
+        "projected/sample"
+        if modeled_count > sample_count or audience_mode == "projected_sample"
+        else "actual"
+    )
+    started_at = first_message_created_at or created_at
+    last_updated = last_message_updated_at or campaign_updated_at or started_at
+    completed_sample_count = counts["sent"] + counts["failed"] + counts["dead_lettered"]
+    percent_complete = (
+        round(min(100.0, (completed_sample_count / sample_count) * 100), 2)
+        if sample_count > 0
+        else 0.0
+    )
+    elapsed_seconds = (
+        max((last_updated - started_at).total_seconds(), 0.0)
+        if started_at is not None and last_updated is not None
+        else 0.0
+    )
+    throughput_per_second = (
+        round(completed_sample_count / elapsed_seconds, 4)
+        if completed_sample_count > 0 and elapsed_seconds >= 1
+        else 0.0
+    )
+    messages_per_minute = round(throughput_per_second * 60, 2)
+    remaining_for_eta = max(modeled_count - completed_sample_count, 0)
+    eta_seconds = (
+        int(round(remaining_for_eta / throughput_per_second))
+        if throughput_per_second > 0 and remaining_for_eta > 0
+        else None
+    )
+    projected_completion_at = (
+        last_updated + timedelta(seconds=eta_seconds)
+        if eta_seconds is not None and last_updated is not None
+        else None
+    )
+    return {
+        "campaign_id": campaign_id,
+        "company_id": company_id,
+        "campaign_name": campaign_name,
+        "status": status,
+        "total_audience": modeled_count,
+        "modeled_audience": modeled_count,
+        "sample_message_count": sample_count,
+        "mode": mode,
+        "queued": counts["queued"],
+        "sent": counts["sent"],
+        "failed": counts["failed"],
+        "retried": counts["retried"],
+        "dead_lettered": counts["dead_lettered"],
+        "percent_complete": percent_complete,
+        "throughput_per_second": throughput_per_second,
+        "messages_per_minute": messages_per_minute,
+        "eta_seconds": eta_seconds,
+        "projected_completion_at": projected_completion_at,
+        "started_at": started_at,
+        "last_updated": last_updated,
     }
 
 
@@ -508,7 +719,35 @@ async def get_company_dashboard_summary(
                 c.name AS company_name,
                 c.monthly_send_limit,
                 c.credit_balance,
-                (SELECT COUNT(*)::int FROM subscribers WHERE company_id = c.id) AS subscriber_count,
+                COALESCE(
+                    (
+                        SELECT NULLIF(
+                            SUM(
+                                GREATEST(
+                                    sl.estimated_subscriber_count,
+                                    COALESCE(list_sample_counts.sample_subscriber_count, 0)
+                                )
+                            )::int,
+                            0
+                        )
+                        FROM subscriber_lists sl
+                        LEFT JOIN (
+                            SELECT
+                                subscriber_list_id,
+                                COUNT(subscriber_id)::int AS sample_subscriber_count
+                            FROM subscriber_list_memberships
+                            GROUP BY subscriber_list_id
+                        ) list_sample_counts
+                          ON list_sample_counts.subscriber_list_id = sl.id
+                        WHERE sl.company_id = c.id
+                    ),
+                    (
+                        SELECT COUNT(*)::int
+                        FROM subscribers
+                        WHERE company_id = c.id
+                          AND marketing_status <> 'opted_out'
+                    )
+                ) AS subscriber_count,
                 (SELECT COUNT(*)::int FROM campaigns WHERE company_id = c.id) AS campaign_count,
                 (SELECT COUNT(*)::int FROM messages WHERE company_id = c.id) AS message_count,
                 COALESCE(
@@ -621,30 +860,43 @@ async def create_subscriber_list(
     async with pool.acquire() as connection:
         row = await connection.fetchrow(
             """
-            INSERT INTO subscriber_lists (id, company_id, name)
-            VALUES ($1, $2, $3)
-            RETURNING id, company_id, name
+            INSERT INTO subscriber_lists (id, company_id, name, estimated_subscriber_count)
+            VALUES ($1, $2, $3, 0)
+            RETURNING id, company_id, name, estimated_subscriber_count
             """,
             list_id,
             company_id,
             name,
         )
-    return {**dict(row), "subscriber_count": 0}
+    return {
+        **dict(row),
+        "sample_subscriber_count": 0,
+        "subscriber_count": 0,
+    }
 
 
 async def list_subscriber_lists(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
     async with pool.acquire() as connection:
         rows = await connection.fetch(
             """
+            WITH list_sample_counts AS (
+                SELECT subscriber_list_id, COUNT(subscriber_id)::int AS sample_subscriber_count
+                FROM subscriber_list_memberships
+                GROUP BY subscriber_list_id
+            )
             SELECT
                 sl.id,
                 sl.company_id,
                 sl.name,
-                COUNT(slm.subscriber_id)::int AS subscriber_count
+                COALESCE(lsc.sample_subscriber_count, 0)::int AS sample_subscriber_count,
+                sl.estimated_subscriber_count,
+                GREATEST(
+                    sl.estimated_subscriber_count,
+                    COALESCE(lsc.sample_subscriber_count, 0)
+                )::int AS subscriber_count
             FROM subscriber_lists sl
-            LEFT JOIN subscriber_list_memberships slm ON slm.subscriber_list_id = sl.id
+            LEFT JOIN list_sample_counts lsc ON lsc.subscriber_list_id = sl.id
             WHERE sl.company_id = $1
-            GROUP BY sl.id, sl.company_id, sl.name
             ORDER BY sl.name
             """,
             company_id,
@@ -653,7 +905,52 @@ async def list_subscriber_lists(pool: asyncpg.Pool, *, company_id: str) -> list[
 
 
 async def list_subscribers(pool: asyncpg.Pool, *, company_id: str) -> list[dict[str, Any]]:
+    result = await search_subscribers(pool, company_id=company_id, limit=100, offset=0)
+    return result["rows"]
+
+
+async def search_subscribers(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    q: str | None = None,
+    list_id: str | None = None,
+    consent_status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
+    normalized_q = q.strip() if q else None
+    normalized_list_id = list_id.strip() if list_id else None
+    normalized_consent_status = consent_status.strip() if consent_status else None
     async with pool.acquire() as connection:
+        total = await connection.fetchval(
+            """
+            SELECT COUNT(*)::int
+            FROM subscribers s
+            WHERE s.company_id = $1
+              AND s.marketing_status <> 'opted_out'
+              AND s.consent_status IN ('company_provided', 'double_opt_in_confirmed')
+              AND (
+                  $2::text IS NULL
+                  OR s.phone_number ILIKE '%' || $2 || '%'
+                  OR s.source ILIKE '%' || $2 || '%'
+              )
+              AND (
+                  $3::text IS NULL
+                  OR EXISTS (
+                      SELECT 1
+                      FROM subscriber_list_memberships slm_filter
+                      WHERE slm_filter.subscriber_id = s.id
+                        AND slm_filter.subscriber_list_id = $3
+                  )
+              )
+              AND ($4::text IS NULL OR s.consent_status = $4)
+            """,
+            company_id,
+            normalized_q,
+            normalized_list_id,
+            normalized_consent_status,
+        )
         rows = await connection.fetch(
             """
             SELECT
@@ -675,11 +972,38 @@ async def list_subscribers(pool: asyncpg.Pool, *, company_id: str) -> list[dict[
             WHERE s.company_id = $1
               AND s.marketing_status <> 'opted_out'
               AND s.consent_status IN ('company_provided', 'double_opt_in_confirmed')
+              AND (
+                  $2::text IS NULL
+                  OR s.phone_number ILIKE '%' || $2 || '%'
+                  OR s.source ILIKE '%' || $2 || '%'
+              )
+              AND (
+                  $3::text IS NULL
+                  OR EXISTS (
+                      SELECT 1
+                      FROM subscriber_list_memberships slm_filter
+                      WHERE slm_filter.subscriber_id = s.id
+                        AND slm_filter.subscriber_list_id = $3
+                  )
+              )
+              AND ($4::text IS NULL OR s.consent_status = $4)
             ORDER BY s.created_at DESC
+            LIMIT $5
+            OFFSET $6
             """,
             company_id,
+            normalized_q,
+            normalized_list_id,
+            normalized_consent_status,
+            limit,
+            offset,
         )
-    return [dict(row) for row in rows]
+    return {
+        "rows": [dict(row) for row in rows],
+        "total": int(total or 0),
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 async def import_subscriber(
@@ -1173,6 +1497,11 @@ async def list_campaigns(pool: asyncpg.Pool, *, company_id: str) -> list[dict[st
                 c.scheduled_at,
                 c.created_at,
                 COUNT(DISTINCT m.id)::int AS message_count,
+                GREATEST(
+                    c.modeled_audience_count,
+                    COUNT(DISTINCT m.id)::int
+                )::int AS audience_count,
+                c.audience_mode,
                 c.credit_cost,
                 COUNT(DISTINCT rc.id)::int AS reminder_count
             FROM campaigns c
@@ -1188,6 +1517,8 @@ async def list_campaigns(pool: asyncpg.Pool, *, company_id: str) -> list[dict[st
                 c.status,
                 c.scheduled_at,
                 c.created_at,
+                c.modeled_audience_count,
+                c.audience_mode,
                 c.credit_cost
             ORDER BY COALESCE(c.scheduled_at, c.created_at) DESC
             """,
@@ -1293,11 +1624,35 @@ async def get_admin_company_health(
                     c.name AS company_name,
                     c.credit_balance AS credits_remaining,
                     c.monthly_send_limit,
-                    (
-                        SELECT COUNT(*)::int
-                        FROM subscribers subscribers_for_company
-                        WHERE subscribers_for_company.company_id = c.id
-                          AND subscribers_for_company.marketing_status <> 'opted_out'
+                    COALESCE(
+                        (
+                            SELECT NULLIF(
+                                SUM(
+                                    GREATEST(
+                                        subscriber_lists_for_company.estimated_subscriber_count,
+                                        COALESCE(list_sample_counts.sample_subscriber_count, 0)
+                                    )
+                                )::int,
+                                0
+                            )
+                            FROM subscriber_lists subscriber_lists_for_company
+                            LEFT JOIN (
+                                SELECT
+                                    subscriber_list_id,
+                                    COUNT(subscriber_id)::int AS sample_subscriber_count
+                                FROM subscriber_list_memberships
+                                GROUP BY subscriber_list_id
+                            ) list_sample_counts
+                              ON list_sample_counts.subscriber_list_id =
+                                 subscriber_lists_for_company.id
+                            WHERE subscriber_lists_for_company.company_id = c.id
+                        ),
+                        (
+                            SELECT COUNT(*)::int
+                            FROM subscribers subscribers_for_company
+                            WHERE subscribers_for_company.company_id = c.id
+                              AND subscribers_for_company.marketing_status <> 'opted_out'
+                        )
                     ) AS subscriber_count,
                     (
                         SELECT COUNT(*)::int
@@ -1306,11 +1661,19 @@ async def get_admin_company_health(
                     ) AS campaign_count,
                     COALESCE(
                         (
-                            SELECT COUNT(messages_for_campaign.id)::int
+                            SELECT SUM(
+                                GREATEST(
+                                    scheduled_campaigns.modeled_audience_count,
+                                    (
+                                        SELECT COUNT(messages_for_campaign.id)::int
+                                        FROM messages messages_for_campaign
+                                        WHERE messages_for_campaign.campaign_id =
+                                              scheduled_campaigns.id
+                                    )
+                                )
+                            )::int
                             FROM campaigns scheduled_campaigns
-                            LEFT JOIN messages messages_for_campaign
-                              ON messages_for_campaign.campaign_id = scheduled_campaigns.id,
-                            bounds
+                            CROSS JOIN bounds
                             WHERE scheduled_campaigns.company_id = c.id
                               AND scheduled_campaigns.status = 'scheduled'
                               AND scheduled_campaigns.scheduled_at >= bounds.start_date

@@ -8,8 +8,10 @@
 
 ## Current-slice completions
 
-- P0 Done: Demo Retail Co seed now targets 1,100 deterministic subscribers across 7 realistic lists, 6 seeded campaigns, 950 campaign messages, and 560 scheduled reach. Acceptance: `tests/unit/test_demo_seed_data.py` validates scale, list diversity, current company ID, unique phone numbers, source diversity, and message/reach counts.
+- P0 Done: Demo Retail Co seed now targets 1,100 deterministic sample subscribers across 7 realistic lists while modeling 2,650,000 audience members and 1,360,000 scheduled reach. Acceptance: `tests/unit/test_demo_seed_data.py` validates sample scale, modeled scale, idempotent scale upserts, current company ID, unique phone numbers, source diversity, and message/reach counts.
 - P0 Done: Customer campaign workspace now has search, status, scheduled/created date-time filters, clear filters, and visible result counts. Acceptance: Vitest covers search by body, status filtering, date filtering, and reset.
+- P0 Done: Subscriber directory now uses `/companies/{company_id}/subscribers/search` with `q`, `list_id`, `consent_status`, `limit`, and `offset`, and the campaign builder searches direct subscribers instead of relying on an all-subscriber array.
+- P0 Done: Campaigns now expose `GET /campaigns/{campaign_id}/broadcast-monitor`, and the customer Campaigns workspace includes a Monitor tab with modeled audience, local sample progress, throughput, ETA, and actual queued/sent/failed/retried/dead-lettered counts.
 
 ## Marketing landing
 
@@ -191,14 +193,15 @@ Current strengths:
 - Current slice adds search, status, date filters, body previews, result counts, and reset.
 
 Gaps/friction:
-- Builder still lists only a capped direct subscriber picklist at scale; there is no subscriber search in the builder.
+- Builder supports direct subscriber search, but selected subscribers are still displayed only in the current search result context.
 - No edit/reschedule/cancel workflow despite "Modify campaign" actions.
 - Follow-ups reference source campaign IDs rather than campaign names in the table.
 - No delivery status breakdown in campaign history cards.
 
 Recommended improvements:
 - P0 Done: Add campaign filters and body/date visibility.
-- P1: Add audience search in the builder for direct subscriber selection.
+- P0 Done: Add audience search in the builder for direct subscriber selection.
+- P0 Done: Add live broadcast monitor for selected active/recent campaigns.
 - P1: Implement cancel/reschedule for scheduled campaigns.
 - P1: Show delivery counts by queued/sent/failed/dead-lettered per campaign.
 - P2: Follow-up table should resolve source campaign names and show estimated lift.
@@ -221,13 +224,13 @@ Current strengths:
 - CSV import creates lists on demand and imports rows.
 
 Gaps/friction:
-- Directory has no search, consent filter, source filter, pagination, or bulk actions.
+- Directory has search, consent filter, list filter, and pagination; source-specific filters and bulk actions remain open.
 - CSV parser is intentionally simple and does not handle quoted fields or validation reports.
 - Subscribers can only belong to one visible list in the current API response, even though memberships support many lists.
 
 Recommended improvements:
-- P0 Done: Expand Demo Retail Co to a large subscriber base with realistic list counts.
-- P1: Add subscriber search/filter/pagination before the directory grows beyond local-demo scale.
+- P0 Done: Expand Demo Retail Co to a modeled 2.65M audience with realistic list counts while keeping 1,100 physical sample rows.
+- P0 Done: Add subscriber search/filter/pagination before the directory grows beyond local-demo scale.
 - P1: Add CSV validation preview with duplicate, invalid phone, and consent warnings.
 - P2: Show all list memberships per subscriber.
 

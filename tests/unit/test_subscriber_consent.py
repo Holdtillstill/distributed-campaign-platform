@@ -133,6 +133,7 @@ def test_schema_defines_subscribers_consent_suppression_and_double_opt_in_tables
 
     assert "double_opt_in_requested" in schema
     assert "double_opt_in_confirmed" in schema
+    assert "estimated_subscriber_count INTEGER NOT NULL DEFAULT 0" in schema
     assert "idx_subscribers_company_phone" in schema
 
 
@@ -150,6 +151,8 @@ def test_customer_can_create_subscriber_list(campaign_module, fake_repo) -> None
         "company_id": "company-1",
         "name": "VIP Customers",
         "subscriber_count": 0,
+        "sample_subscriber_count": 0,
+        "estimated_subscriber_count": 0,
     }
     assert fake_repo.created_list == {"company_id": "company-1", "name": "VIP Customers"}
 

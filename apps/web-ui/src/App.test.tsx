@@ -75,13 +75,13 @@ function mockFetch() {
         {
           company_id: 'company-demo',
           company_name: 'Demo Retail Co',
-          subscriber_count: 2450,
+          subscriber_count: 2650000,
           campaign_count: 7,
-          scheduled_reach: 1125,
-          credits_remaining: 44000,
-          monthly_send_limit: 50000,
-          quota_usage: 0.225,
-          active_access_code: 'DEMO-2026',
+          scheduled_reach: 1360000,
+          credits_remaining: 4800000,
+          monthly_send_limit: 3000000,
+          quota_usage: 0.4533,
+          active_access_code: 'DEMORETA-E568C9',
         },
       ])
     }
@@ -209,6 +209,8 @@ function mockFetch() {
           scheduled_at: '2026-05-25T16:00:00Z',
           created_at: '2026-05-22T05:00:00Z',
           message_count: 2,
+          audience_count: 250000,
+          audience_mode: 'projected_sample',
           credit_cost: 4,
           reminder_count: 0,
         },
@@ -222,6 +224,8 @@ function mockFetch() {
           scheduled_at: '2026-05-20T16:00:00Z',
           created_at: '2026-05-20T15:00:00Z',
           message_count: 10,
+          audience_count: 10,
+          audience_mode: 'actual',
           credit_cost: 10,
           reminder_count: 1,
         },
@@ -235,6 +239,8 @@ function mockFetch() {
           scheduled_at: null,
           created_at: '2026-05-23T15:00:00Z',
           message_count: 8,
+          audience_count: 8,
+          audience_mode: 'actual',
           credit_cost: 8,
           reminder_count: 0,
         },
@@ -253,6 +259,8 @@ function mockFetch() {
           scheduled_at: '2026-06-01T17:30:00Z',
           created_at: '2026-05-22T05:00:00Z',
           message_count: 1125,
+          audience_count: 1360000,
+          audience_mode: 'projected_sample',
           credit_cost: 2250,
           reminder_count: 0,
         },
@@ -266,6 +274,8 @@ function mockFetch() {
           scheduled_at: '2026-05-18T18:00:00Z',
           created_at: '2026-05-17T15:00:00Z',
           message_count: 980,
+          audience_count: 980,
+          audience_mode: 'actual',
           credit_cost: 980,
           reminder_count: 1,
         },
@@ -306,14 +316,82 @@ function mockFetch() {
 
     if (url.endsWith('/companies/company-1/subscriber-lists') && method === 'POST') {
       const body = JSON.parse(String(init?.body ?? '{}')) as { name?: string }
-      return okJson({ id: body.name === 'Phoenix VIP' ? 'list-phoenix-vip' : 'list-1', company_id: 'company-1', name: body.name ?? 'VIP List', subscriber_count: 0 }, 201)
+      return okJson(
+        {
+          id: body.name === 'Phoenix VIP' ? 'list-phoenix-vip' : 'list-1',
+          company_id: 'company-1',
+          name: body.name ?? 'VIP List',
+          subscriber_count: 0,
+          sample_subscriber_count: 0,
+          estimated_subscriber_count: 0,
+        },
+        201,
+      )
     }
 
     if (url.endsWith('/companies/company-1/subscriber-lists') && method === 'GET') {
       return okJson([
-        { id: 'list-vip', company_id: 'company-1', name: 'VIP Customers', subscriber_count: 2 },
-        { id: 'list-west', company_id: 'company-1', name: 'West Region', subscriber_count: 1 },
+        {
+          id: 'list-vip',
+          company_id: 'company-1',
+          name: 'VIP Customers',
+          subscriber_count: 250000,
+          sample_subscriber_count: 2,
+          estimated_subscriber_count: 250000,
+        },
+        {
+          id: 'list-west',
+          company_id: 'company-1',
+          name: 'West Region',
+          subscriber_count: 125000,
+          sample_subscriber_count: 1,
+          estimated_subscriber_count: 125000,
+        },
       ])
+    }
+
+    if (url.startsWith('/api/companies/company-1/subscribers/search') && method === 'GET') {
+      const parsedUrl = new URL(url, 'http://localhost')
+      const listId = parsedUrl.searchParams.get('list_id')
+      const consentStatus = parsedUrl.searchParams.get('consent_status')
+      const query = parsedUrl.searchParams.get('q')?.toLowerCase() ?? ''
+      const limit = Number(parsedUrl.searchParams.get('limit') ?? '25')
+      const offset = Number(parsedUrl.searchParams.get('offset') ?? '0')
+      const rows = [
+        {
+          id: 'subscriber-1',
+          company_id: 'company-1',
+          phone_number: '+15550001001',
+          marketing_status: 'confirmed',
+          consent_status: 'double_opt_in_confirmed',
+          list_id: 'list-vip',
+          source: 'loyalty',
+          region: 'Phoenix',
+          created_at: '2026-05-20T15:00:00Z',
+        },
+        {
+          id: 'subscriber-2',
+          company_id: 'company-1',
+          phone_number: '+15550001002',
+          marketing_status: 'imported',
+          consent_status: 'company_provided',
+          list_id: 'list-west',
+          source: 'csv_import',
+          region: 'West',
+          created_at: '2026-05-21T15:00:00Z',
+        },
+      ].filter((row) => {
+        if (listId && row.list_id !== listId) return false
+        if (consentStatus && row.consent_status !== consentStatus) return false
+        if (query && !`${row.phone_number} ${row.source}`.toLowerCase().includes(query)) return false
+        return true
+      })
+      return okJson({
+        rows: rows.slice(offset, offset + limit),
+        total: rows.length,
+        limit,
+        offset,
+      })
     }
 
     if (url.endsWith('/companies/company-1/subscribers') && method === 'POST') {
@@ -379,6 +457,56 @@ function mockFetch() {
       })
     }
 
+    if (url.endsWith('/campaigns/campaign-upcoming/broadcast-monitor') && method === 'GET') {
+      return okJson({
+        campaign_id: 'campaign-upcoming',
+        company_id: 'company-1',
+        campaign_name: 'Memorial Day Promo',
+        status: 'scheduled',
+        total_audience: 250000,
+        modeled_audience: 250000,
+        sample_message_count: 2,
+        mode: 'projected/sample',
+        queued: 1,
+        sent: 1,
+        failed: 0,
+        retried: 0,
+        dead_lettered: 0,
+        percent_complete: 50,
+        throughput_per_second: 0.5,
+        messages_per_minute: 30,
+        eta_seconds: 499998,
+        projected_completion_at: '2026-05-31T12:00:00Z',
+        started_at: '2026-05-28T12:00:00Z',
+        last_updated: '2026-05-28T12:02:00Z',
+      })
+    }
+
+    if (url.endsWith('/campaigns/campaign-1/broadcast-monitor') && method === 'GET') {
+      return okJson({
+        campaign_id: 'campaign-1',
+        company_id: 'company-1',
+        campaign_name: 'Memorial Day Promo',
+        status: 'scheduled',
+        total_audience: 250002,
+        modeled_audience: 250002,
+        sample_message_count: 3,
+        mode: 'projected/sample',
+        queued: 3,
+        sent: 0,
+        failed: 0,
+        retried: 0,
+        dead_lettered: 0,
+        percent_complete: 0,
+        throughput_per_second: 0,
+        messages_per_minute: 0,
+        eta_seconds: null,
+        projected_completion_at: null,
+        started_at: '2026-05-28T12:00:00Z',
+        last_updated: '2026-05-28T12:00:00Z',
+      })
+    }
+
     if (url.endsWith('/campaigns') && method === 'POST') {
       return okJson(
         {
@@ -388,10 +516,12 @@ function mockFetch() {
           message_type: 'smart',
           status: 'scheduled',
           scheduled_at: '2026-05-25T16:00:00Z',
-          audience_count: 3,
-          message_count: 2,
-          credit_cost: 4,
-          remaining_credits: 41996,
+          audience_count: 250002,
+          message_count: 3,
+          sample_message_count: 3,
+          audience_mode: 'projected_sample',
+          credit_cost: 6,
+          remaining_credits: 41994,
           tracked_links: [
             {
               subscriber_id: 'subscriber-1',
@@ -404,7 +534,7 @@ function mockFetch() {
               public_url: '/r/spring-token-2',
             },
           ],
-          status_counts: { queued: 2, sent: 0, failed: 0, retried: 0, dead_lettered: 0 },
+          status_counts: { queued: 3, sent: 0, failed: 0, retried: 0, dead_lettered: 0 },
         },
         201,
       )
@@ -630,12 +760,12 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: /Demo Retail Co workspace/i })).toBeInTheDocument()
     expect(screen.getByText('company-demo')).toBeInTheDocument()
-    expect(screen.getAllByText('2,450')).not.toHaveLength(0)
-    expect(screen.getAllByText('1,125')).not.toHaveLength(0)
-    expect(screen.getAllByText('44,000')).not.toHaveLength(0)
-    expect(screen.getAllByText('50,000')).not.toHaveLength(0)
-    expect(screen.getAllByText(/23% used/i)).not.toHaveLength(0)
-    expect(screen.getAllByText('DEMO-2026')).not.toHaveLength(0)
+    expect(screen.getAllByText('2,650,000')).not.toHaveLength(0)
+    expect(screen.getAllByText('1,360,000')).not.toHaveLength(0)
+    expect(screen.getAllByText('4,800,000')).not.toHaveLength(0)
+    expect(screen.getAllByText('3,000,000')).not.toHaveLength(0)
+    expect(screen.getAllByText(/45% used/i)).not.toHaveLength(0)
+    expect(screen.getAllByText('DEMORETA-E568C9')).not.toHaveLength(0)
     expect(screen.getByText(/Summer Preview/i)).toBeInTheDocument()
     expect(screen.getByText(/Operator notes have not been added/i)).toBeInTheDocument()
   })
@@ -871,16 +1001,34 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/scheduled\/created from/i), '2026-05-24T00:00')
     await user.type(screen.getByLabelText(/scheduled\/created to/i), '2026-05-26T00:00')
 
-    expect(screen.getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
     expect(screen.queryByText(/Spring Launch/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Cart Rescue/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /clear filters/i }))
 
     expect(screen.getByText(/Showing 3 of 3 campaigns/i)).toBeInTheDocument()
-    expect(screen.getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
     expect(screen.getByText(/Spring Launch/i)).toBeInTheDocument()
     expect(screen.getByText(/Cart Rescue/i)).toBeInTheDocument()
+  })
+
+  it('renders live broadcast monitor with modeled audience and sample throughput', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    await user.click(await screen.findByRole('button', { name: /monitor/i }))
+
+    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
+    expect(screen.getByText('250,000')).toBeInTheDocument()
+    expect(screen.getByText(/2 local sample messages/i)).toBeInTheDocument()
+    expect(screen.getByText(/projected\/sample/i)).toBeInTheDocument()
+    expect(screen.getByText('30/min')).toBeInTheDocument()
   })
 
   it('shows subscriber segment cards, a selected subscriber table, and imports pasted CSV rows', async () => {
@@ -897,9 +1045,14 @@ describe('App', () => {
     expect(screen.getByText('+15550001001')).toBeInTheDocument()
     expect(screen.getByText(/double_opt_in_confirmed/i)).toBeInTheDocument()
 
+    await user.type(screen.getByLabelText(/search subscribers/i), 'csv')
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([request]) => String(request).includes('q=csv'))).toBe(true)
+    })
+    await user.clear(screen.getByLabelText(/search subscribers/i))
     await user.click(screen.getByRole('button', { name: /West Region/i }))
+    expect(await screen.findByText('+15550001002')).toBeInTheDocument()
     expect(screen.queryByText('+15550001001')).not.toBeInTheDocument()
-    expect(screen.getByText('+15550001002')).toBeInTheDocument()
 
     await user.clear(screen.getByLabelText(/paste csv subscribers/i))
     await user.type(
@@ -1033,7 +1186,7 @@ describe('App', () => {
     expect(await screen.findByText(/Top tenant by message volume/i)).toBeInTheDocument()
     expect(screen.getAllByText(/Acme Retail/i)).not.toHaveLength(0)
     expect(screen.getAllByText(/Scheduled reach next 30 days/i)).not.toHaveLength(0)
-    expect(screen.getByText('1,975')).toBeInTheDocument()
+    expect(screen.getByText('1,360,850')).toBeInTheDocument()
     expect(screen.getByText(/Highest quota usage/i)).toBeInTheDocument()
   })
 

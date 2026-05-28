@@ -39,12 +39,16 @@ class FakePlanningRepository:
                 "company_id": company_id,
                 "name": "VIP Customers",
                 "subscriber_count": 2,
+                "sample_subscriber_count": 2,
+                "estimated_subscriber_count": 0,
             },
             {
                 "id": "list-west",
                 "company_id": company_id,
                 "name": "West Region",
                 "subscriber_count": 1,
+                "sample_subscriber_count": 1,
+                "estimated_subscriber_count": 0,
             },
         ]
 
@@ -67,6 +71,29 @@ class FakePlanningRepository:
                 "list_id": "list-west",
             },
         ]
+
+    async def search_subscribers(
+        self,
+        *,
+        company_id: str,
+        q: str | None,
+        list_id: str | None,
+        consent_status: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict[str, object]:
+        rows = await self.list_subscribers(company_id=company_id)
+        return {
+            "rows": rows,
+            "total": len(rows),
+            "limit": limit,
+            "offset": offset,
+            "filters": {
+                "q": q,
+                "list_id": list_id,
+                "consent_status": consent_status,
+            },
+        }
 
     async def create_campaign_with_messages(
         self,
@@ -165,6 +192,8 @@ class FakePlanningRepository:
                 "scheduled_at": "2026-05-25T16:00:00Z",
                 "created_at": "2026-05-22T05:00:00Z",
                 "message_count": 2,
+                "audience_count": 2,
+                "audience_mode": "actual",
                 "credit_cost": 4,
                 "reminder_count": 0,
             },
@@ -178,6 +207,8 @@ class FakePlanningRepository:
                 "scheduled_at": "2026-05-20T16:00:00Z",
                 "created_at": "2026-05-20T15:00:00Z",
                 "message_count": 10,
+                "audience_count": 10,
+                "audience_mode": "actual",
                 "credit_cost": 10,
                 "reminder_count": 1,
             },
@@ -200,6 +231,8 @@ def test_schema_defines_campaign_planning_fields() -> None:
     assert "scheduled_at TIMESTAMPTZ" in schema
     assert "status TEXT NOT NULL DEFAULT 'queued'" in schema
     assert "subscriber_id TEXT REFERENCES subscribers(id)" in schema
+    assert "estimated_subscriber_count INTEGER NOT NULL DEFAULT 0" in schema
+    assert "modeled_audience_count INTEGER NOT NULL DEFAULT 0" in schema
     assert "idx_campaigns_company_scheduled" in schema
 
 
@@ -215,9 +248,26 @@ def test_customer_can_list_subscriber_audiences(campaign_module, fake_repo) -> N
         "company_id": "company-1",
         "name": "VIP Customers",
         "subscriber_count": 2,
+        "sample_subscriber_count": 2,
+        "estimated_subscriber_count": 0,
     }
     assert subscribers_response.status_code == 200
     assert subscribers_response.json()[0]["id"] == "subscriber-1"
+
+
+def test_customer_can_search_subscribers_with_pagination(campaign_module, fake_repo) -> None:
+    client = TestClient(campaign_module.app)
+
+    response = client.get(
+        "/companies/company-1/subscribers/search"
+        "?q=555&list_id=list-vip&consent_status=company_provided&limit=10&offset=20"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 2
+    assert response.json()["limit"] == 10
+    assert response.json()["offset"] == 20
+    assert response.json()["rows"][0]["id"] == "subscriber-1"
 
 
 def test_campaign_can_be_scheduled_for_existing_subscriber_segments(

@@ -61,6 +61,8 @@ class CampaignCreateResponse(BaseModel):
     scheduled_at: str | None = None
     audience_count: int
     message_count: int
+    sample_message_count: int | None = None
+    audience_mode: str = "actual"
     credit_cost: int
     remaining_credits: int
     tracked_links: list[dict[str, Any]] = Field(default_factory=list)
@@ -177,6 +179,8 @@ class SubscriberListResponse(BaseModel):
     company_id: str
     name: str
     subscriber_count: int
+    sample_subscriber_count: int = 0
+    estimated_subscriber_count: int = 0
 
 
 class SubscriberImportRequest(BaseModel):
@@ -196,6 +200,13 @@ class SubscriberResponse(BaseModel):
     created_at: Any | None = None
 
 
+class SubscriberSearchResponse(BaseModel):
+    rows: list[SubscriberResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 class CampaignListItemResponse(BaseModel):
     id: str
     company_id: str
@@ -206,8 +217,33 @@ class CampaignListItemResponse(BaseModel):
     scheduled_at: Any | None = None
     created_at: Any | None = None
     message_count: int
+    audience_count: int = 0
+    audience_mode: str = "actual"
     credit_cost: int
     reminder_count: int
+
+
+class BroadcastMonitorResponse(BaseModel):
+    campaign_id: str
+    company_id: str
+    campaign_name: str
+    status: str
+    total_audience: int
+    modeled_audience: int
+    sample_message_count: int
+    mode: str
+    queued: int
+    sent: int
+    failed: int
+    retried: int
+    dead_lettered: int
+    percent_complete: float
+    throughput_per_second: float
+    messages_per_minute: float
+    eta_seconds: int | None = None
+    projected_completion_at: Any | None = None
+    started_at: Any | None = None
+    last_updated: Any | None = None
 
 
 class DoubleOptInStartRequest(BaseModel):
@@ -348,6 +384,8 @@ class CampaignRepository(Protocol):
 
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None: ...
 
+    async def get_broadcast_monitor(self, campaign_id: str) -> dict[str, Any] | None: ...
+
     async def create_company_with_admin(
         self,
         *,
@@ -400,6 +438,17 @@ class CampaignRepository(Protocol):
     async def list_subscriber_lists(self, *, company_id: str) -> list[dict[str, Any]]: ...
 
     async def list_subscribers(self, *, company_id: str) -> list[dict[str, Any]]: ...
+
+    async def search_subscribers(
+        self,
+        *,
+        company_id: str,
+        q: str | None,
+        list_id: str | None,
+        consent_status: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict[str, Any]: ...
 
     async def import_subscriber(
         self,
@@ -556,6 +605,20 @@ class AsyncpgCampaignRepository:
         else:
             resolved_recipients = recipients
             resolved_subscriber_ids = [None] * len(recipients)
+        audience_scale = (
+            await db.estimate_campaign_audience(
+                self._pool,
+                company_id=company_id,
+                subscriber_ids=subscriber_ids,
+                subscriber_list_ids=subscriber_list_ids,
+                sample_count=len(resolved_recipients),
+            )
+            if recipients is None
+            else {
+                "modeled_audience_count": len(resolved_recipients),
+                "audience_mode": "actual",
+            }
+        )
         message_rows = build_message_rows(
             campaign_id,
             resolved_recipients,
@@ -573,6 +636,8 @@ class AsyncpgCampaignRepository:
             media_asset_id=media_asset_id,
             actor_email=actor_email,
             scheduled_at=scheduled_at,
+            modeled_audience_count=audience_scale["modeled_audience_count"],
+            audience_mode=audience_scale["audience_mode"],
         )
         if credit_result["status"] != "scheduled":
             with tracer.start_as_current_span("nats.publish.messages.dispatch"):
@@ -590,6 +655,8 @@ class AsyncpgCampaignRepository:
             "status": credit_result["status"],
             "scheduled_at": scheduled_at,
             "audience_count": credit_result["audience_count"],
+            "sample_message_count": credit_result["sample_message_count"],
+            "audience_mode": credit_result["audience_mode"],
             "message_count": len(message_rows),
             "credit_cost": credit_result["credit_cost"],
             "remaining_credits": credit_result["remaining_credits"],
@@ -599,6 +666,9 @@ class AsyncpgCampaignRepository:
 
     async def get_campaign_status(self, campaign_id: str) -> dict[str, Any] | None:
         return await db.get_campaign_status(self._pool, campaign_id)
+
+    async def get_broadcast_monitor(self, campaign_id: str) -> dict[str, Any] | None:
+        return await db.get_broadcast_monitor(self._pool, campaign_id)
 
     async def create_company_with_admin(
         self,
@@ -682,6 +752,26 @@ class AsyncpgCampaignRepository:
 
     async def list_subscribers(self, *, company_id: str) -> list[dict[str, Any]]:
         return await db.list_subscribers(self._pool, company_id=company_id)
+
+    async def search_subscribers(
+        self,
+        *,
+        company_id: str,
+        q: str | None = None,
+        list_id: str | None = None,
+        consent_status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        return await db.search_subscribers(
+            self._pool,
+            company_id=company_id,
+            q=q,
+            list_id=list_id,
+            consent_status=consent_status,
+            limit=limit,
+            offset=offset,
+        )
 
     async def import_subscriber(
         self,
@@ -928,6 +1018,8 @@ async def create_campaign(
         "status": result.get("status", "queued"),
         "scheduled_at": result.get("scheduled_at"),
         "audience_count": result.get("audience_count", result["message_count"]),
+        "sample_message_count": result.get("sample_message_count", result["message_count"]),
+        "audience_mode": result.get("audience_mode", "actual"),
         "message_count": result["message_count"],
         "credit_cost": result["credit_cost"],
         "remaining_credits": result["remaining_credits"],
@@ -1142,6 +1234,26 @@ async def list_subscribers(
     return await repository.list_subscribers(company_id=company_id)
 
 
+@app.get("/companies/{company_id}/subscribers/search", response_model=SubscriberSearchResponse)
+async def search_subscribers(
+    company_id: str,
+    q: Annotated[str | None, Query()] = None,
+    list_id: Annotated[str | None, Query()] = None,
+    consent_status: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.search_subscribers(
+        company_id=company_id,
+        q=q,
+        list_id=list_id,
+        consent_status=consent_status,
+        limit=limit,
+        offset=offset,
+    )
+
+
 @app.post(
     "/public/opt-ins",
     response_model=DoubleOptInStartResponse,
@@ -1343,6 +1455,17 @@ async def get_campaign_status(
     repository: CampaignRepository = REPOSITORY_DEPENDENCY,
 ) -> dict[str, Any]:
     result = await repository.get_campaign_status(campaign_id)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="campaign not found")
+    return result
+
+
+@app.get("/campaigns/{campaign_id}/broadcast-monitor", response_model=BroadcastMonitorResponse)
+async def get_broadcast_monitor(
+    campaign_id: str,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    result = await repository.get_broadcast_monitor(campaign_id)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="campaign not found")
     return result

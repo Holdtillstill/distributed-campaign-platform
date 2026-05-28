@@ -789,17 +789,30 @@ textarea {
   margin-top: 18px;
 }
 
-.campaign-filters .form-grid {
+.campaign-filters .form-grid,
+.subscriber-filters .form-grid,
+.monitor-controls {
   max-width: none;
 }
 
-.filter-actions {
+.subscriber-filters {
+  margin-top: 18px;
+}
+
+.filter-actions,
+.pagination-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   margin-top: 12px;
   color: #64748b;
+}
+
+.pagination-actions div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .campaign-board.single {
@@ -890,6 +903,61 @@ textarea {
   display: grid;
   gap: 16px;
   max-width: 1040px;
+}
+
+.broadcast-monitor {
+  margin-top: 24px;
+}
+
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.monitor-progress,
+.monitor-meta {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 16px;
+}
+
+.monitor-progress {
+  grid-column: span 2;
+}
+
+.monitor-progress strong,
+.monitor-meta span {
+  color: #111827;
+}
+
+.monitor-progress span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.progress-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f766e;
+}
+
+.monitor-meta {
+  grid-column: span 2;
+  align-content: center;
 }
 
 .builder-step {
@@ -1133,5 +1201,19 @@ textarea {
   .filter-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .pagination-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .monitor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .monitor-progress,
+  .monitor-meta {
+    grid-column: auto;
   }
 }
