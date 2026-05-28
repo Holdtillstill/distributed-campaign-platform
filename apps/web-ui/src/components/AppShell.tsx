@@ -94,6 +94,10 @@ export function AppShell({
         </nav>
         <div className="sidebar-footer">
           <span>{isAdmin ? 'Internal console' : roleMeta?.marketScope ?? 'Workspace access'}</span>
+          <div className="sidebar-resource-links" aria-label="Product help links">
+            <a href="/features">Features</a>
+            <a href="/kb">Knowledge base</a>
+          </div>
           <button className="secondary" onClick={onLogout}>
             Logout
           </button>

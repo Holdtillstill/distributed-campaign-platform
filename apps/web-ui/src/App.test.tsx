@@ -669,8 +669,82 @@ describe('App', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: /CampaignOS/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^Features$/i })).toHaveAttribute('href', '/features')
+    expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
+    expect(screen.getByRole('link', { name: /Feature tour/i })).toHaveAttribute('href', '/features')
+    expect(screen.getByRole('link', { name: /Customer KB/i })).toHaveAttribute('href', '/kb')
     expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
+  })
+
+  it('renders the feature marketing route with real product capabilities and CTAs', () => {
+    mockFetch()
+
+    window.history.pushState(null, '', '/features')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /CampaignOS features/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/2.65M modeled subscribers/i)).not.toHaveLength(0)
+    expect(screen.getByText(/Live broadcast monitor/i)).toBeInTheDocument()
+    expect(screen.getByText(/Subscriber segments and modeled audiences/i)).toBeInTheDocument()
+    expect(screen.getByText(/Role-based access, invites, and budgets/i)).toBeInTheDocument()
+    expect(screen.getByText(/Analytics and campaign reporting/i)).toBeInTheDocument()
+    expect(screen.getByText(/Consent and compliance controls/i)).toBeInTheDocument()
+    expect(screen.getByText(/Grafana dashboards, Tempo traces, Prometheus metrics, Loki log collection/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: /Open customer app/i })[0]).toHaveAttribute('href', '/app')
+    expect(screen.getAllByRole('link', { name: /Open broadcast monitor/i })[0]).toHaveAttribute('href', '/monitor')
+    expect(screen.getAllByRole('link', { name: /Customer knowledge base/i })[0]).toHaveAttribute('href', '/kb')
+    expect(screen.getByRole('link', { name: /Open internal admin/i })).toHaveAttribute('href', '/internal')
+  })
+
+  it('renders focused feature subroutes without breaking public navigation', () => {
+    mockFetch()
+
+    window.history.pushState(null, '', '/features/broadcast-monitor')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { level: 1, name: /Live broadcast monitor/i })).toBeInTheDocument()
+    expect(screen.getByText(/Feature deep dive/i)).toBeInTheDocument()
+    expect(screen.getByText(/Track queued, sent, failed, retried, and dead-lettered messages/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^Open monitor$/i })).toHaveAttribute('href', '/monitor')
+    expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
+  })
+
+  it('renders the customer knowledge base with category filters, search, articles, and CTAs', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/kb')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /Customer knowledge base/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/owner@demo-retail.test/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/DEMORETA-E568C9/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/ops@example.test/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Getting started with Demo Retail Co/i)).toBeInTheDocument()
+    expect(screen.getByText(/Sign in with an invite or access code/i)).toBeInTheDocument()
+    expect(screen.getByText(/Create and schedule a campaign/i)).toBeInTheDocument()
+    expect(screen.getByText(/Monitor broadcast throughput live/i)).toBeInTheDocument()
+    expect(screen.getByText(/Internal admin and tenant operations overview/i)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: /^Open customer app$/i })[0]).toHaveAttribute('href', '/app')
+    expect(screen.getAllByRole('link', { name: /^Open broadcast monitor$/i })[0]).toHaveAttribute('href', '/monitor')
+    expect(screen.getAllByRole('link', { name: /^View features$/i })[0]).toHaveAttribute('href', '/features')
+    expect(screen.getAllByRole('link', { name: /^Open internal admin$/i })[0]).toHaveAttribute('href', '/internal')
+
+    const articles = screen.getByLabelText(/Knowledge base articles/i)
+    await user.type(screen.getByLabelText(/Search knowledge base/i), 'broadcast')
+
+    expect(within(articles).getByText(/Monitor broadcast throughput live/i)).toBeInTheDocument()
+    expect(within(articles).queryByText(/Invite teammates from Settings/i)).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText(/Search knowledge base/i))
+    await user.click(screen.getByRole('button', { name: /^Compliance$/i }))
+
+    expect(within(articles).getByText(/Consent and compliance basics/i)).toBeInTheDocument()
+    expect(within(articles).queryByText(/Create and schedule a campaign/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Clear filters/i }))
+    expect(within(articles).getByText(/Troubleshooting common issues/i)).toBeInTheDocument()
   })
 
   it('renders five unique portfolio-grade design explorations on /1 through /5', () => {
@@ -1011,6 +1085,32 @@ describe('App', () => {
     expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
     expect(await screen.findByText('30/min')).toBeInTheDocument()
     expect(await screen.findAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
+    expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
+  })
+
+  it('keeps the /monitor direct route working for an authenticated customer session', async () => {
+    const fetchMock = mockFetch()
+
+    window.localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        role: 'company_user',
+        email: 'owner@acme.test',
+        companyId: 'company-1',
+        companyName: 'Acme Retail',
+        membershipRole: 'customer_admin',
+        creditLimit: 50000,
+        creditsUsed: 125,
+      }),
+    )
+    window.history.pushState(null, '', '/monitor')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^monitor$/i })).toHaveClass('active')
+    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Monitor guide/i })).toHaveAttribute('href', '/kb')
+    expect(await screen.findByText('30/min')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
   })
 

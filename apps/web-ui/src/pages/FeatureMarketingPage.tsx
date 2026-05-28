@@ -1,0 +1,267 @@
+type FeatureSlug =
+  | 'broadcast-monitor'
+  | 'audience-segments'
+  | 'role-based-access'
+  | 'analytics'
+  | 'compliance'
+
+type FeatureSpotlight = {
+  slug: FeatureSlug
+  kicker: string
+  title: string
+  summary: string
+  proof: string
+  bullets: string[]
+  ctaHref: string
+  ctaLabel: string
+}
+
+const featureSpotlights: FeatureSpotlight[] = [
+  {
+    slug: 'broadcast-monitor',
+    kicker: 'Live operations',
+    title: 'Live broadcast monitor',
+    summary:
+      'Track queued, sent, failed, retried, and dead-lettered messages with throughput, progress, and projected ETA.',
+    proof: 'Monitor projected/sample broadcasts before the full modeled audience is moved.',
+    bullets: ['Messages per minute and per second', 'Projected completion and ETA', 'Provider outcome counters'],
+    ctaHref: '/monitor',
+    ctaLabel: 'Open monitor',
+  },
+  {
+    slug: 'audience-segments',
+    kicker: 'Audience scale',
+    title: 'Subscriber segments and modeled audiences',
+    summary:
+      'Plan campaigns against regional lists, sample subscriber rows, and modeled reach without loading millions of rows into the browser.',
+    proof: 'Demo Retail Co carries 2.65M modeled subscribers with representative local sample rows.',
+    bullets: ['Segment cards by list', 'Consent-aware subscriber directory', 'CSV import for sample data'],
+    ctaHref: '/app',
+    ctaLabel: 'Open audience tools',
+  },
+  {
+    slug: 'role-based-access',
+    kicker: 'Team controls',
+    title: 'Role-based access, invites, and budgets',
+    summary:
+      'Company owners can issue access codes, assign roles, and set per-user credit allocations for campaign work.',
+    proof: 'Settings exposes company admin, campaign manager, regional manager, analyst, and viewer guardrails.',
+    bullets: ['Invite codes carry role and budget', 'Read-only roles keep operations disabled', 'Budget context follows the user'],
+    ctaHref: '/app',
+    ctaLabel: 'Open settings',
+  },
+  {
+    slug: 'analytics',
+    kicker: 'Reporting',
+    title: 'Analytics and campaign reporting',
+    summary:
+      'Review scheduled reach, campaign volume, Smart SMS clicks, offer redemptions, follow-ups, and credit usage in one workspace.',
+    proof: 'Analytics combines campaign history, tracked links, redemptions, and quota usage from tenant APIs.',
+    bullets: ['Campaign performance table', 'Tracked link and redemption totals', 'Quota and message activity'],
+    ctaHref: '/app',
+    ctaLabel: 'View analytics',
+  },
+  {
+    slug: 'compliance',
+    kicker: 'Governance',
+    title: 'Consent and compliance controls',
+    summary:
+      'Keep imported, company-provided, and double opt-in subscriber states visible before teams schedule sends.',
+    proof: 'Subscriber filters expose consent status while internal operators retain tenant oversight.',
+    bullets: ['Consent status filtering', 'Double opt-in confirmation flow', 'Internal tenant operations overview'],
+    ctaHref: '/kb',
+    ctaLabel: 'Read compliance guide',
+  },
+]
+
+const capabilityRows = [
+  {
+    label: 'Campaign builder and scheduling',
+    value: 'Segment picks, Smart SMS media, scheduling, credit estimates',
+  },
+  {
+    label: 'Campaign filters',
+    value: 'Search, status, and scheduled/created date filters for active history',
+  },
+  {
+    label: 'Customer settings',
+    value: 'Team controls, invite codes, roles, and regional credit budgets',
+  },
+  {
+    label: 'Internal admin',
+    value: 'Tenant creation, health review, usage rollups, and access-code visibility',
+  },
+  {
+    label: 'Observability',
+    value: 'Grafana dashboards, Tempo traces, Prometheus metrics, Loki log collection',
+  },
+]
+
+function getSpotlight(slug?: string): FeatureSpotlight | null {
+  return featureSpotlights.find((feature) => feature.slug === slug) ?? null
+}
+
+export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
+  const activeFeature = getSpotlight(activeSlug)
+  const orderedFeatures = activeFeature
+    ? [activeFeature, ...featureSpotlights.filter((feature) => feature.slug !== activeFeature.slug)]
+    : featureSpotlights
+
+  return (
+    <main className="public-product-page feature-marketing">
+      <header className="public-product-nav">
+        <a className="public-brand" href="/">
+          CampaignOS
+        </a>
+        <nav aria-label="Feature navigation">
+          <a href="/features">Features</a>
+          <a href="/kb">Knowledge base</a>
+          <a href="/app">Customer app</a>
+          <a href="/internal">Internal admin</a>
+        </nav>
+      </header>
+
+      <section className="feature-hero">
+        <div className="feature-hero-copy">
+          <p className="eyebrow">{activeFeature ? 'Feature deep dive' : 'Campaign platform'}</p>
+          <h1>{activeFeature ? activeFeature.title : 'CampaignOS features'}</h1>
+          <p>
+            Multi-tenant SMS campaign software for customer teams that need modeled audience planning, live
+            throughput visibility, controlled budgets, and tenant operations in one demo-ready product.
+          </p>
+          <div className="hero-actions">
+            <a className="docs-link" href="/app">
+              Open customer app
+            </a>
+            <a className="docs-link secondary-link" href="/monitor">
+              Open broadcast monitor
+            </a>
+            <a className="docs-link secondary-link" href="/kb">
+              Read customer KB
+            </a>
+          </div>
+        </div>
+
+        <aside className="feature-command-center" aria-label="CampaignOS capability snapshot">
+          <div className="command-topline">
+            <span>Demo Retail Co</span>
+            <strong>2.65M modeled subscribers</strong>
+          </div>
+          <div className="command-progress">
+            <span>Summer Preview</span>
+            <strong>41.8k/min</strong>
+            <i aria-hidden="true" />
+          </div>
+          <dl>
+            <div>
+              <dt>Queued</dt>
+              <dd>1,125</dd>
+            </div>
+            <div>
+              <dt>Sent</dt>
+              <dd>980</dd>
+            </div>
+            <div>
+              <dt>Credit guardrail</dt>
+              <dd>Enabled</dd>
+            </div>
+            <div>
+              <dt>Observability</dt>
+              <dd>Grafana + Tempo</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section className="feature-proof-band" aria-label="Platform proof points">
+        <div>
+          <span>Modeled reach</span>
+          <strong>2,650,000</strong>
+          <p>Subscriber segments can represent production-scale audiences while demo rows stay small.</p>
+        </div>
+        <div>
+          <span>Operations</span>
+          <strong>Live ETA</strong>
+          <p>Broadcast monitor exposes progress, throughput, retry pressure, and failed rows.</p>
+        </div>
+        <div>
+          <span>Governance</span>
+          <strong>Roles + budgets</strong>
+          <p>Access codes, permissions, and credit allocations travel with every invited user.</p>
+        </div>
+      </section>
+
+      <section className="feature-index" aria-label="Feature overview">
+        <div className="feature-section-heading">
+          <p className="eyebrow">Capability map</p>
+          <h2>Built around the real customer workflow.</h2>
+        </div>
+        <div className="feature-index-grid">
+          {orderedFeatures.map((feature) => (
+            <article className={feature.slug === activeFeature?.slug ? 'feature-card active' : 'feature-card'} key={feature.slug}>
+              <span>{feature.kicker}</span>
+              <h3>{feature.title}</h3>
+              <p>{feature.summary}</p>
+              <strong>{feature.proof}</strong>
+              <ul>
+                {feature.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+              <div className="feature-card-actions">
+                <a href={`/features/${feature.slug}`}>Feature details</a>
+                <a href={feature.ctaHref}>{feature.ctaLabel}</a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="feature-depth" aria-label="Product depth">
+        <div>
+          <p className="eyebrow">Product depth</p>
+          <h2>Campaign planning, admin controls, and platform visibility.</h2>
+          <p>
+            The demo is not just a landing page. Customer teams can sign in, create campaigns, schedule sends,
+            filter campaign history, monitor throughput, invite teammates, and review analytics. Internal admins can
+            manage tenants and inspect usage health.
+          </p>
+          <div className="hero-actions">
+            <a className="docs-link" href="/internal">
+              Open internal admin
+            </a>
+            <a className="docs-link secondary-link" href="/kb">
+              Browse KB
+            </a>
+          </div>
+        </div>
+        <ul className="capability-list">
+          {capabilityRows.map((row) => (
+            <li key={row.label}>
+              <strong>{row.label}</strong>
+              <span>{row.value}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="feature-final-cta" aria-label="Feature calls to action">
+        <div>
+          <p className="eyebrow">Evaluate the demo</p>
+          <h2>Open the app, monitor a broadcast, or hand customers the KB.</h2>
+        </div>
+        <div className="hero-actions">
+          <a className="docs-link" href="/app">
+            Customer workspace
+          </a>
+          <a className="docs-link secondary-link" href="/monitor">
+            Broadcast monitor
+          </a>
+          <a className="docs-link secondary-link" href="/kb">
+            Customer knowledge base
+          </a>
+        </div>
+      </section>
+    </main>
+  )
+}

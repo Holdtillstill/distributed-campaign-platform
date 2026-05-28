@@ -15,6 +15,8 @@ export function MarketingPage({
         <strong>CampaignOS</strong>
         <nav aria-label="Public navigation">
           <a href="#platform">Platform</a>
+          <a href="/features">Features</a>
+          <a href="/kb">Knowledge base</a>
           <a href="#pricing">Pricing</a>
           <button className="secondary" onClick={onCustomerAccess}>
             Customer login
@@ -37,6 +39,12 @@ export function MarketingPage({
           </p>
           <div className="hero-actions">
             <button onClick={onCustomerAccess}>Start with access code</button>
+            <a className="docs-link secondary-link" href="/features">
+              Feature tour
+            </a>
+            <a className="docs-link secondary-link" href="/kb">
+              Customer KB
+            </a>
             <a className="docs-link secondary-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
               API docs
             </a>
@@ -71,6 +79,27 @@ export function MarketingPage({
           <span>03</span>
           <h2>Credit-aware sending</h2>
           <p>Regular and smart SMS flows account for credits before campaigns leave the platform.</p>
+        </div>
+      </section>
+
+      <section className="marketing-band feature-band" aria-label="Feature and help links">
+        <div>
+          <span>Features</span>
+          <h2>Broadcast monitor, segments, roles, and analytics.</h2>
+          <p>See the product capabilities behind the customer app, internal admin, and observability surfaces.</p>
+          <a href="/features">Explore features</a>
+        </div>
+        <div>
+          <span>Knowledge base</span>
+          <h2>Customer help for real demo workflows.</h2>
+          <p>Search setup, access-code sign-in, budgets, campaign scheduling, consent, and troubleshooting guides.</p>
+          <a href="/kb">Open knowledge base</a>
+        </div>
+        <div>
+          <span>Live ops</span>
+          <h2>Monitor throughput from a direct route.</h2>
+          <p>Open the broadcast monitor without navigating through the dashboard first.</p>
+          <a href="/monitor">Open monitor</a>
         </div>
       </section>
 

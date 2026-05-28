@@ -3,7 +3,9 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { API_BASE_URL } from './api/client'
 import { AppShell } from './components/AppShell'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
+import { FeatureMarketingPage } from './pages/FeatureMarketingPage'
 import { InternalLoginPage } from './pages/InternalLoginPage'
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { MarketingPage } from './pages/MarketingPage'
 import { AppDesignExploration, routeToAppDesign } from './pages/AppDesignExplorations'
 import { DesignExploration, routeToExploration } from './pages/DesignExplorations'
@@ -11,6 +13,8 @@ import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
 import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
+
+type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' }
 
 function companyPageFromLocation(): CompanyPage {
   return window.location.pathname.startsWith('/app/monitor') || window.location.pathname.startsWith('/monitor')
@@ -24,9 +28,20 @@ function campaignSubpageFromLocation(): CampaignSubpage | undefined {
     : undefined
 }
 
+function publicRouteFromLocation(): PublicRoute | null {
+  const path = window.location.pathname
+  if (path === '/kb' || path.startsWith('/kb/')) return { page: 'kb' }
+  if (path === '/features' || path.startsWith('/features/')) {
+    const activeSlug = path.split('/')[2]
+    return { page: 'features', activeSlug }
+  }
+  return null
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => loadStoredSession())
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
+  const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() => publicRouteFromLocation())
   const [designExploration, setDesignExploration] = useState(() => routeToExploration(window.location.pathname))
   const [appDesignExploration, setAppDesignExploration] = useState(() => routeToAppDesign(window.location.pathname))
   const [adminPage, setAdminPage] = useState<AdminPage>('dashboard')
@@ -42,12 +57,14 @@ export default function App() {
   function navigate(nextSurface: Surface) {
     const path = nextSurface === 'internal' ? '/internal' : nextSurface === 'app' ? '/app' : '/'
     window.history.pushState(null, '', path)
+    setPublicRoute(null)
     setSurface(nextSurface)
   }
 
   useEffect(() => {
     const handlePopState = () => {
       setSurface(surfaceFromLocation())
+      setPublicRoute(publicRouteFromLocation())
       setDesignExploration(routeToExploration(window.location.pathname))
       setAppDesignExploration(routeToAppDesign(window.location.pathname))
       setCompanyPage(companyPageFromLocation())
@@ -163,6 +180,14 @@ export default function App() {
 
   if (appDesignExploration) {
     return <AppDesignExploration id={appDesignExploration} />
+  }
+
+  if (publicRoute?.page === 'kb') {
+    return <KnowledgeBasePage />
+  }
+
+  if (publicRoute?.page === 'features') {
+    return <FeatureMarketingPage activeSlug={publicRoute.activeSlug} />
   }
 
   if (!session) {

@@ -755,6 +755,9 @@ export function CompanyWorkspace({
             <button className="secondary" onClick={() => onNavigate('analytics')}>
               View analytics
             </button>
+            <a className="docs-link secondary-link" href="/kb">
+              Read customer KB
+            </a>
             {!canCreateCampaign ? <p className="helper-text wide">{restrictionCopy}</p> : null}
           </section>
         </div>
@@ -959,6 +962,19 @@ export function CompanyWorkspace({
         {campaignSubpage === 'create' ? (
           <>
             <form className="campaign-builder" onSubmit={createCampaign}>
+              <section className="product-help-callout" aria-label="Campaign builder help">
+                <div>
+                  <strong>Campaign builder help</strong>
+                  <p>
+                    Review the customer KB before scheduling if you need a refresher on segments, Smart SMS credit
+                    costs, media requirements, or modeled audience estimates.
+                  </p>
+                </div>
+                <div>
+                  <a href="/kb">Open campaign guide</a>
+                  <a href="/features/broadcast-monitor">Preview monitor feature</a>
+                </div>
+              </section>
               {!canCreateCampaign ? (
                 <section className="permission-callout" aria-label="Read-only campaign restriction">
                   <strong>Campaign scheduling is disabled for {roleMeta.label}</strong>
@@ -1150,6 +1166,16 @@ export function CompanyWorkspace({
               <span>Live monitor</span>
               <strong>Broadcast throughput</strong>
             </div>
+            <div className="monitor-help-strip">
+              <p>
+                Use this view after scheduling to confirm progress, throughput, ETA, retries, failures, and
+                dead-lettered rows before escalating provider issues.
+              </p>
+              <div>
+                <a href="/kb">Monitor guide</a>
+                <a href="/features/broadcast-monitor">Feature details</a>
+              </div>
+            </div>
             {campaigns.length ? (
               <>
                 <div className="form-grid monitor-controls">
@@ -1170,7 +1196,12 @@ export function CompanyWorkspace({
                     Refresh monitor
                   </button>
                 </div>
-                {monitorError ? <p className="error">{monitorError}</p> : null}
+                {monitorError ? (
+                  <p className="error">
+                    {monitorError}. Data may still be collecting; refresh after the campaign is queued or review the
+                    monitor guide.
+                  </p>
+                ) : null}
                 {broadcastMonitor ? (
                   <div className="monitor-grid">
                     <div className="monitor-progress">
@@ -1214,13 +1245,17 @@ export function CompanyWorkspace({
                     </div>
                   </div>
                 ) : (
-                  <p className="muted">{monitorLoading ? 'Loading monitor...' : 'Choose a campaign to load monitor data.'}</p>
+                  <p className="muted">
+                    {monitorLoading
+                      ? 'Loading monitor...'
+                      : 'Choose a campaign to load monitor data. The monitor guide explains queued, sent, failed, retried, and dead-lettered rows.'}
+                  </p>
                 )}
               </>
             ) : (
               <EmptyState
                 title="No campaigns to monitor"
-                description="Create or seed a campaign before viewing broadcast throughput."
+                description="Create or seed a campaign before viewing broadcast throughput. Then validate ETA, retries, and dead-letter rows here."
               />
             )}
           </section>
@@ -1761,6 +1796,19 @@ export function CompanyWorkspace({
   return (
     <>
       <PageHeader title="Settings" description="Manage tenant identity, team access, roles, invites, and regional credit budgets." />
+      <section className="product-help-callout" aria-label="Settings help">
+        <div>
+          <strong>Need to invite or restrict a teammate?</strong>
+          <p>
+            The customer knowledge base explains access codes, roles, permissions, and user credit allocations for
+            company owners.
+          </p>
+        </div>
+        <div>
+          <a href="/kb">Open team access guide</a>
+          <a href="/features/role-based-access">View access feature</a>
+        </div>
+      </section>
       <section className="settings-summary" aria-label="Tenant access summary">
         <div>
           <span>Company</span>
