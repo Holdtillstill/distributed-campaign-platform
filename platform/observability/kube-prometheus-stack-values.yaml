@@ -26,6 +26,10 @@ grafana:
           tags: [{ key: service.name, value: service }]
         tracesToMetrics:
           datasourceUid: prometheus
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
 
 prometheus:
   prometheusSpec:
@@ -33,6 +37,7 @@ prometheus:
     podMonitorSelectorNilUsesHelmValues: false
     scrapeInterval: 15s
     retention: 3d
+    enableRemoteWriteReceiver: true
 
 alertmanager:
   enabled: true

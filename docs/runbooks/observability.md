@@ -94,6 +94,8 @@ The frontend can also generate traffic:
 
 ## Find Traces In Grafana Explore
 
+Normal trace search reads stored traces from Tempo. It does not require generated metrics.
+
 1. Open Grafana at <http://127.0.0.1:3000>.
 2. Open Grafana Explore.
 3. Select the Tempo data source.
@@ -105,6 +107,40 @@ The frontend can also generate traffic:
    - `provider-simulator`
 7. For the trace-smoke check, look for a recent `GET /observability/trace-smoke` server span and an `observability.trace_smoke` child span.
 8. For campaign dispatch, look for `message.consume` and `provider.send` spans after creating a campaign with NATS/dispatcher enabled.
+
+## Use Explore Traces Breakdown And Rate Views
+
+The Grafana Traces Drilldown or Explore Traces breakdown views are different from
+normal trace search. Breakdown and Rate run TraceQL metrics queries such as
+`{resource.service.name != nil} | rate() by(resource.service.name)`. Those queries
+require Tempo metrics-generator with the `local-blocks` processor registered in
+Tempo's generator ring. This stack also enables the `service-graphs` and
+`span-metrics` processors and remote-writes generated metrics to the local
+Prometheus service.
+
+If the stack was installed before metrics-generator was enabled, refresh
+Prometheus first so it accepts remote write, then refresh Tempo:
+
+```bash
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace observability \
+  -f platform/observability/kube-prometheus-stack-values.yaml
+
+helm upgrade --install tempo grafana/tempo \
+  --namespace observability \
+  -f platform/observability/tempo-values.yaml
+```
+
+Click path for the breakdown view:
+
+1. Open Grafana at <http://127.0.0.1:3000>.
+2. Open Drilldown, then Traces. In older Grafana builds this may be labeled Explore Traces.
+3. Select the Tempo data source if Grafana asks.
+4. Set the time range to Last 15 minutes.
+5. Select All spans.
+6. Select Rate.
+7. Open the Breakdown tab.
+8. Group by the resource attribute `service.name` or `resource.service.name`.
 
 ## Check Prometheus Metrics
 
@@ -186,3 +222,9 @@ If Grafana shows no traces:
 - Check collector logs for exporter errors to `tempo.observability.svc.cluster.local:4317`.
 - Check Tempo logs for rejected batches or readiness failures.
 - Avoid testing with `/healthz`, `/readyz`, and `/metrics`; those endpoints are intentionally excluded from FastAPI tracing.
+
+If normal Tempo search works but Explore Traces Breakdown or Rate fails with
+`error finding generators: empty ring`, Tempo is answering trace queries but the
+metrics-generator is not running or has not registered in the ring. Upgrade Tempo
+with `platform/observability/tempo-values.yaml`, then generate fresh traffic and
+retry the breakdown view over Last 15 minutes.

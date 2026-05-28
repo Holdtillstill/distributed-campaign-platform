@@ -96,6 +96,30 @@ def test_tempo_values_enable_otlp_receivers_on_service_ports() -> None:
     assert protocols["http"]["endpoint"] == "0.0.0.0:4318"
 
 
+def test_tempo_values_enable_metrics_generator_for_traceql_metrics() -> None:
+    values = yaml.safe_load((OBS_DIR / "tempo-values.yaml").read_text())
+    metrics_generator = values["tempo"]["metricsGenerator"]
+    processor_config = metrics_generator["processor"]
+    enabled_processors = values["tempo"]["overrides"]["defaults"]["metrics_generator"][
+        "processors"
+    ]
+
+    assert metrics_generator["enabled"] is True
+    assert (
+        metrics_generator["remoteWriteUrl"]
+        == "http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/api/v1/write"
+    )
+    assert enabled_processors == ["service-graphs", "span-metrics", "local-blocks"]
+    assert processor_config["local_blocks"]["flush_to_storage"] is True
+    assert processor_config["local_blocks"]["filter_server_spans"] is False
+    assert processor_config["service_graphs"]["wait"] == "10s"
+    assert processor_config["service_graphs"]["max_items"] == 10000
+    assert processor_config["span_metrics"]["enable_target_info"] is True
+    assert metrics_generator["registry"]["collection_interval"] == "15s"
+    assert metrics_generator["storage"]["path"] == "/tmp/tempo"
+    assert metrics_generator["traces_storage"]["path"] == "/tmp/traces"
+
+
 def test_grafana_datasources_include_loki_and_tempo() -> None:
     values = yaml.safe_load((OBS_DIR / "kube-prometheus-stack-values.yaml").read_text())
     datasources = values["grafana"]["additionalDataSources"]
@@ -108,6 +132,15 @@ def test_grafana_datasources_include_loki_and_tempo() -> None:
     assert by_name["Tempo"]["uid"] == "tempo"
     assert by_name["Tempo"]["url"] == "http://tempo.observability.svc.cluster.local:3200"
     assert by_name["Tempo"]["jsonData"]["tracesToLogsV2"]["datasourceUid"] == "loki"
+    assert by_name["Tempo"]["jsonData"]["tracesToMetrics"]["datasourceUid"] == "prometheus"
+    assert by_name["Tempo"]["jsonData"]["serviceMap"]["datasourceUid"] == "prometheus"
+    assert by_name["Tempo"]["jsonData"]["nodeGraph"]["enabled"] is True
+
+
+def test_prometheus_accepts_tempo_metrics_generator_remote_write() -> None:
+    values = yaml.safe_load((OBS_DIR / "kube-prometheus-stack-values.yaml").read_text())
+
+    assert values["prometheus"]["prometheusSpec"]["enableRemoteWriteReceiver"] is True
 
 
 def test_python_service_dockerfiles_install_otel_dependencies() -> None:

@@ -80,6 +80,25 @@ curl -i http://127.0.0.1:18080/api/observability/trace-smoke
 
 Then open Grafana Explore, select the Tempo data source, and search for `service.name = campaign-api` over the last 15 minutes. See [`docs/runbooks/observability.md`](../../docs/runbooks/observability.md) for the full trace troubleshooting flow.
 
+Normal Tempo search and Grafana's Traces Drilldown or Explore Traces breakdown
+views use different Tempo paths. Search reads stored traces directly. Breakdown
+and Rate run TraceQL metrics queries, so Tempo metrics-generator must be enabled
+with `local-blocks`; this values set also enables `service-graphs` and
+`span-metrics` and remote-writes generated metrics to the in-cluster Prometheus
+service. Prometheus has `enableRemoteWriteReceiver` enabled for that local ingest.
+
+Click path for the breakdown view:
+
+1. Open Grafana at <http://127.0.0.1:3000>.
+2. Open Drilldown, then Traces. In older Grafana builds this may be labeled Explore Traces.
+3. Select Tempo if Grafana asks for a trace data source.
+4. Set Last 15 minutes, select All spans, then select Rate.
+5. Open Breakdown and group by `service.name` or `resource.service.name`.
+
+If plain Tempo search works but Breakdown or Rate fails with
+`error finding generators: empty ring`, upgrade Tempo with
+`platform/observability/tempo-values.yaml` and generate fresh traffic.
+
 ## Essential Grafana dashboards
 
 Load the local dashboard ConfigMap after Grafana is installed:
