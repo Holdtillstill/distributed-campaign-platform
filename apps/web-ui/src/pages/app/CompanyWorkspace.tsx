@@ -229,6 +229,11 @@ export function CompanyWorkspace({
     dashboardSummary?.monthly_send_limit && dashboardSummary.credits_used / dashboardSummary.monthly_send_limit >= 0.8
       ? 'Review quota before approval'
       : 'Budget available for planned sends'
+  const complianceReadinessItems = [
+    'Prior express written consent evidence',
+    'STOP opt-out and suppression checks',
+    'Quiet hours, sender identity, and audit trail',
+  ]
 
   useEffect(() => {
     async function loadDashboardSummary() {
@@ -1031,14 +1036,15 @@ export function CompanyWorkspace({
             <form className="campaign-builder" onSubmit={createCampaign}>
               <section className="product-help-callout" aria-label="Campaign builder help">
                 <div>
-                  <strong>Campaign builder help</strong>
+                  <strong>TCPA-aware campaign builder help</strong>
                   <p>
-                    Review the customer KB before scheduling if you need a refresher on segments, Smart SMS credit
-                    costs, media requirements, or modeled audience estimates.
+                    Review segments, Smart SMS costs, media requirements, consent evidence, opt-out/STOP suppression,
+                    quiet hours, sender identity, and modeled audience estimates before scheduling.
                   </p>
                 </div>
                 <div>
                   <a href="/kb">Open campaign guide</a>
+                  <a href="/features/compliance">Compliance readiness</a>
                   <a href="/features/broadcast-monitor">Preview monitor feature</a>
                 </div>
               </section>
@@ -1195,6 +1201,16 @@ export function CompanyWorkspace({
                   {formatNumber(projectedModeledCreditCost)} credits would be required for the full modeled audience;
                   this demo schedules against loaded sample rows while preserving the modeled audience count.
                 </p>
+                <div className="compliance-readiness-list" aria-label="TCPA-aware send readiness">
+                  <strong>TCPA-aware send readiness</strong>
+                  {complianceReadinessItems.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                  <small>
+                    Compliance-readiness only. Production sends need legal review, carrier policy alignment, and backend
+                    enforcement.
+                  </small>
+                </div>
                 {selectedSampleAudienceCount === 0 ? (
                   <p className="helper-text">Select at least one segment or subscriber before scheduling.</p>
                 ) : null}
@@ -1753,16 +1769,10 @@ export function CompanyWorkspace({
               <strong>Existing media</strong>
             </div>
             {mediaAssets.length ? (
-              <ul className="asset-grid embedded-list">
+              <ul className="asset-grid embedded-list" aria-label="Media asset library">
                 {mediaAssets.map((asset) => (
                   <li key={asset.id}>
-                    <div className="asset-thumb">
-                      {asset.content_type?.startsWith('image/') && asset.url ? (
-                        <img src={asset.url} alt={`${asset.filename} preview`} loading="lazy" />
-                      ) : (
-                        <span>FILE</span>
-                      )}
-                    </div>
+                    <MediaAssetPreview asset={asset} />
                     <strong>{asset.filename}</strong>
                     <span>{asset.content_type}</span>
                     <span>{asset.url}</span>
@@ -1933,6 +1943,11 @@ export function CompanyWorkspace({
           <span>Company credits</span>
           <strong>{formatNumber(dashboardSummary?.credit_balance)}</strong>
           <p>{hasUserBudget ? `${formatNumber(userBudgetRemaining)} remaining in your allocation.` : 'No separate user allocation.'}</p>
+        </div>
+        <div>
+          <span>Compliance readiness</span>
+          <strong>TCPA-aware controls</strong>
+          <p>Review consent evidence, STOP suppression, sender identity, and send windows before production enforcement.</p>
         </div>
       </section>
 
@@ -2118,6 +2133,70 @@ function CampaignColumn({
       )}
     </section>
   )
+}
+
+function MediaAssetPreview({ asset }: { asset: MediaAsset }) {
+  const [imageState, setImageState] = useState<'loading' | 'loaded' | 'failed'>('loading')
+  const filename = asset.filename ?? 'Untitled media'
+  const url = asset.url ?? ''
+  const isImage = Boolean(asset.content_type?.startsWith('image/') && url)
+  const usesGeneratedPreview = !isImage || isSeededExternalMedia(url) || imageState === 'failed'
+  const showPlaceholder = usesGeneratedPreview || imageState !== 'loaded'
+
+  useEffect(() => {
+    setImageState('loading')
+  }, [url])
+
+  return (
+    <div
+      className={usesGeneratedPreview ? 'asset-thumb asset-thumb-generated' : 'asset-thumb'}
+      aria-label={`${filename} media preview`}
+    >
+      {isImage && !isSeededExternalMedia(url) ? (
+        <img
+          className={imageState === 'loaded' ? 'is-loaded' : ''}
+          src={url}
+          alt={`${filename} preview`}
+          loading="lazy"
+          onLoad={() => setImageState('loaded')}
+          onError={() => setImageState('failed')}
+        />
+      ) : null}
+      {showPlaceholder ? <GeneratedMediaPlaceholder asset={asset} /> : null}
+    </div>
+  )
+}
+
+function GeneratedMediaPlaceholder({ asset }: { asset: MediaAsset }) {
+  return (
+    <div className="asset-generated-preview">
+      <span>CampaignOS preview</span>
+      <strong>{mediaPreviewLabel(asset)}</strong>
+      <small>{asset.filename ?? asset.content_type ?? 'Stored asset'}</small>
+    </div>
+  )
+}
+
+function isSeededExternalMedia(url: string) {
+  try {
+    const parsedUrl = new URL(url)
+    return parsedUrl.hostname === 'cdn.example'
+  } catch {
+    return url.startsWith('local-upload://')
+  }
+}
+
+function mediaPreviewLabel(asset: MediaAsset) {
+  const searchable = `${asset.filename ?? ''} ${asset.url ?? ''}`.toLowerCase()
+  if (searchable.includes('vip') || searchable.includes('loyalty') || searchable.includes('points')) return 'VIP loyalty'
+  if (searchable.includes('flash') || searchable.includes('48')) return 'Flash MMS'
+  if (searchable.includes('winback') || searchable.includes('back')) return 'Winback offer'
+  if (searchable.includes('coupon') || searchable.includes('offer') || searchable.includes('pass') || searchable.includes('memorial')) {
+    return 'Retail offer'
+  }
+  if (asset.content_type?.startsWith('video/')) return 'Video asset'
+  if (asset.content_type?.includes('pdf')) return 'Document asset'
+  return asset.content_type?.startsWith('image/') ? 'Image asset' : 'File asset'
 }
 
 function filterCampaigns(

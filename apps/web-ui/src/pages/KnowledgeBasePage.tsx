@@ -148,13 +148,15 @@ const kbArticles: KbArticle[] = [
   {
     id: 'consent-compliance',
     category: 'Compliance',
-    title: 'Consent and compliance basics',
+    title: 'TCPA-aware consent and compliance readiness',
     summary:
-      'CampaignOS keeps subscriber consent state visible and separates company-provided imports from confirmed opt-ins.',
+      'CampaignOS keeps TCPA-aware SMS readiness visible by separating consent sources, opt-in evidence, suppression, send windows, and approval records.',
     steps: [
-      'Filter subscribers by consent status before selecting segments.',
-      'Use the public opt-in flow for double opt-in confirmation demos.',
-      'Treat consent and suppression policy as required production integrations before real sends.',
+      'Capture prior express written consent evidence before telemarketing or advertising SMS sends under TCPA-oriented workflows.',
+      'Make opt-out and STOP handling visible, then route revoked numbers into suppression lists before audience selection.',
+      'Review quiet hours, send windows, sender identity, message purpose, and audience source before scheduling.',
+      'Keep audit evidence for approvals, audience source, consent source, and suppression/revocation checks.',
+      'Treat this as compliance-readiness only: production senders still need legal review, carrier policy alignment, and backend enforcement before real sends.',
     ],
     links: [{ label: 'Compliance feature page', href: '/features/compliance' }],
   },

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,9 +34,11 @@ function failedJson(body: unknown, status = 503) {
 
 function mockFetch({
   companyCampaigns,
+  mediaAssets,
   monitorError = false,
 }: {
   companyCampaigns?: unknown[]
+  mediaAssets?: unknown[]
   monitorError?: boolean
 } = {}) {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -192,17 +194,22 @@ function mockFetch({
     }
 
     if (url.endsWith('/companies/company-1/media-assets') && method === 'POST') {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        filename?: string
+        content_type?: string
+        url?: string
+      }
       return okJson({
         id: 'media-1',
         company_id: 'company-1',
-        filename: 'coupon.png',
-        content_type: 'image/png',
-        url: 'https://cdn.example/coupon.png',
+        filename: body.filename ?? 'coupon.png',
+        content_type: body.content_type ?? 'image/png',
+        url: body.url ?? 'https://cdn.example/coupon.png',
       })
     }
 
     if (url.endsWith('/companies/company-1/media-assets')) {
-      return okJson([
+      return okJson(mediaAssets ?? [
         {
           id: 'media-1',
           company_id: 'company-1',
@@ -689,7 +696,7 @@ describe('App', () => {
     expect(screen.getByText(/Subscriber segments and modeled audiences/i)).toBeInTheDocument()
     expect(screen.getByText(/Role-based access, invites, and budgets/i)).toBeInTheDocument()
     expect(screen.getByText(/Analytics and campaign reporting/i)).toBeInTheDocument()
-    expect(screen.getByText(/Consent and compliance controls/i)).toBeInTheDocument()
+    expect(screen.getByText(/TCPA-aware compliance readiness/i)).toBeInTheDocument()
     expect(screen.getByText(/Grafana dashboards, Tempo traces, Prometheus metrics, Loki log collection/i)).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /Open customer app/i })[0]).toHaveAttribute('href', '/app')
     expect(screen.getAllByRole('link', { name: /Open broadcast monitor/i })[0]).toHaveAttribute('href', '/monitor')
@@ -759,11 +766,29 @@ describe('App', () => {
     await user.clear(screen.getByLabelText(/Search knowledge base/i))
     await user.click(screen.getByRole('button', { name: /^Compliance$/i }))
 
-    expect(within(articles).getByText(/Consent and compliance basics/i)).toBeInTheDocument()
+    expect(within(articles).getByText(/TCPA-aware consent and compliance readiness/i)).toBeInTheDocument()
+    expect(within(articles).getByText(/prior express written consent/i)).toBeInTheDocument()
+    expect(within(articles).getByText(/opt-out and STOP handling/i)).toBeInTheDocument()
+    expect(within(articles).getByText(/quiet hours, send windows, sender identity/i)).toBeInTheDocument()
+    expect(within(articles).getByText(/legal review, carrier policy alignment, and backend enforcement/i)).toBeInTheDocument()
     expect(within(articles).queryByText(/Create and schedule a campaign/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /Clear filters/i }))
     expect(within(articles).getByText(/Troubleshooting common issues/i)).toBeInTheDocument()
+  })
+
+  it('renders the compliance feature route with TCPA-aware readiness and caveats', () => {
+    mockFetch()
+
+    window.history.pushState(null, '', '/features/compliance')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { level: 1, name: /TCPA-aware compliance readiness/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/prior express written consent/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/STOP opt-out, suppression, and revocation checks/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/quiet hours, send windows, sender identity/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/not legal compliance/i)).toBeInTheDocument()
+    expect(screen.getByText(/carrier and CTIA policy alignment/i)).toBeInTheDocument()
   })
 
   it('renders five unique portfolio-grade design explorations on /1 through /5', () => {
@@ -1591,6 +1616,12 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /content library/i }))
 
     expect(await screen.findAllByText(/coupon.png/i)).not.toHaveLength(0)
+    const mediaLibrary = screen.getByLabelText(/media asset library/i)
+    expect(within(mediaLibrary).getByText(/CampaignOS preview/i)).toBeInTheDocument()
+    expect(within(mediaLibrary).getByText(/Retail offer/i)).toBeInTheDocument()
+    expect(within(mediaLibrary).getByText(/https:\/\/cdn.example\/coupon.png/i)).toBeInTheDocument()
+    expect(within(mediaLibrary).queryByRole('img')).not.toBeInTheDocument()
+
     await user.clear(screen.getByLabelText(/media filename/i))
     await user.type(screen.getByLabelText(/media filename/i), 'menu.png')
     await user.clear(screen.getByLabelText(/media url/i))
@@ -1609,6 +1640,35 @@ describe('App', () => {
       }),
     )
     expect(screen.getByLabelText(/upload media file/i)).toBeInTheDocument()
+  })
+
+  it('replaces failed external image previews with a branded media placeholder', async () => {
+    mockFetch({
+      mediaAssets: [
+        {
+          id: 'media-broken',
+          company_id: 'company-1',
+          filename: 'seattle-vip-double-points.png',
+          content_type: 'image/png',
+          url: 'https://assets.example/retail/seattle-vip-double-points.png',
+        },
+      ],
+    })
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /content library/i }))
+
+    const preview = await screen.findByLabelText(/seattle-vip-double-points.png media preview/i)
+    const image = preview.querySelector('img')
+    expect(image).not.toBeNull()
+
+    fireEvent.error(image as HTMLImageElement)
+
+    expect(within(preview).getByText(/CampaignOS preview/i)).toBeInTheDocument()
+    expect(within(preview).getByText(/VIP loyalty/i)).toBeInTheDocument()
   })
 
   it('shows realistic content template cards with suggested SMS copy', async () => {

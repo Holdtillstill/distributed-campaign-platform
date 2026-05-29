@@ -64,11 +64,15 @@ const featureSpotlights: FeatureSpotlight[] = [
   {
     slug: 'compliance',
     kicker: 'Governance',
-    title: 'Consent and compliance controls',
+    title: 'TCPA-aware compliance readiness',
     summary:
-      'Keep imported, company-provided, and double opt-in subscriber states visible before teams schedule sends.',
-    proof: 'Subscriber filters expose consent status while internal operators retain tenant oversight.',
-    bullets: ['Consent status filtering', 'Double opt-in confirmation flow', 'Internal tenant operations overview'],
+      'Keep consent evidence, opt-out readiness, suppression, sender identity, audience source, and send-window checks visible before teams schedule SMS sends.',
+    proof: 'Built for TCPA-aware readiness, not a legal compliance guarantee.',
+    bullets: [
+      'Prior express written consent and audience source review',
+      'STOP opt-out, suppression, and revocation checks',
+      'Quiet hours, sender identity, approvals, and audit evidence',
+    ],
     ctaHref: '/kb',
     ctaLabel: 'Read compliance guide',
   },
@@ -190,6 +194,26 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
           <p>Access codes, permissions, and credit allocations travel with every invited user.</p>
         </div>
       </section>
+
+      {activeFeature?.slug === 'compliance' ? (
+        <section className="feature-compliance-readiness" aria-label="TCPA compliance-readiness details">
+          <div>
+            <p className="eyebrow">Compliance readiness</p>
+            <h2>TCPA-aware controls need evidence, suppression, and operational enforcement.</h2>
+            <p>
+              CampaignOS can surface prior express written consent, opt-out/STOP status, suppression or revocation
+              state, quiet hours, send windows, sender identity, approval history, and audience source before a send.
+            </p>
+          </div>
+          <aside>
+            <strong>Production caveat</strong>
+            <p>
+              This demo is not legal compliance. Real senders need legal review, carrier and CTIA policy alignment,
+              and backend enforcement for consent, suppression, and send-window rules.
+            </p>
+          </aside>
+        </section>
+      ) : null}
 
       <section className="feature-index" aria-label="Feature overview">
         <div className="feature-section-heading">
