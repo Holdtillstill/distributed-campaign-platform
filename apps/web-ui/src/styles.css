@@ -1879,6 +1879,20 @@ textarea {
   max-width: none;
 }
 
+.monitor-controls {
+  grid-template-columns: minmax(320px, 1fr) auto;
+  align-items: end;
+}
+
+.monitor-controls label {
+  margin-bottom: 0;
+}
+
+.monitor-controls button {
+  min-height: 41px;
+  white-space: nowrap;
+}
+
 .subscriber-filters {
   margin-top: 18px;
 }
