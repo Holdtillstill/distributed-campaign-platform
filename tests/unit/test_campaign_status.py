@@ -267,7 +267,69 @@ def test_broadcast_monitor_calculates_projected_sample_eta(campaign_module) -> N
     assert monitor["total_audience"] == 1_000_000
     assert monitor["percent_complete"] == 75.0
     assert monitor["messages_per_minute"] == 37.5
-    assert monitor["eta_seconds"] is not None
+    assert monitor["eta_seconds"] == 40
+
+
+def test_broadcast_monitor_derives_completed_status_and_clears_eta(campaign_module) -> None:
+    started_at = datetime(2026, 5, 28, 12, 0, tzinfo=UTC)
+    last_updated = started_at + timedelta(minutes=2)
+
+    monitor = campaign_module.db.calculate_broadcast_monitor(
+        campaign_id="campaign-1",
+        company_id="company-1",
+        campaign_name="Scale send",
+        status="queued",
+        modeled_audience_count=1_000_000,
+        audience_mode="projected_sample",
+        created_at=started_at,
+        campaign_updated_at=started_at,
+        first_message_created_at=started_at,
+        last_message_updated_at=last_updated,
+        sample_message_count=100,
+        status_counts={
+            "queued": 0,
+            "sent": 100,
+            "failed": 0,
+            "retried": 0,
+            "dead_lettered": 0,
+        },
+    )
+
+    assert monitor["status"] == "sent"
+    assert monitor["percent_complete"] == 100.0
+    assert monitor["eta_seconds"] is None
+    assert monitor["projected_completion_at"] == last_updated
+
+
+def test_broadcast_monitor_waiting_campaign_has_no_started_timestamp(campaign_module) -> None:
+    created_at = datetime(2026, 5, 28, 12, 0, tzinfo=UTC)
+
+    monitor = campaign_module.db.calculate_broadcast_monitor(
+        campaign_id="campaign-1",
+        company_id="company-1",
+        campaign_name="Scale send",
+        status="scheduled",
+        modeled_audience_count=2_650_000,
+        audience_mode="actual",
+        created_at=created_at,
+        campaign_updated_at=created_at,
+        first_message_created_at=created_at,
+        last_message_updated_at=created_at,
+        sample_message_count=2_650_000,
+        status_counts={
+            "queued": 2_650_000,
+            "sent": 0,
+            "failed": 0,
+            "retried": 0,
+            "dead_lettered": 0,
+        },
+    )
+
+    assert monitor["status"] == "scheduled"
+    assert monitor["started_at"] is None
+    assert monitor["last_updated"] is None
+    assert monitor["eta_seconds"] is None
+    assert monitor["projected_completion_at"] is None
 
 
 def test_aggregate_status_counts_includes_zero_for_missing_statuses(campaign_module) -> None:

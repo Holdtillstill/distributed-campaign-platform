@@ -541,8 +541,8 @@ function mockFetch({
         messages_per_minute: 0,
         eta_seconds: null,
         projected_completion_at: null,
-        started_at: '2026-05-28T12:00:00Z',
-        last_updated: '2026-05-28T12:00:00Z',
+        started_at: null,
+        last_updated: null,
       })
     }
 
@@ -1446,6 +1446,12 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /schedule campaign/i }))
 
     expect(await screen.findAllByText(/campaign-1/i)).not.toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: /^monitor$/i }))
+    expect(await screen.findByText(/Not started/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/No ETA yet/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Not projected yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Projected complete:\s*Immediate/i)).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-1/broadcast-monitor')
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/campaigns',
       expect.objectContaining({

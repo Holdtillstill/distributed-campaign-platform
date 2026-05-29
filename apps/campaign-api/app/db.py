@@ -462,9 +462,14 @@ def calculate_broadcast_monitor(
         if modeled_count > sample_count or audience_mode == "projected_sample"
         else "actual"
     )
-    started_at = first_message_created_at or created_at
-    last_updated = last_message_updated_at or campaign_updated_at or started_at
     completed_sample_count = counts["sent"] + counts["failed"] + counts["dead_lettered"]
+    has_started = completed_sample_count > 0 or counts["retried"] > 0
+    started_at = first_message_created_at if has_started else None
+    last_updated = (
+        last_message_updated_at or campaign_updated_at or started_at
+        if has_started
+        else None
+    )
     percent_complete = (
         round(min(100.0, (completed_sample_count / sample_count) * 100), 2)
         if sample_count > 0
@@ -481,22 +486,26 @@ def calculate_broadcast_monitor(
         else 0.0
     )
     messages_per_minute = round(throughput_per_second * 60, 2)
-    remaining_for_eta = max(modeled_count - completed_sample_count, 0)
+    remaining_for_eta = max(sample_count - completed_sample_count, 0)
     eta_seconds = (
         int(round(remaining_for_eta / throughput_per_second))
         if throughput_per_second > 0 and remaining_for_eta > 0
         else None
     )
-    projected_completion_at = (
-        last_updated + timedelta(seconds=eta_seconds)
-        if eta_seconds is not None and last_updated is not None
-        else None
-    )
+    projected_completion_at = None
+    if eta_seconds is not None and last_updated is not None:
+        projected_completion_at = last_updated + timedelta(seconds=eta_seconds)
+    elif sample_count > 0 and remaining_for_eta == 0 and last_updated is not None:
+        projected_completion_at = last_updated
+    derived_status = status
+    if sample_count > 0 and counts["queued"] == 0 and completed_sample_count >= sample_count:
+        has_terminal_failures = counts["failed"] > 0 or counts["dead_lettered"] > 0
+        derived_status = "completed_with_errors" if has_terminal_failures else "sent"
     return {
         "campaign_id": campaign_id,
         "company_id": company_id,
         "campaign_name": campaign_name,
-        "status": status,
+        "status": derived_status,
         "total_audience": modeled_count,
         "modeled_audience": modeled_count,
         "sample_message_count": sample_count,

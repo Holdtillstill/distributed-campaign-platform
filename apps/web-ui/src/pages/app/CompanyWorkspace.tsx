@@ -1342,22 +1342,25 @@ export function CompanyWorkspace({
                         value={
                           broadcastMonitor.eta_seconds !== null && broadcastMonitor.eta_seconds !== undefined
                             ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
-                            : 'Waiting'
+                            : 'No ETA yet'
                         }
                         trend="Estimated from current throughput"
                       />
                       <Metric label="Percent complete" value={`${formatNumber(broadcastMonitor.percent_complete)}%`} trend="Loaded rows" />
                     </div>
                     <div className="monitor-meta">
-                      <span>Started: {formatLocalDateTime(broadcastMonitor.started_at)}</span>
-                      <span>Last updated: {formatLocalDateTime(broadcastMonitor.last_updated)}</span>
+                      <span>Started: {formatLocalDateTime(broadcastMonitor.started_at, 'Not started')}</span>
+                      <span>Last updated: {formatLocalDateTime(broadcastMonitor.last_updated, 'Not updated yet')}</span>
                       <span>
                         ETA:{' '}
                         {broadcastMonitor.eta_seconds !== null && broadcastMonitor.eta_seconds !== undefined
                           ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
-                          : 'Waiting for throughput'}
+                          : 'No ETA yet'}
                       </span>
-                      <span>Projected complete: {formatLocalDateTime(broadcastMonitor.projected_completion_at)}</span>
+                      <span>
+                        Projected complete:{' '}
+                        {formatLocalDateTime(broadcastMonitor.projected_completion_at, 'Not projected yet')}
+                      </span>
                     </div>
                     <section className="monitor-semantics" aria-label="Monitor status semantics">
                       <strong>Operational labels</strong>

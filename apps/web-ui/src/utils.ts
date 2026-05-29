@@ -13,8 +13,8 @@ export function formatActivity(value?: number | null): string {
   return new Intl.NumberFormat().format(value)
 }
 
-export function formatLocalDateTime(value?: string | null): string {
-  if (!value) return 'Immediate'
+export function formatLocalDateTime(value?: string | null, emptyLabel = 'Immediate'): string {
+  if (!value) return emptyLabel
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   return new Intl.DateTimeFormat(undefined, {
