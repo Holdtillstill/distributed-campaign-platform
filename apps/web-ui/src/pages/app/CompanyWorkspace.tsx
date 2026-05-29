@@ -217,6 +217,23 @@ export function CompanyWorkspace({
   const activeCampaign =
     campaigns.find((item) => ['queued', 'scheduled', 'sending', 'processing'].includes(item.status)) ?? campaigns[0] ?? null
   const activeCampaignReach = activeCampaign?.audience_count ?? activeCampaign?.message_count ?? 0
+  const monitorIsTerminal = broadcastMonitor
+    ? ['sent', 'completed_with_errors', 'cancelled'].includes(broadcastMonitor.status) ||
+      (broadcastMonitor.sample_message_count > 0 && broadcastMonitor.queued === 0 && broadcastMonitor.percent_complete >= 100)
+    : false
+  const monitorEtaLabel = monitorIsTerminal
+    ? 'Complete'
+    : broadcastMonitor?.eta_seconds !== null && broadcastMonitor?.eta_seconds !== undefined
+      ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
+      : 'No ETA yet'
+  const monitorEtaTrend = monitorIsTerminal
+    ? 'All loaded rows reached a terminal outcome'
+    : 'Estimated from current throughput'
+  const monitorCompletionLabel = monitorIsTerminal ? 'Completed' : 'Projected complete'
+  const monitorCompletionValue = formatLocalDateTime(
+    broadcastMonitor?.projected_completion_at ?? null,
+    monitorIsTerminal ? 'Completed' : 'Not projected yet',
+  )
   const dashboardAudienceSummary = subscriberLists.length
     ? `${formatNumber(subscriberLists.length)} segments / ${formatNumber(modeledAudienceTotal)} modeled`
     : 'No segments loaded'
@@ -1339,27 +1356,17 @@ export function CompanyWorkspace({
                       />
                       <Metric
                         label="ETA"
-                        value={
-                          broadcastMonitor.eta_seconds !== null && broadcastMonitor.eta_seconds !== undefined
-                            ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
-                            : 'No ETA yet'
-                        }
-                        trend="Estimated from current throughput"
+                        value={monitorEtaLabel}
+                        trend={monitorEtaTrend}
                       />
                       <Metric label="Percent complete" value={`${formatNumber(broadcastMonitor.percent_complete)}%`} trend="Loaded rows" />
                     </div>
                     <div className="monitor-meta">
                       <span>Started: {formatLocalDateTime(broadcastMonitor.started_at, 'Not started')}</span>
                       <span>Last updated: {formatLocalDateTime(broadcastMonitor.last_updated, 'Not updated yet')}</span>
+                      <span>ETA: {monitorEtaLabel}</span>
                       <span>
-                        ETA:{' '}
-                        {broadcastMonitor.eta_seconds !== null && broadcastMonitor.eta_seconds !== undefined
-                          ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
-                          : 'No ETA yet'}
-                      </span>
-                      <span>
-                        Projected complete:{' '}
-                        {formatLocalDateTime(broadcastMonitor.projected_completion_at, 'Not projected yet')}
+                        {monitorCompletionLabel}: {monitorCompletionValue}
                       </span>
                     </div>
                     <section className="monitor-semantics" aria-label="Monitor status semantics">

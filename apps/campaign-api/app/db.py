@@ -1496,6 +1496,18 @@ async def list_campaigns(pool: asyncpg.Pool, *, company_id: str) -> list[dict[st
     async with pool.acquire() as connection:
         rows = await connection.fetch(
             """
+            WITH message_counts AS (
+                SELECT campaign_id, COUNT(*)::int AS message_count
+                FROM messages
+                WHERE company_id = $1
+                GROUP BY campaign_id
+            ),
+            reminder_counts AS (
+                SELECT source_campaign_id, COUNT(*)::int AS reminder_count
+                FROM reminder_campaigns
+                WHERE company_id = $1
+                GROUP BY source_campaign_id
+            )
             SELECT
                 c.id,
                 c.company_id,
@@ -1505,30 +1517,18 @@ async def list_campaigns(pool: asyncpg.Pool, *, company_id: str) -> list[dict[st
                 c.status,
                 c.scheduled_at,
                 c.created_at,
-                COUNT(DISTINCT m.id)::int AS message_count,
+                COALESCE(mc.message_count, 0)::int AS message_count,
                 GREATEST(
                     c.modeled_audience_count,
-                    COUNT(DISTINCT m.id)::int
+                    COALESCE(mc.message_count, 0)
                 )::int AS audience_count,
                 c.audience_mode,
                 c.credit_cost,
-                COUNT(DISTINCT rc.id)::int AS reminder_count
+                COALESCE(rc.reminder_count, 0)::int AS reminder_count
             FROM campaigns c
-            LEFT JOIN messages m ON m.campaign_id = c.id
-            LEFT JOIN reminder_campaigns rc ON rc.source_campaign_id = c.id
+            LEFT JOIN message_counts mc ON mc.campaign_id = c.id
+            LEFT JOIN reminder_counts rc ON rc.source_campaign_id = c.id
             WHERE c.company_id = $1
-            GROUP BY
-                c.id,
-                c.company_id,
-                c.name,
-                c.body,
-                c.message_type,
-                c.status,
-                c.scheduled_at,
-                c.created_at,
-                c.modeled_audience_count,
-                c.audience_mode,
-                c.credit_cost
             ORDER BY COALESCE(c.scheduled_at, c.created_at) DESC
             """,
             company_id,

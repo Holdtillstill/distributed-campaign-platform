@@ -36,10 +36,12 @@ function mockFetch({
   companyCampaigns,
   mediaAssets,
   monitorError = false,
+  monitorResponses,
 }: {
   companyCampaigns?: unknown[]
   mediaAssets?: unknown[]
   monitorError?: boolean
+  monitorResponses?: Record<string, unknown>
 } = {}) {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -493,6 +495,12 @@ function mockFetch({
         phone_number: '+15550001011',
         status: 'confirmed',
       })
+    }
+
+    if (url.includes('/campaigns/') && url.endsWith('/broadcast-monitor') && method === 'GET') {
+      if (monitorError) return failedJson({ detail: 'monitor offline' })
+      const campaignId = url.match(/\/campaigns\/([^/]+)\/broadcast-monitor$/)?.[1]
+      if (campaignId && monitorResponses?.[campaignId]) return okJson(monitorResponses[campaignId])
     }
 
     if (url.endsWith('/campaigns/campaign-upcoming/broadcast-monitor') && method === 'GET') {
@@ -1234,6 +1242,65 @@ describe('App', () => {
     expect(await screen.findByText('30/min')).toBeInTheDocument()
     expect(await screen.findAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
     expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
+  })
+
+  it('labels completed monitor ETA as complete instead of missing', async () => {
+    const fetchMock = mockFetch({
+      companyCampaigns: [
+        {
+          id: 'campaign-complete',
+          company_id: 'company-1',
+          name: 'Full Million Complete',
+          body: 'Done broadcast',
+          message_type: 'regular',
+          status: 'sent',
+          scheduled_at: '2026-05-28T20:30:00Z',
+          created_at: '2026-05-28T20:30:00Z',
+          message_count: 2650000,
+          audience_count: 2650000,
+          audience_mode: 'actual',
+          credit_cost: 2650000,
+          reminder_count: 0,
+        },
+      ],
+      monitorResponses: {
+        'campaign-complete': {
+          campaign_id: 'campaign-complete',
+          company_id: 'company-1',
+          campaign_name: 'Full Million Complete',
+          status: 'sent',
+          total_audience: 2650000,
+          modeled_audience: 2650000,
+          sample_message_count: 2650000,
+          mode: 'actual',
+          queued: 0,
+          sent: 2650000,
+          failed: 0,
+          retried: 0,
+          dead_lettered: 0,
+          percent_complete: 100,
+          throughput_per_second: 2310,
+          messages_per_minute: 138600,
+          eta_seconds: null,
+          projected_completion_at: '2026-05-29T03:49:12Z',
+          started_at: '2026-05-29T03:30:16Z',
+          last_updated: '2026-05-29T03:49:12Z',
+        },
+      },
+    })
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app/monitor')
+    render(<App />)
+    await signupAsCompanyUser(user)
+
+    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByText(/Status: sent/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/^Complete$/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Completed:/i)).toBeInTheDocument()
+    expect(screen.queryByText(/ETA:\s*No ETA yet/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Projected complete:/i)).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-complete/broadcast-monitor')
   })
 
   it('keeps the /monitor direct route working for an authenticated customer session', async () => {
