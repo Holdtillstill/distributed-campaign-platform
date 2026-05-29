@@ -12,7 +12,7 @@ const owner = 'owner@demo-retail.test'
 function AppDesignLinks({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
   return (
     <div className={`app-design-links app-design-links-${tone}`}>
-      <a href="/app">Open customer app</a>
+      <a href="/app">Open customer login</a>
       <a href="/app/monitor">Open real-time monitor</a>
       <a href="/internal">Internal admin</a>
     </div>
@@ -22,7 +22,7 @@ function AppDesignLinks({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
 function AppDesignResourceLinks({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
   return (
     <div className={`app-design-links app-design-links-${tone}`}>
-      <a href="/app">Open app</a>
+      <a href="/app">Open customer login</a>
       <a href="/monitor">Open monitor</a>
       <a href="/features">Features</a>
       <a href="/kb">Knowledge base</a>

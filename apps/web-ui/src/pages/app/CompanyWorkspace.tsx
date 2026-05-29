@@ -1842,6 +1842,84 @@ export function CompanyWorkspace({
   if (page === 'analytics') {
     const scheduledReach = upcomingCampaigns.reduce((total, item) => total + (item.audience_count ?? item.message_count), 0)
     const totalListSubscribers = subscriberLists.reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
+    const trackedClickCount = performance?.click_count ?? dashboardSummary?.click_count ?? 0
+    const trackedRedemptionCount = performance?.redemption_count ?? dashboardSummary?.redemption_count ?? 0
+    const chartCampaigns = campaigns.slice(0, 6)
+    const trackedSourceLabel = performance
+      ? 'Tracked performance after sends from tenant reporting.'
+      : dashboardSummary
+        ? 'Tracked performance totals from dashboard summary. Refresh performance for the latest tenant report.'
+        : 'Tracked performance appears after campaign activity is reported.'
+    const analyticsCharts = [
+      {
+        title: 'Modeled reach',
+        eyebrow: 'Projected / scheduled',
+        sourceLabel: 'Projected from campaign schedules and modeled audience fields.',
+        emptyTitle: 'No scheduled reach yet',
+        emptyDescription: 'Create or load campaigns with modeled audiences to compare planned reach.',
+        points: chartCampaigns.map((campaign) => ({
+          label: campaign.name,
+          value: campaign.audience_count ?? campaign.message_count,
+          valueLabel: `${formatNumber(campaign.audience_count ?? campaign.message_count)} modeled`,
+          detail: campaign.status,
+        })),
+      },
+      {
+        title: 'Sample messages',
+        eyebrow: 'Loaded campaigns',
+        sourceLabel: 'Loaded campaign sample message counts; delivery activity may differ after send.',
+        emptyTitle: 'No sample messages yet',
+        emptyDescription: 'Sample message volume appears after campaigns are loaded or scheduled.',
+        points: chartCampaigns.map((campaign) => ({
+          label: campaign.name,
+          value: campaign.message_count,
+          valueLabel: `${formatNumber(campaign.message_count)} sample messages`,
+          detail: campaign.status,
+        })),
+      },
+      {
+        title: 'Credit costs',
+        eyebrow: 'Budget estimate',
+        sourceLabel: 'Scheduled campaign credit estimates from tenant campaign records.',
+        emptyTitle: 'No credit estimates yet',
+        emptyDescription: 'Campaign credit costs appear when campaigns have audience selections and message type.',
+        points: chartCampaigns.map((campaign) => ({
+          label: campaign.name,
+          value: campaign.credit_cost,
+          valueLabel: `${formatNumber(campaign.credit_cost)} credits`,
+          detail: campaign.message_type === 'smart' ? 'Smart SMS' : 'Regular SMS',
+        })),
+      },
+      {
+        title: 'Follow-ups',
+        eyebrow: 'Automation',
+        sourceLabel: 'Follow-up counts are loaded from campaign and reminder records, not inferred conversions.',
+        emptyTitle: 'No follow-ups configured',
+        emptyDescription: 'Follow-up counts stay empty until reminder campaigns or campaign reminder counts exist.',
+        points: buildFollowUpPoints(chartCampaigns, reminderCampaigns),
+      },
+      {
+        title: 'Clicks and redemptions',
+        eyebrow: 'Tracked performance',
+        sourceLabel: trackedSourceLabel,
+        emptyTitle: 'No tracked clicks or redemptions yet',
+        emptyDescription: 'Click and redemption bars stay empty until Smart SMS tracking reports real activity.',
+        points: [
+          {
+            label: 'Clicks',
+            value: trackedClickCount,
+            valueLabel: formatActivity(trackedClickCount),
+            detail: 'Tracked link engagement',
+          },
+          {
+            label: 'Redemptions',
+            value: trackedRedemptionCount,
+            valueLabel: formatActivity(trackedRedemptionCount),
+            detail: 'Offer conversion',
+          },
+        ],
+      },
+    ]
 
     return (
       <>
@@ -1893,19 +1971,8 @@ export function CompanyWorkspace({
           />
         </section>
         <div className="analytics-grid">
-          {['Messages', 'Clicks', 'Redemptions', 'Quota usage'].map((label, index) => (
-            <section className="panel chart-card" aria-label={`${label} chart`} key={label}>
-              <div className="section-heading">
-                <span>Chart</span>
-                <strong>{label}</strong>
-              </div>
-              <div className="mini-chart" aria-hidden="true">
-                {[32, 48, 38, 62, 54, 76, 58].map((height, barIndex) => (
-                  <span key={barIndex} style={{ height: `${Math.max(18, height - index * 8)}%` }} />
-                ))}
-              </div>
-              <p className="muted">{performance ? 'Performance data refreshed from tenant reporting.' : 'No data yet. Refresh after campaigns have activity.'}</p>
-            </section>
+          {analyticsCharts.map((chart) => (
+            <AnalyticsChartCard key={chart.title} {...chart} />
           ))}
         </div>
       </>
@@ -2105,34 +2172,220 @@ function CampaignColumn({
 }) {
   return (
     <section className="campaign-column">
-      <h2>{title}</h2>
+      <h2>
+        {title}
+        <span>{formatNumber(campaigns.length)}</span>
+      </h2>
       {campaigns.length ? (
-        <ul className="compact-list">
+        <ul className="campaign-card-list">
           {campaigns.map((campaign) => (
             <li key={campaign.id}>
-              <strong>{campaign.name}</strong>
-              <small className="subtle-id">Campaign ID: {campaign.id}</small>
-              {campaign.body ? <span>Copy: {campaign.body}</span> : null}
-              <span>{campaign.status}</span>
-              <span>Scheduled: {formatLocalDateTime(campaign.scheduled_at)}</span>
-              <span>Created: {formatLocalDateTime(campaign.created_at)}</span>
-              <span>Modeled audience: {formatNumber(campaign.audience_count ?? campaign.message_count)}</span>
-              <span>Sample messages: {formatNumber(campaign.message_count)}</span>
-              <span>Credits: {formatNumber(campaign.credit_cost)}</span>
-              <span>Follow-ups: {formatNumber(campaign.reminder_count)}</span>
-              {onEdit ? (
-                <button className="secondary inline-action" type="button" onClick={() => onEdit(campaign)}>
-                  Modify campaign
-                </button>
-              ) : null}
+              <article className="campaign-card" aria-label={`${campaign.name} campaign card`}>
+                <header className="campaign-card-header">
+                  <div>
+                    <strong>{campaign.name}</strong>
+                    <small className="subtle-id" title={`Campaign ID: ${campaign.id}`}>Campaign ID: {shortCampaignId(campaign.id)}</small>
+                  </div>
+                  <span className={`campaign-status campaign-status-${statusClassName(campaign.status)}`}>
+                    {formatCampaignStatus(campaign.status)}
+                  </span>
+                </header>
+
+                <dl className="campaign-date-grid">
+                  <div>
+                    <dt>Scheduled</dt>
+                    <dd>{formatLocalDateTime(campaign.scheduled_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Created</dt>
+                    <dd>{formatLocalDateTime(campaign.created_at)}</dd>
+                  </div>
+                </dl>
+
+                {campaign.body ? (
+                  <p className="campaign-copy-preview">
+                    <span>Body preview</span>
+                    {campaign.body}
+                  </p>
+                ) : (
+                  <p className="campaign-copy-preview muted">No message body loaded for this campaign.</p>
+                )}
+
+                <div className="campaign-reach-meter" aria-label={`${campaign.name} sample to modeled audience`}>
+                  <div>
+                    <span>{formatAudienceMode(campaign.audience_mode)}</span>
+                    <strong>
+                      {formatNumber(campaign.message_count)} of {formatNumber(campaign.audience_count ?? campaign.message_count)}
+                    </strong>
+                  </div>
+                  <i style={{ width: `${sampleCoveragePercent(campaign)}%` }} aria-hidden="true" />
+                </div>
+
+                <dl className="campaign-stat-grid">
+                  <div>
+                    <dt>Modeled audience</dt>
+                    <dd>{formatNumber(campaign.audience_count ?? campaign.message_count)}</dd>
+                  </div>
+                  <div>
+                    <dt>Sample messages</dt>
+                    <dd>{formatNumber(campaign.message_count)}</dd>
+                  </div>
+                  <div>
+                    <dt>Credits</dt>
+                    <dd>{formatNumber(campaign.credit_cost)}</dd>
+                  </div>
+                  <div>
+                    <dt>Follow-ups</dt>
+                    <dd>{formatNumber(campaign.reminder_count)}</dd>
+                  </div>
+                </dl>
+
+                <footer className="campaign-card-actions">
+                  <span>{campaign.message_type === 'smart' ? 'Smart SMS with tracking support' : 'Regular SMS'}</span>
+                  {onEdit ? (
+                    <button className="secondary" type="button" onClick={() => onEdit(campaign)}>
+                      Modify campaign
+                    </button>
+                  ) : null}
+                </footer>
+              </article>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="muted">{emptyText}</p>
+        <div className="empty-state campaign-empty-state">
+          <strong>{title} is empty</strong>
+          <p>{emptyText}</p>
+        </div>
       )}
     </section>
   )
+}
+
+type AnalyticsChartPoint = {
+  label: string
+  value: number
+  valueLabel?: string
+  detail?: string
+}
+
+function AnalyticsChartCard({
+  title,
+  eyebrow,
+  points,
+  sourceLabel,
+  emptyTitle,
+  emptyDescription,
+}: {
+  title: string
+  eyebrow: string
+  points: AnalyticsChartPoint[]
+  sourceLabel: string
+  emptyTitle: string
+  emptyDescription: string
+}) {
+  const visiblePoints = points.filter((point) => point.value > 0)
+  const maxValue = Math.max(...points.map((point) => point.value), 0)
+  const hasData = visiblePoints.length > 0
+
+  return (
+    <section className="panel chart-card analytics-chart-card" aria-label={`${title} chart`}>
+      <div className="section-heading">
+        <span>{eyebrow}</span>
+        <strong>{title}</strong>
+      </div>
+      {hasData ? (
+        <>
+          <div className="mini-chart analytics-chart" aria-hidden="true">
+            {points.map((point) => (
+              <span
+                key={point.label}
+                style={{ height: `${Math.max(14, Math.round((point.value / maxValue) * 100))}%` }}
+              />
+            ))}
+          </div>
+          <ul className="analytics-chart-list">
+            {points.map((point) => (
+              <li key={point.label}>
+                <span>{point.label}</span>
+                <strong>{point.valueLabel ?? formatNumber(point.value)}</strong>
+                {point.detail ? <small>{point.detail}</small> : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <div className="analytics-empty-chart">
+          <strong>{emptyTitle}</strong>
+          <p>{emptyDescription}</p>
+        </div>
+      )}
+      <p className="chart-source">{sourceLabel}</p>
+    </section>
+  )
+}
+
+function buildFollowUpPoints(campaigns: CampaignListItem[], reminders: ReminderCampaign[]): AnalyticsChartPoint[] {
+  const reminderCountByCampaign = new Map<string, number>()
+  reminders.forEach((reminder) => {
+    if (!reminder.source_campaign_id) return
+    reminderCountByCampaign.set(
+      reminder.source_campaign_id,
+      (reminderCountByCampaign.get(reminder.source_campaign_id) ?? 0) + 1,
+    )
+  })
+  const points = campaigns.map((campaign) => {
+    const value = Math.max(campaign.reminder_count, reminderCountByCampaign.get(campaign.id) ?? 0)
+    return {
+      label: campaign.name,
+      value,
+      valueLabel: `${formatNumber(value)} ${value === 1 ? 'follow-up' : 'follow-ups'}`,
+      detail: campaign.status,
+    }
+  })
+  const orphanReminderCount = reminders.filter((reminder) => {
+    if (!reminder.source_campaign_id) return true
+    return !campaigns.some((campaign) => campaign.id === reminder.source_campaign_id)
+  }).length
+  return orphanReminderCount
+    ? [
+        ...points,
+        {
+          label: 'Unmatched reminder drafts',
+          value: orphanReminderCount,
+          valueLabel: `${formatNumber(orphanReminderCount)} ${orphanReminderCount === 1 ? 'follow-up' : 'follow-ups'}`,
+          detail: 'Loaded reminder records',
+        },
+      ]
+    : points
+}
+
+function statusClassName(status: string) {
+  return status.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+}
+
+function formatCampaignStatus(status: string) {
+  return status
+    .replace(/[_-]+/g, ' ')
+    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+}
+
+function formatAudienceMode(mode?: string) {
+  if (!mode) return 'Audience mode'
+  if (mode === 'projected_sample') return 'Projected sample'
+  return formatCampaignStatus(mode)
+}
+
+function sampleCoveragePercent(campaign: CampaignListItem) {
+  const modeledAudience = Math.max(campaign.audience_count ?? campaign.message_count, 1)
+  const sampleAudience = Math.max(campaign.message_count, 0)
+  if (sampleAudience === 0) return 0
+  return Math.min(100, Math.max(8, Math.round((sampleAudience / modeledAudience) * 100)))
+}
+
+function shortCampaignId(id: string) {
+  if (id.length <= 16) return id
+  return `${id.slice(0, 8)}…${id.slice(-6)}`
 }
 
 function MediaAssetPreview({ asset }: { asset: MediaAsset }) {

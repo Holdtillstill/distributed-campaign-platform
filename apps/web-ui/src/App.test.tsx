@@ -675,11 +675,14 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /CampaignOS/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Orchestrate every customer message before it moves/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/CampaignOS/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /^Features$/i })).toHaveAttribute('href', '/features')
-    expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
-    expect(screen.getByRole('link', { name: /Feature tour/i })).toHaveAttribute('href', '/features')
-    expect(screen.getByRole('link', { name: /Customer KB/i })).toHaveAttribute('href', '/kb')
+    expect(screen.getAllByRole('link', { name: /^Knowledge base$/i })[0]).toHaveAttribute('href', '/kb')
+    expect(screen.getAllByRole('button', { name: /^Customer login$/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: /Feature tour/i })[0]).toHaveAttribute('href', '/features')
+    expect(screen.getByLabelText(/CampaignOS live campaign flow preview/i)).toHaveTextContent(/Credits reserved/i)
+    expect(screen.getByLabelText(/CampaignOS live campaign flow preview/i)).toHaveTextContent(/Live monitor/i)
     expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
   })
@@ -698,7 +701,7 @@ describe('App', () => {
     expect(screen.getByText(/Analytics and campaign reporting/i)).toBeInTheDocument()
     expect(screen.getByText(/TCPA-aware compliance readiness/i)).toBeInTheDocument()
     expect(screen.getByText(/Grafana dashboards, Tempo traces, Prometheus metrics, Loki log collection/i)).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /Open customer app/i })[0]).toHaveAttribute('href', '/app')
+    expect(screen.getAllByRole('link', { name: /Open customer login/i })[0]).toHaveAttribute('href', '/app')
     expect(screen.getAllByRole('link', { name: /Open broadcast monitor/i })[0]).toHaveAttribute('href', '/monitor')
     expect(screen.getAllByRole('link', { name: /Customer knowledge base/i })[0]).toHaveAttribute('href', '/kb')
     expect(screen.getByRole('link', { name: /Open internal admin/i })).toHaveAttribute('href', '/internal')
@@ -724,7 +727,8 @@ describe('App', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: /Recommended production composition/i })).toBeInTheDocument()
-    expect(screen.getAllByText(/Customer app/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Customer login/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Customer login \/ workspace/i)).toBeInTheDocument()
     expect(screen.getByText(/\/app-designs\/6 Minimal Enterprise Workspace/i)).toBeInTheDocument()
     expect(screen.getByText(/\/app-designs\/7 Realtime Broadcast War Room/i)).toBeInTheDocument()
     expect(screen.getByText(/\/app-designs\/10 Agency Multi-tenant Console/i)).toBeInTheDocument()
@@ -752,7 +756,7 @@ describe('App', () => {
     expect(screen.getByText(/Create and schedule a campaign/i)).toBeInTheDocument()
     expect(screen.getByText(/Monitor broadcast throughput live/i)).toBeInTheDocument()
     expect(screen.getByText(/Internal admin and tenant operations overview/i)).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /^Open customer app$/i })[0]).toHaveAttribute('href', '/app')
+    expect(screen.getAllByRole('link', { name: /^Open customer login$/i })[0]).toHaveAttribute('href', '/app')
     expect(screen.getAllByRole('link', { name: /^Open broadcast monitor$/i })[0]).toHaveAttribute('href', '/monitor')
     expect(screen.getAllByRole('link', { name: /^View features$/i })[0]).toHaveAttribute('href', '/features')
     expect(screen.getAllByRole('link', { name: /^Open internal admin$/i })[0]).toHaveAttribute('href', '/internal')
@@ -831,7 +835,7 @@ describe('App', () => {
       for (const content of exploration.keyContent) {
         expect(screen.getAllByText(content).length).toBeGreaterThan(0)
       }
-      expect(screen.getByRole('link', { name: /open customer app/i })).toHaveAttribute('href', '/app')
+      expect(screen.getByRole('link', { name: /open customer login/i })).toHaveAttribute('href', '/app')
       expect(screen.getByRole('link', { name: /internal console/i })).toHaveAttribute('href', '/internal')
       expect(screen.getByRole('link', { name: /api docs/i })).toHaveAttribute('href', '/api/docs')
 
@@ -885,7 +889,7 @@ describe('App', () => {
       expect(screen.getAllByText(/Analytics/i).length).toBeGreaterThan(0)
       expect(screen.getAllByText(/Settings/i).length).toBeGreaterThan(0)
       expect(screen.getByText(design.activeSurface)).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: /open customer app/i })).toHaveAttribute('href', '/app')
+      expect(screen.getByRole('link', { name: /open customer login/i })).toHaveAttribute('href', '/app')
       expect(screen.getByRole('link', { name: /open real-time monitor/i })).toHaveAttribute('href', '/app/monitor')
       expect(screen.getByRole('link', { name: /internal admin/i })).toHaveAttribute('href', '/internal')
 
@@ -941,7 +945,7 @@ describe('App', () => {
       for (const content of design.keyContent) {
         expect(screen.getAllByText(content).length).toBeGreaterThan(0)
       }
-      expect(screen.getByRole('link', { name: /^Open app$/i })).toHaveAttribute('href', '/app')
+      expect(screen.getByRole('link', { name: /open customer login/i })).toHaveAttribute('href', '/app')
       expect(screen.getByRole('link', { name: /^Open monitor$/i })).toHaveAttribute('href', '/monitor')
       expect(screen.getByRole('link', { name: /^Features$/i })).toHaveAttribute('href', '/features')
       expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
@@ -953,12 +957,12 @@ describe('App', () => {
     expect(renderedHeadings.size).toBe(5)
   })
 
-  it('shows company login and signup choices from the customer app surface', async () => {
+  it('shows company login and signup choices from the customer login surface', async () => {
     mockFetch()
     const user = userEvent.setup()
 
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /customer login/i }))
+    await user.click(screen.getAllByRole('button', { name: /customer login/i })[0])
 
     expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /find my companies/i })).toBeInTheDocument()
@@ -1394,6 +1398,15 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: /upcoming/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
+    const memorialCard = screen.getByRole('article', { name: /Memorial Day Promo campaign card/i })
+    expect(within(memorialCard).getAllByText(/Scheduled/i).length).toBeGreaterThan(0)
+    expect(within(memorialCard).getByText(/Body preview/i)).toBeInTheDocument()
+    expect(within(memorialCard).getByText(/Memorial Day discount copy/i)).toBeInTheDocument()
+    expect(within(memorialCard).getByText(/Modeled audience/i)).toBeInTheDocument()
+    expect(within(memorialCard).getAllByText(/250,000/i).length).toBeGreaterThan(0)
+    expect(within(memorialCard).getByText(/Sample messages/i)).toBeInTheDocument()
+    expect(within(memorialCard).getByText(/Credits/i)).toBeInTheDocument()
+    expect(within(memorialCard).getByRole('button', { name: /Modify campaign/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /past/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Spring Launch/i)).not.toHaveLength(0)
     expect(screen.queryByLabelText(/follow-up source campaign/i)).not.toBeInTheDocument()
@@ -1723,8 +1736,28 @@ describe('App', () => {
     expect(screen.getByText(/Subscriber lists/i)).toBeInTheDocument()
     expect(screen.getByText(/Message volume/i)).toBeInTheDocument()
     expect(screen.getByRole('table', { name: /campaign analytics summary/i })).toBeInTheDocument()
-    expect(screen.getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Memorial Day Promo/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/May 25, 2026/i)).toBeInTheDocument()
+
+    const reachChart = screen.getByLabelText(/Modeled reach chart/i)
+    expect(reachChart).toHaveTextContent(/Projected from campaign schedules/i)
+    expect(within(reachChart).getByText(/Memorial Day Promo/i)).toBeInTheDocument()
+    expect(within(reachChart).getByText(/250,000 modeled/i)).toBeInTheDocument()
+
+    const creditChart = screen.getByLabelText(/Credit costs chart/i)
+    expect(creditChart).toHaveTextContent(/Scheduled campaign credit estimates/i)
+    expect(within(creditChart).getByText(/4 credits/i)).toBeInTheDocument()
+
+    const followUpChart = screen.getByLabelText(/Follow-ups chart/i)
+    expect(followUpChart).toHaveTextContent(/loaded from campaign and reminder records/i)
+    expect(within(followUpChart).getAllByText(/1 follow-up/i).length).toBeGreaterThan(0)
+
+    const trackedChart = screen.getByLabelText(/Clicks and redemptions chart/i)
+    expect(trackedChart).toHaveTextContent(/Tracked performance totals from dashboard summary/i)
+    expect(within(trackedChart).getAllByText(/Clicks/i).length).toBeGreaterThan(0)
+    expect(within(trackedChart).getByText(/123/i)).toBeInTheDocument()
+    expect(within(trackedChart).getAllByText(/Redemptions/i).length).toBeGreaterThan(0)
+    expect(within(trackedChart).getByText(/45/i)).toBeInTheDocument()
   })
 
   it('renders internal usage top tenant and scheduled reach summaries', async () => {

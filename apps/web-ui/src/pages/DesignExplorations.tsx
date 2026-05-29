@@ -15,7 +15,7 @@ const facts = {
 }
 
 const links = [
-  { href: '/app', label: 'Open customer app' },
+  { href: '/app', label: 'Open customer login' },
   { href: '/internal', label: 'Internal console' },
   { href: `${API_BASE_URL}/docs`, label: 'API docs' },
 ]

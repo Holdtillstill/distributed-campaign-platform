@@ -17,12 +17,12 @@ const kbArticles: KbArticle[] = [
     summary:
       'Use the demo workspace to explore modeled audiences, campaign planning, broadcast monitoring, and reporting.',
     steps: [
-      'Open the customer app and sign in as an invited user.',
+      'Open Customer login and sign in as an invited user.',
       'Use Demo Retail Co to inspect the 2.65M modeled subscriber setup.',
       'Review dashboard quotas, campaigns, subscribers, content, analytics, and settings.',
     ],
     links: [
-      { label: 'Open customer app', href: '/app' },
+      { label: 'Open customer login', href: '/app' },
       { label: 'View features', href: '/features' },
     ],
   },
@@ -66,7 +66,7 @@ const kbArticles: KbArticle[] = [
       'Choose an invite role such as campaign manager or regional manager.',
       'Set a user credit limit and share the generated access code with the teammate.',
     ],
-    links: [{ label: 'Open customer app', href: '/app' }],
+    links: [{ label: 'Open customer login', href: '/app' }],
   },
   {
     id: 'budgets-credits',
@@ -93,7 +93,7 @@ const kbArticles: KbArticle[] = [
       'Review modeled audience, sample count, credit cost, and scheduled time before submitting.',
     ],
     links: [
-      { label: 'Open customer app', href: '/app' },
+      { label: 'Open customer login', href: '/app' },
       { label: 'Feature overview', href: '/features' },
     ],
   },
@@ -126,7 +126,7 @@ const kbArticles: KbArticle[] = [
     ],
     links: [
       { label: 'Audience feature page', href: '/features/audience-segments' },
-      { label: 'Open customer app', href: '/app' },
+      { label: 'Open customer login', href: '/app' },
     ],
   },
   {
@@ -188,7 +188,7 @@ const kbArticles: KbArticle[] = [
       'If scheduling is disabled, check role permissions and remaining user credit allocation.',
     ],
     links: [
-      { label: 'Open customer app', href: '/app' },
+      { label: 'Open customer login', href: '/app' },
       { label: 'Open broadcast monitor', href: '/monitor' },
     ],
   },
@@ -225,7 +225,7 @@ export function KnowledgeBasePage() {
         <nav aria-label="Knowledge base navigation">
           <a href="/features">Features</a>
           <a href="/kb">Knowledge base</a>
-          <a href="/app">Customer app</a>
+          <a href="/app">Customer login</a>
           <a href="/internal">Internal admin</a>
         </nav>
       </header>
@@ -263,7 +263,7 @@ export function KnowledgeBasePage() {
       </section>
 
       <section className="kb-quick-ctas" aria-label="Knowledge base quick links">
-        <a href="/app">Open customer app</a>
+        <a href="/app">Open customer login</a>
         <a href="/monitor">Open broadcast monitor</a>
         <a href="/features">View features</a>
         <a href="/internal">Open internal admin</a>

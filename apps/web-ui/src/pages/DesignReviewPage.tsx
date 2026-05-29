@@ -4,7 +4,7 @@ const productionRoutes = ['/app', '/monitor', '/internal', '/kb', '/features']
 
 const recommendations = [
   {
-    surface: 'Customer app',
+    surface: 'Customer login / workspace',
     route: '/app',
     direction: '/app-designs/6 Minimal Enterprise Workspace',
     reason: 'Calm role-aware workspace with budget posture, audience readiness, reporting, and next actions.',
@@ -53,7 +53,7 @@ export function DesignReviewPage() {
     <main className="design-review-page">
       <header className="design-review-hero">
         <nav aria-label="Design review navigation">
-          <a href="/app">Customer app</a>
+          <a href="/app">Customer login</a>
           <a href="/monitor">Monitor</a>
           <a href="/internal">Internal</a>
           <a href="/features">Features</a>

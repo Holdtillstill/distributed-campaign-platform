@@ -120,7 +120,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
         <nav aria-label="Feature navigation">
           <a href="/features">Features</a>
           <a href="/kb">Knowledge base</a>
-          <a href="/app">Customer app</a>
+          <a href="/app">Customer login</a>
           <a href="/internal">Internal admin</a>
         </nav>
       </header>
@@ -135,7 +135,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
           </p>
           <div className="hero-actions">
             <a className="docs-link" href="/app">
-              Open customer app
+              Open customer login
             </a>
             <a className="docs-link secondary-link" href="/monitor">
               Open broadcast monitor
@@ -276,7 +276,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
         </div>
         <div className="hero-actions">
           <a className="docs-link" href="/app">
-            Customer workspace
+            Customer login
           </a>
           <a className="docs-link secondary-link" href="/monitor">
             Broadcast monitor
