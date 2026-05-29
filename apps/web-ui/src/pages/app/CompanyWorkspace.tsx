@@ -79,7 +79,7 @@ export function CompanyWorkspace({
   page: CompanyPage
   session: Extract<Session, { role: 'company_user' }>
   initialCampaignSubpage?: CampaignSubpage
-  onNavigate: (page: CompanyPage) => void
+  onNavigate: (page: CompanyPage, options?: { campaignSubpage?: CampaignSubpage; path?: string }) => void
 }) {
   const companyId = session.companyId
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
@@ -244,8 +244,8 @@ export function CompanyWorkspace({
   }, [companyId])
 
   useEffect(() => {
-    if (initialCampaignSubpage) setCampaignSubpage(initialCampaignSubpage)
-  }, [initialCampaignSubpage])
+    if (page === 'campaigns') setCampaignSubpage(initialCampaignSubpage ?? 'overview')
+  }, [initialCampaignSubpage, page])
 
   useEffect(() => {
     async function loadCampaignPlanningData() {
@@ -373,13 +373,12 @@ export function CompanyWorkspace({
     setSmartMediaAssetId(template.messageType === 'smart' ? mediaAsset?.id ?? '' : '')
     setCampaignSubpage('create')
     setContentFeedback(`${template.title} loaded into Campaign Builder`)
-    onNavigate('campaigns')
+    onNavigate('campaigns', { campaignSubpage: 'create' })
   }
 
   function openBroadcastMonitor() {
-    window.history.pushState(null, '', '/app/monitor')
     setCampaignSubpage('monitor')
-    onNavigate('campaigns')
+    onNavigate('campaigns', { campaignSubpage: 'monitor', path: '/app/monitor' })
   }
 
   function copyTemplateCopy(template: (typeof contentTemplates)[number]) {
@@ -773,7 +772,7 @@ export function CompanyWorkspace({
               disabled={!canCreateCampaign}
               onClick={() => {
                 setCampaignSubpage('create')
-                onNavigate('campaigns')
+                onNavigate('campaigns', { campaignSubpage: 'create' })
               }}
             >
               Create campaign

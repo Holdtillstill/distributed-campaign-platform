@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -663,6 +663,26 @@ async function signupAsCompanyUser(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /sign up with access code/i }))
 }
 
+function storeCompanySession(overrides: Record<string, unknown> = {}) {
+  window.localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({
+      role: 'company_user',
+      email: 'owner@acme.test',
+      companyId: 'company-1',
+      companyName: 'Acme Retail',
+      membershipRole: 'customer_admin',
+      creditLimit: 50000,
+      creditsUsed: 125,
+      ...overrides,
+    }),
+  )
+}
+
+function storeInternalSession() {
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify({ role: 'internal_admin', email: 'ops@example.test' }))
+}
+
 describe('App', () => {
   afterEach(() => {
     window.localStorage.clear()
@@ -981,6 +1001,22 @@ describe('App', () => {
     expect(screen.getByText(/owner@demo-retail.test/i)).toBeInTheDocument()
   })
 
+  it('labels the existing-user lookup and access-code signup inputs without relying on placeholders', () => {
+    mockFetch()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    expect(screen.getByLabelText(/login email.*email lookup input/i)).toHaveAttribute(
+      'placeholder',
+      'you@company.com',
+    )
+    expect(screen.getByLabelText(/access code.*signup input/i)).toHaveAttribute(
+      'placeholder',
+      'ACME-7KQ9',
+    )
+  })
+
   it('explains invite workspace access and renders membership role plus budget cards', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -1226,6 +1262,51 @@ describe('App', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
   })
 
+  it.each([
+    { path: '/app/campaigns', heading: /^campaigns$/i, nav: /^campaigns$/i },
+    { path: '/app/subscribers', heading: /^subscribers$/i, nav: /^subscribers$/i },
+    { path: '/app/content', heading: /^content library$/i, nav: /^content library$/i },
+    { path: '/app/analytics', heading: /^analytics$/i, nav: /^analytics$/i },
+    { path: '/app/settings', heading: /^settings$/i, nav: /^settings$/i },
+  ])('opens authenticated customer deep link $path without falling back to dashboard', async ({ path, heading, nav }) => {
+    mockFetch()
+    storeCompanySession()
+
+    window.history.pushState(null, '', path)
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: nav })).toHaveClass('active')
+    expect(screen.queryByRole('heading', { name: /company dashboard/i })).not.toBeInTheDocument()
+  })
+
+  it('updates canonical customer routes from sidebar nav and restores them on popstate', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+    storeCompanySession()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^campaigns$/i }))
+    expect(window.location.pathname).toBe('/app/campaigns')
+    expect(await screen.findByRole('heading', { name: /^campaigns$/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^settings$/i }))
+    expect(window.location.pathname).toBe('/app/settings')
+    expect(await screen.findByRole('heading', { name: /^settings$/i })).toBeInTheDocument()
+
+    act(() => {
+      window.history.pushState(null, '', '/app/subscribers')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(await screen.findByRole('heading', { name: /^subscribers$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^subscribers$/i })).toHaveClass('active')
+  })
+
   it('shows quota bar and quick actions on company dashboard without Not set', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -1448,6 +1529,24 @@ describe('App', () => {
     expect(screen.getByLabelText(/campaign credit estimate/i)).toHaveTextContent(/Company balance/i)
     expect(screen.getByLabelText(/campaign credit estimate/i)).toHaveTextContent(/User allocation/i)
     expect(screen.getByRole('button', { name: /schedule campaign/i })).toBeDisabled()
+  })
+
+  it('keeps limited company role messaging away from full-control admin wording', async () => {
+    mockFetch()
+    storeCompanySession({
+      email: 'viewer@acme.test',
+      membershipRole: 'viewer',
+      creditLimit: 1000,
+      creditsUsed: 200,
+    })
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    const shellContext = await screen.findByLabelText(/workspace role and budget/i)
+    expect(within(shellContext).getByText(/^Viewer$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/workspace access summary/i)).toHaveTextContent(/Read-only workspace access/i)
+    expect(screen.queryByText(/Full workspace control/i)).not.toBeInTheDocument()
   })
 
   it('filters campaigns by search, status, scheduled date, and clears filters', async () => {
@@ -1775,6 +1874,48 @@ describe('App', () => {
     expect(screen.getAllByText(/Scheduled reach next 30 days/i)).not.toHaveLength(0)
     expect(screen.getByText('1,360,850')).toBeInTheDocument()
     expect(screen.getByText(/Highest quota usage/i)).toBeInTheDocument()
+  })
+
+  it.each([
+    { path: '/internal/companies', heading: /^companies$/i, nav: /^companies$/i },
+    { path: '/internal/usage', heading: /^usage$/i, nav: /^usage$/i },
+  ])('opens authenticated internal deep link $path without falling back to dashboard', async ({ path, heading, nav }) => {
+    mockFetch()
+    storeInternalSession()
+
+    window.history.pushState(null, '', path)
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: nav })).toHaveClass('active')
+    expect(screen.queryByRole('heading', { name: /internal operator console/i })).not.toBeInTheDocument()
+  })
+
+  it('updates canonical internal routes from sidebar nav and restores them on popstate', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+    storeInternalSession()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /internal operator console/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^companies$/i }))
+    expect(window.location.pathname).toBe('/internal/companies')
+    expect(await screen.findByRole('heading', { name: /^companies$/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^usage$/i }))
+    expect(window.location.pathname).toBe('/internal/usage')
+    expect(await screen.findByRole('heading', { name: /^usage$/i })).toBeInTheDocument()
+
+    act(() => {
+      window.history.pushState(null, '', '/internal/companies')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(await screen.findByRole('heading', { name: /^companies$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^companies$/i })).toHaveClass('active')
   })
 
   it('lets company admins create access codes and adjust team budgets', async () => {

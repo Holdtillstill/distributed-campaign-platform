@@ -65,6 +65,7 @@ export function CustomerAccessPage({
           </p>
           <label>
             Login email
+            <span className="sr-only">email lookup input</span>
             <input
               type="email"
               value={loginEmail}
@@ -129,6 +130,7 @@ export function CustomerAccessPage({
           </label>
           <label>
             Access code
+            <span className="sr-only">signup input</span>
             <input
               value={accessCode}
               onChange={(event) => onAccessCode(event.target.value.toUpperCase())}

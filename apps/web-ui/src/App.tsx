@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 
 import { API_BASE_URL } from './api/client'
 import { AppShell } from './components/AppShell'
+import { EmptyState } from './components/EmptyState'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
 import { DesignReviewPage } from './pages/DesignReviewPage'
 import { FeatureMarketingPage } from './pages/FeatureMarketingPage'
@@ -16,17 +17,76 @@ import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } fr
 import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
 
 type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' } | { page: 'design-review' }
+type AuthenticatedRouteUnavailable = { surface: 'app' | 'internal'; path: string }
+
+const companyPageIds = ['dashboard', 'campaigns', 'subscribers', 'content', 'analytics', 'settings'] as const
+const adminPageIds = ['dashboard', 'companies', 'usage'] as const
+
+const companyPagePaths: Record<CompanyPage, string> = {
+  dashboard: '/app/dashboard',
+  campaigns: '/app/campaigns',
+  subscribers: '/app/subscribers',
+  content: '/app/content',
+  analytics: '/app/analytics',
+  settings: '/app/settings',
+}
+
+const adminPagePaths: Record<AdminPage, string> = {
+  dashboard: '/internal/dashboard',
+  companies: '/internal/companies',
+  usage: '/internal/usage',
+}
+
+function isCompanyPage(value: string): value is CompanyPage {
+  return (companyPageIds as readonly string[]).includes(value)
+}
+
+function isAdminPage(value: string): value is AdminPage {
+  return (adminPageIds as readonly string[]).includes(value)
+}
+
+function firstRouteSegment(path: string, basePath: string): string | null {
+  if (path === basePath || path === `${basePath}/`) return null
+  if (!path.startsWith(`${basePath}/`)) return null
+  return path.slice(basePath.length + 1).split('/')[0] || null
+}
+
+function isCampaignMonitorPath(path: string): boolean {
+  return path === '/monitor' || path.startsWith('/monitor/') || path === '/app/monitor' || path.startsWith('/app/monitor/')
+}
 
 function companyPageFromLocation(): CompanyPage {
-  return window.location.pathname.startsWith('/app/monitor') || window.location.pathname.startsWith('/monitor')
-    ? 'campaigns'
-    : 'dashboard'
+  const path = window.location.pathname
+  if (isCampaignMonitorPath(path)) return 'campaigns'
+
+  const segment = firstRouteSegment(path, '/app')
+  if (!segment) return 'dashboard'
+  return isCompanyPage(segment) ? segment : 'dashboard'
+}
+
+function adminPageFromLocation(): AdminPage {
+  const segment = firstRouteSegment(window.location.pathname, '/internal')
+  if (!segment) return 'dashboard'
+  return isAdminPage(segment) ? segment : 'dashboard'
 }
 
 function campaignSubpageFromLocation(): CampaignSubpage | undefined {
-  return window.location.pathname.startsWith('/app/monitor') || window.location.pathname.startsWith('/monitor')
-    ? 'monitor'
-    : undefined
+  return isCampaignMonitorPath(window.location.pathname) ? 'monitor' : undefined
+}
+
+function unavailableAuthenticatedRouteFromLocation(): AuthenticatedRouteUnavailable | null {
+  const path = window.location.pathname
+  const companySegment = firstRouteSegment(path, '/app')
+  if (companySegment && !isCampaignMonitorPath(path) && !isCompanyPage(companySegment)) {
+    return { surface: 'app', path }
+  }
+
+  const adminSegment = firstRouteSegment(path, '/internal')
+  if (adminSegment && !isAdminPage(adminSegment)) {
+    return { surface: 'internal', path }
+  }
+
+  return null
 }
 
 function publicRouteFromLocation(): PublicRoute | null {
@@ -46,8 +106,14 @@ export default function App() {
   const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() => publicRouteFromLocation())
   const [designExploration, setDesignExploration] = useState(() => routeToExploration(window.location.pathname))
   const [appDesignExploration, setAppDesignExploration] = useState(() => routeToAppDesign(window.location.pathname))
-  const [adminPage, setAdminPage] = useState<AdminPage>('dashboard')
+  const [adminPage, setAdminPage] = useState<AdminPage>(() => adminPageFromLocation())
   const [companyPage, setCompanyPage] = useState<CompanyPage>(() => companyPageFromLocation())
+  const [companyCampaignSubpage, setCompanyCampaignSubpage] = useState<CampaignSubpage | undefined>(() =>
+    campaignSubpageFromLocation(),
+  )
+  const [unavailableRoute, setUnavailableRoute] = useState<AuthenticatedRouteUnavailable | null>(() =>
+    unavailableAuthenticatedRouteFromLocation(),
+  )
   const [authMessage, setAuthMessage] = useState<string | null>(null)
   const [adminEmail, setAdminEmail] = useState('')
   const [loginEmail, setLoginEmail] = useState('')
@@ -56,20 +122,53 @@ export default function App() {
   const [accessCode, setAccessCode] = useState('')
   const [memberships, setMemberships] = useState<Membership[]>([])
 
+  function syncRouteStateFromLocation() {
+    setSurface(surfaceFromLocation())
+    setPublicRoute(publicRouteFromLocation())
+    setDesignExploration(routeToExploration(window.location.pathname))
+    setAppDesignExploration(routeToAppDesign(window.location.pathname))
+    setAdminPage(adminPageFromLocation())
+    setCompanyPage(companyPageFromLocation())
+    setCompanyCampaignSubpage(campaignSubpageFromLocation())
+    setUnavailableRoute(unavailableAuthenticatedRouteFromLocation())
+  }
+
+  function pushHistory(path: string) {
+    if (window.location.pathname !== path) window.history.pushState(null, '', path)
+  }
+
   function navigate(nextSurface: Surface) {
-    const path = nextSurface === 'internal' ? '/internal' : nextSurface === 'app' ? '/app' : '/'
-    window.history.pushState(null, '', path)
+    pushHistory(nextSurface === 'internal' ? '/internal' : nextSurface === 'app' ? '/app' : '/')
+    syncRouteStateFromLocation()
+  }
+
+  function navigateAdminPage(nextPage: AdminPage) {
+    pushHistory(adminPagePaths[nextPage])
+    setSurface('internal')
     setPublicRoute(null)
-    setSurface(nextSurface)
+    setDesignExploration(null)
+    setAppDesignExploration(null)
+    setUnavailableRoute(null)
+    setAdminPage(nextPage)
+  }
+
+  function navigateCompanyPage(
+    nextPage: CompanyPage,
+    options: { campaignSubpage?: CampaignSubpage; path?: string } = {},
+  ) {
+    pushHistory(options.path ?? companyPagePaths[nextPage])
+    setSurface('app')
+    setPublicRoute(null)
+    setDesignExploration(null)
+    setAppDesignExploration(null)
+    setUnavailableRoute(null)
+    setCompanyPage(nextPage)
+    setCompanyCampaignSubpage(options.campaignSubpage ?? campaignSubpageFromLocation())
   }
 
   useEffect(() => {
     const handlePopState = () => {
-      setSurface(surfaceFromLocation())
-      setPublicRoute(publicRouteFromLocation())
-      setDesignExploration(routeToExploration(window.location.pathname))
-      setAppDesignExploration(routeToAppDesign(window.location.pathname))
-      setCompanyPage(companyPageFromLocation())
+      syncRouteStateFromLocation()
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -87,12 +186,14 @@ export default function App() {
     setMemberships([])
     setAdminPage('dashboard')
     setCompanyPage('dashboard')
+    setCompanyCampaignSubpage(undefined)
+    setUnavailableRoute(null)
   }
 
   function loginInternalAdmin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     persistSession({ role: 'internal_admin', email: adminEmail || 'ops@company.com' })
-    setSurface('internal')
+    syncRouteStateFromLocation()
   }
 
   async function lookupMemberships(event: FormEvent<HTMLFormElement>) {
@@ -141,8 +242,7 @@ export default function App() {
       creditLimit: result.credit_limit,
       creditsUsed: result.credits_used ?? 0,
     })
-    setSurface('app')
-    setCompanyPage(companyPageFromLocation())
+    syncRouteStateFromLocation()
   }
 
   function openMembership(membership: Membership) {
@@ -155,7 +255,7 @@ export default function App() {
       creditLimit: membership.credit_limit,
       creditsUsed: membership.credits_used ?? 0,
     })
-    setCompanyPage(companyPageFromLocation())
+    syncRouteStateFromLocation()
   }
 
   const customerAccess = (
@@ -222,25 +322,57 @@ export default function App() {
     return <MarketingPage onCustomerAccess={() => navigate('app')} onInternalAccess={() => navigate('internal')} />
   }
 
+  const activeUnavailableRoute =
+    unavailableRoute &&
+    ((session.role === 'internal_admin' && unavailableRoute.surface === 'internal') ||
+      (session.role === 'company_user' && unavailableRoute.surface === 'app'))
+      ? unavailableRoute
+      : null
+
   return (
     <AppShell
       session={session}
       adminPage={adminPage}
       companyPage={companyPage}
-      onAdminPage={setAdminPage}
-      onCompanyPage={setCompanyPage}
+      onAdminPage={navigateAdminPage}
+      onCompanyPage={navigateCompanyPage}
       onLogout={logout}
     >
-      {session.role === 'internal_admin' ? (
+      {activeUnavailableRoute ? (
+        <AuthenticatedRoutePlaceholder route={activeUnavailableRoute} />
+      ) : session.role === 'internal_admin' ? (
         <AdminWorkspace page={adminPage} />
       ) : (
         <CompanyWorkspace
           page={companyPage}
           session={session}
-          initialCampaignSubpage={campaignSubpageFromLocation()}
-          onNavigate={setCompanyPage}
+          initialCampaignSubpage={companyCampaignSubpage}
+          onNavigate={navigateCompanyPage}
         />
       )}
     </AppShell>
+  )
+}
+
+function AuthenticatedRoutePlaceholder({ route }: { route: AuthenticatedRouteUnavailable }) {
+  const isInternal = route.surface === 'internal'
+  const homePath = isInternal ? adminPagePaths.dashboard : companyPagePaths.dashboard
+  const availableRoutes = isInternal
+    ? Object.values(adminPagePaths).join(', ')
+    : [...Object.values(companyPagePaths), '/app/monitor', '/monitor'].join(', ')
+
+  return (
+    <section className="panel route-placeholder" aria-label="Unavailable route">
+      <EmptyState
+        title="Route not available"
+        description={`${route.path} does not map to an available ${isInternal ? 'internal admin' : 'customer workspace'} page.`}
+        action={
+          <a className="docs-link secondary-link" href={homePath}>
+            Open dashboard
+          </a>
+        }
+      />
+      <p className="helper-text">Available routes: {availableRoutes}</p>
+    </section>
   )
 }
