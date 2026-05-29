@@ -26,14 +26,46 @@ export function AdminDashboard({
   const scheduledReach = companyHealthRows.reduce((total, row) => total + row.scheduled_reach, 0)
   const totalCredits = adminSummary?.total_credit_balance ?? 0
   const creditTone = totalCredits < 10000 ? 'warning' : 'neutral'
+  const quotaWatchCount = companyHealthRows.filter((row) => row.quota_usage >= 0.8).length
+  const accessCodeReadyCount = companyHealthRows.filter((row) => row.active_access_code).length
+  const busiestTenant = [...companyHealthRows].sort((a, b) => b.scheduled_reach - a.scheduled_reach)[0]
 
   return (
     <>
       <PageHeader
         eyebrow="Internal admin"
-        title="Admin dashboard"
-        description="Monitor tenant onboarding, quota setup, access code handoff, and platform readiness."
+        title="Internal operator console"
+        description="Scan tenant health, quota pressure, access-code handoff, and platform readiness across active customers."
       />
+
+      <section className="admin-operator-command" aria-label="Internal operator command surface">
+        <div>
+          <p className="eyebrow">Operator scan</p>
+          <h2>Tenant health, quotas, and access handoff in one queue.</h2>
+          <p>
+            Prioritize quota-watch tenants, confirm access codes are ready for customer admins, and use system checks
+            before escalating delivery or platform issues.
+          </p>
+        </div>
+        <dl>
+          <div>
+            <dt>Quota watch</dt>
+            <dd>{formatNumber(quotaWatchCount)}</dd>
+            <small>Tenants at 80%+ monthly usage</small>
+          </div>
+          <div>
+            <dt>Access codes ready</dt>
+            <dd>{formatNumber(accessCodeReadyCount)}</dd>
+            <small>Customer handoffs with active codes</small>
+          </div>
+          <div>
+            <dt>Highest scheduled reach</dt>
+            <dd>{busiestTenant ? busiestTenant.company_name : 'No tenant loaded'}</dd>
+            <small>{busiestTenant ? `${formatNumber(busiestTenant.scheduled_reach)} upcoming messages` : 'Load tenant health'}</small>
+          </div>
+        </dl>
+      </section>
+
       <div className="metric-grid">
         <MetricCard label="Active companies" value={formatCount(adminSummary?.active_company_count)} trend="Contracted tenants" />
         <MetricCard label="Subscribers" value={totalSubscribers ? formatNumber(totalSubscribers) : 'No data yet'} trend="Across visible tenants" />
@@ -46,15 +78,35 @@ export function AdminDashboard({
       <section className="panel table-panel">
         <div className="section-heading">
           <span>Tenant health</span>
-          <strong>Scheduled reach next 30 days</strong>
+          <strong>Tenant health, quotas, and access codes</strong>
         </div>
+        <p className="muted">Scheduled reach next 30 days drives quota watch and access-code handoff priority.</p>
         <DataTable
           ariaLabel="Tenant health"
           rows={companyHealthRows}
           getRowKey={(row) => row.company_id}
           empty={<EmptyState title="No tenant health loaded" description="Company health loads subscribers, credits, quota, and scheduled reach." />}
           columns={[
-            { key: 'company', header: 'Company', render: (row) => row.company_name },
+            {
+              key: 'company',
+              header: 'Company',
+              render: (row) => (
+                <div className="table-primary-cell">
+                  <strong>{row.company_name}</strong>
+                  <span>{row.company_id}</span>
+                </div>
+              ),
+            },
+            {
+              key: 'health',
+              header: 'Health',
+              render: (row) => {
+                const pct = Math.round(row.quota_usage * 100)
+                const label = pct >= 95 ? 'Quota critical' : pct >= 80 ? 'Quota watch' : 'Stable'
+                const tone = pct >= 95 ? 'status-pill danger' : pct >= 80 ? 'status-pill warning' : 'status-pill'
+                return <span className={tone}>{label}</span>
+              },
+            },
             { key: 'subscribers', header: 'Subscribers', render: (row) => formatNumber(row.subscriber_count) },
             { key: 'campaigns', header: 'Campaigns', render: (row) => formatNumber(row.campaign_count) },
             { key: 'reach', header: 'Scheduled reach', render: (row) => formatNumber(row.scheduled_reach) },
@@ -75,7 +127,7 @@ export function AdminDashboard({
             },
             {
               key: 'access',
-              header: 'Active access code',
+              header: 'Access-code handoff',
               render: (row) => <span className="code-chip">{row.active_access_code ?? 'Not configured'}</span>,
             },
           ]}

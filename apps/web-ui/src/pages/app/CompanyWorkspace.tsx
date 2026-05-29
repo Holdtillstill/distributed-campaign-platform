@@ -214,6 +214,21 @@ export function CompanyWorkspace({
   const restrictionCopy = isReadOnly
     ? `${roleMeta.label} access is reporting-only. Operational actions are disabled for this workspace.`
     : `${roleMeta.label} access is scoped to ${roleMeta.marketScope.toLowerCase()}.`
+  const activeCampaign =
+    campaigns.find((item) => ['queued', 'scheduled', 'sending', 'processing'].includes(item.status)) ?? campaigns[0] ?? null
+  const activeCampaignReach = activeCampaign?.audience_count ?? activeCampaign?.message_count ?? 0
+  const dashboardAudienceSummary = subscriberLists.length
+    ? `${formatNumber(subscriberLists.length)} segments / ${formatNumber(modeledAudienceTotal)} modeled`
+    : 'No segments loaded'
+  const dashboardAnalyticsSummary =
+    dashboardSummary && (dashboardSummary.click_count > 0 || dashboardSummary.redemption_count > 0)
+      ? `${formatNumber(dashboardSummary.click_count)} clicks / ${formatNumber(dashboardSummary.redemption_count)} redemptions`
+      : 'Reporting starts after tracked sends'
+  const companyBudgetRemaining = dashboardSummary?.credit_balance ?? 0
+  const dashboardBudgetTone =
+    dashboardSummary?.monthly_send_limit && dashboardSummary.credits_used / dashboardSummary.monthly_send_limit >= 0.8
+      ? 'Review quota before approval'
+      : 'Budget available for planned sends'
 
   useEffect(() => {
     async function loadDashboardSummary() {
@@ -683,7 +698,7 @@ export function CompanyWorkspace({
         <PageHeader
           eyebrow="Company workspace"
           title="Company dashboard"
-          description={`Active company: ${session.companyName} (${companyId}). ${roleMeta.permissionSummary}`}
+          description={`${session.companyName} (${companyId}) / ${roleMeta.permissionSummary}`}
         />
         <section className="role-aware-banner" aria-label="Workspace access summary">
           <div>
@@ -708,14 +723,83 @@ export function CompanyWorkspace({
             </p>
           </div>
         </section>
-        <div className="metric-grid">
+        <section className="dashboard-command-surface" aria-label="Dashboard command surface">
+          <div className="dashboard-command-main">
+            <p className="eyebrow">Today's decisions</p>
+            <h2>
+              {activeCampaign
+                ? `Review ${activeCampaign.name} before the next send window.`
+                : 'Build the first campaign plan for this workspace.'}
+            </h2>
+            <p>
+              Check budget, audience readiness, active broadcast state, and reporting signals before approving the next
+              customer communication.
+            </p>
+            <div className="decision-list" aria-label="Decision queue">
+              <article>
+                <span>Broadcast state</span>
+                <strong>{activeCampaign ? activeCampaign.status : 'No campaign loaded'}</strong>
+                <p>
+                  {activeCampaign
+                    ? `${formatNumber(activeCampaignReach)} modeled recipients / ${formatLocalDateTime(
+                        activeCampaign.scheduled_at ?? activeCampaign.created_at,
+                      )}`
+                    : 'Create or import a campaign to expose monitor readiness.'}
+                </p>
+              </article>
+              <article>
+                <span>Budget posture</span>
+                <strong>{formatNumber(companyBudgetRemaining)} credits</strong>
+                <p>{dashboardBudgetTone}</p>
+              </article>
+              <article>
+                <span>Audience posture</span>
+                <strong>{dashboardAudienceSummary}</strong>
+                <p>Consent filters and modeled/sample counts are available in Subscribers.</p>
+              </article>
+            </div>
+          </div>
+          <aside className="dashboard-command-aside" aria-label="Next actions">
+            <div>
+              <span>Next action</span>
+              <strong>{canCreateCampaign ? 'Approve or create a broadcast' : 'Review reporting and monitor status'}</strong>
+            </div>
+            <button
+              disabled={!canCreateCampaign}
+              onClick={() => {
+                setCampaignSubpage('create')
+                onNavigate('campaigns')
+              }}
+            >
+              Create campaign
+            </button>
+            <button className="secondary" onClick={openBroadcastMonitor}>
+              Open broadcast monitor
+            </button>
+            <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('subscribers')}>
+              Import subscribers
+            </button>
+            <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('content')}>
+              Upload media
+            </button>
+            <button className="secondary" onClick={() => onNavigate('analytics')}>
+              View analytics
+            </button>
+            <a className="docs-link secondary-link" href="/kb">
+              Read customer KB
+            </a>
+            {!canCreateCampaign ? <p className="helper-text">{restrictionCopy}</p> : null}
+          </aside>
+        </section>
+
+        <div className="metric-grid dashboard-metrics" aria-label="Workspace posture">
           <Metric label="Subscribers" value={formatCount(dashboardSummary?.subscriber_count)} trend="Confirmed and imported audience" />
-          <Metric label="Campaigns" value={formatCount(dashboardSummary?.campaign_count)} trend="Scheduled or sent" />
-          <Metric label="Messages" value={formatActivity(dashboardSummary?.message_count)} trend="No data yet until first send" />
+          <Metric label="Active campaigns" value={formatNumber(upcomingCampaigns.length)} trend="Scheduled or queued decision work" />
+          <Metric label="Messages" value={formatActivity(dashboardSummary?.message_count)} trend="Sent or scheduled sample rows" />
           <Metric label="Credits remaining" value={formatCount(dashboardSummary?.credit_balance)} trend="Contract balance" />
-          <Metric label="Clicks" value={formatActivity(dashboardSummary?.click_count)} trend="Smart SMS engagement" />
-          <Metric label="Redemptions" value={formatActivity(dashboardSummary?.redemption_count)} trend="Tracked offer outcomes" />
+          <Metric label="Reporting" value={dashboardAnalyticsSummary} trend="Analytics summary" />
         </div>
+
         <div className="dashboard-grid">
           <QuotaBar
             label="Monthly send quota"
@@ -729,59 +813,42 @@ export function CompanyWorkspace({
                 : 'Monthly send limit is not configured for this tenant.'
             }
           />
-          <section className="panel quick-actions" aria-label="Quick actions">
+          <section className="panel dashboard-reporting-summary" aria-label="Analytics and reporting summary">
             <div className="section-heading">
-              <span>Next steps</span>
-              <strong>Quick actions</strong>
+              <span>Reporting</span>
+              <strong>Performance summary</strong>
             </div>
-            <button
-              disabled={!canCreateCampaign}
-              onClick={() => {
-                setCampaignSubpage('create')
-                onNavigate('campaigns')
-              }}
-            >
-              Create campaign
-            </button>
-            <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('subscribers')}>
-              Import subscribers
-            </button>
-            <button className="secondary" disabled={isReadOnly} onClick={() => onNavigate('content')}>
-              Upload media
-            </button>
-            <button className="secondary" onClick={openBroadcastMonitor}>
-              Open broadcast monitor
-            </button>
-            <button className="secondary" onClick={() => onNavigate('analytics')}>
-              View analytics
-            </button>
-            <a className="docs-link secondary-link" href="/kb">
-              Read customer KB
-            </a>
-            {!canCreateCampaign ? <p className="helper-text wide">{restrictionCopy}</p> : null}
+            <dl>
+              <div>
+                <dt>Clicks</dt>
+                <dd>{formatActivity(dashboardSummary?.click_count)}</dd>
+              </div>
+              <div>
+                <dt>Redemptions</dt>
+                <dd>{formatActivity(dashboardSummary?.redemption_count)}</dd>
+              </div>
+              <div>
+                <dt>Scheduled reach</dt>
+                <dd>{formatNumber(upcomingCampaigns.reduce((total, item) => total + (item.audience_count ?? item.message_count), 0))}</dd>
+              </div>
+            </dl>
+            <p className="muted">Use Analytics for campaign-level click, redemption, and credit reporting.</p>
           </section>
         </div>
-        <div className="dashboard-grid">
-          <section className="panel chart-card" aria-label="Recent performance">
-            <div className="section-heading">
-              <span>Performance</span>
-              <strong>Recent activity</strong>
-            </div>
-            <div className="mini-chart" aria-hidden="true">
-              <span style={{ height: '22%' }} />
-              <span style={{ height: '36%' }} />
-              <span style={{ height: '28%' }} />
-              <span style={{ height: '54%' }} />
-              <span style={{ height: '46%' }} />
-              <span style={{ height: '72%' }} />
-            </div>
-            <p className="muted">Campaign activity will populate as sends, clicks, and redemptions arrive.</p>
-          </section>
-          <EmptyState
-            title="No recent operational alerts"
-            description="Quota risk, failed sends, and reminder opportunities will appear here once activity is available."
-          />
-        </div>
+
+        <section className="panel dashboard-access-handoff" aria-label="Invite and access-code framing">
+          <div className="section-heading">
+            <span>Access</span>
+            <strong>Invite and budget handoff</strong>
+          </div>
+          <p>
+            Owners issue access codes from Settings, assign roles, and set user credit limits before teammates enter
+            the workspace.
+          </p>
+          <button className="secondary" disabled={!canInvite} onClick={() => onNavigate('settings')}>
+            Manage team access
+          </button>
+        </section>
       </>
     )
   }
@@ -1161,15 +1228,15 @@ export function CompanyWorkspace({
         ) : null}
 
         {campaignSubpage === 'monitor' ? (
-          <section className="panel broadcast-monitor" aria-label="Live broadcast monitor">
+          <section className="panel broadcast-monitor monitor-war-room" aria-label="Live broadcast monitor">
             <div className="section-heading">
-              <span>Live monitor</span>
-              <strong>Broadcast throughput</strong>
+              <span>Live operations</span>
+              <strong>Broadcast monitor</strong>
             </div>
             <div className="monitor-help-strip">
               <p>
-                Use this view after scheduling to confirm progress, throughput, ETA, retries, failures, and
-                dead-lettered rows before escalating provider issues.
+                Refreshes every 5 seconds from the current monitor API. Use manual refresh to re-request the selected
+                campaign while checking progress, throughput, ETA, retries, failures, and dead-lettered rows.
               </p>
               <div>
                 <a href="/kb">Monitor guide</a>
@@ -1180,7 +1247,7 @@ export function CompanyWorkspace({
               <>
                 <div className="form-grid monitor-controls">
                   <label>
-                    Campaign
+                    Monitor campaign
                     <select
                       value={selectedMonitorCampaignId}
                       onChange={(event) => setSelectedMonitorCampaignId(event.target.value)}
@@ -1193,7 +1260,7 @@ export function CompanyWorkspace({
                     </select>
                   </label>
                   <button className="secondary" type="button" onClick={() => setMonitorRefreshTick((value) => value + 1)}>
-                    Refresh monitor
+                    Refresh monitor now
                   </button>
                 </div>
                 {monitorError ? (
@@ -1203,35 +1270,69 @@ export function CompanyWorkspace({
                   </p>
                 ) : null}
                 {broadcastMonitor ? (
-                  <div className="monitor-grid">
+                  <div className="monitor-operations">
                     <div className="monitor-progress">
                       <div>
                         <strong>{broadcastMonitor.campaign_name}</strong>
-                        <span>{broadcastMonitor.status}</span>
+                        <span>Status: {broadcastMonitor.status}</span>
                       </div>
+                      <strong className="monitor-percent">{formatNumber(broadcastMonitor.percent_complete)}%</strong>
                       <div className="progress-track" aria-label="Broadcast percent complete">
                         <span style={{ width: `${Math.min(100, Math.max(0, broadcastMonitor.percent_complete))}%` }} />
                       </div>
                       <p className="muted">
-                        {formatNumber(broadcastMonitor.percent_complete)}% complete in local sample. Mode:{' '}
-                        {broadcastMonitor.mode}.
+                        Percent complete is based on loaded message rows for the current {broadcastMonitor.mode} run.
                       </p>
                     </div>
-                    <Metric
-                      label="Modeled audience"
-                      value={formatNumber(broadcastMonitor.modeled_audience)}
-                      trend={`${formatNumber(broadcastMonitor.sample_message_count)} local sample messages`}
-                    />
-                    <Metric
-                      label="Throughput"
-                      value={`${formatNumber(broadcastMonitor.messages_per_minute)}/min`}
-                      trend={`${formatNumber(broadcastMonitor.throughput_per_second)} messages/sec`}
-                    />
-                    <Metric label="Queued" value={formatNumber(broadcastMonitor.queued)} trend="Actual message rows" />
-                    <Metric label="Sent" value={formatNumber(broadcastMonitor.sent)} trend="Actual provider outcomes" />
-                    <Metric label="Failed" value={formatNumber(broadcastMonitor.failed)} trend="Actual failed rows" />
-                    <Metric label="Retried" value={formatNumber(broadcastMonitor.retried)} trend="Actual retry rows" />
-                    <Metric label="Dead-lettered" value={formatNumber(broadcastMonitor.dead_lettered)} trend="Actual terminal rows" />
+                    <dl className="monitor-status-strip" aria-label="Delivery status metrics">
+                      <div>
+                        <dt>Queued</dt>
+                        <dd>{formatNumber(broadcastMonitor.queued)}</dd>
+                        <small>Waiting to send</small>
+                      </div>
+                      <div>
+                        <dt>Sent</dt>
+                        <dd>{formatNumber(broadcastMonitor.sent)}</dd>
+                        <small>Provider accepted</small>
+                      </div>
+                      <div>
+                        <dt>Failed</dt>
+                        <dd>{formatNumber(broadcastMonitor.failed)}</dd>
+                        <small>Needs review</small>
+                      </div>
+                      <div>
+                        <dt>Retried</dt>
+                        <dd>{formatNumber(broadcastMonitor.retried)}</dd>
+                        <small>Retried rows</small>
+                      </div>
+                      <div>
+                        <dt>Dead-lettered</dt>
+                        <dd>{formatNumber(broadcastMonitor.dead_lettered)}</dd>
+                        <small>Terminal rows</small>
+                      </div>
+                    </dl>
+                    <div className="monitor-grid">
+                      <Metric
+                        label="Modeled audience"
+                        value={formatNumber(broadcastMonitor.modeled_audience)}
+                        trend={`${formatNumber(broadcastMonitor.sample_message_count)} local sample messages`}
+                      />
+                      <Metric
+                        label="Throughput"
+                        value={`${formatNumber(broadcastMonitor.messages_per_minute)}/min`}
+                        trend={`${formatNumber(broadcastMonitor.throughput_per_second)} messages/sec`}
+                      />
+                      <Metric
+                        label="ETA"
+                        value={
+                          broadcastMonitor.eta_seconds !== null && broadcastMonitor.eta_seconds !== undefined
+                            ? `${formatNumber(Math.ceil(broadcastMonitor.eta_seconds / 60))} min`
+                            : 'Waiting'
+                        }
+                        trend="Estimated from current throughput"
+                      />
+                      <Metric label="Percent complete" value={`${formatNumber(broadcastMonitor.percent_complete)}%`} trend="Loaded rows" />
+                    </div>
                     <div className="monitor-meta">
                       <span>Started: {formatLocalDateTime(broadcastMonitor.started_at)}</span>
                       <span>Last updated: {formatLocalDateTime(broadcastMonitor.last_updated)}</span>
@@ -1243,6 +1344,14 @@ export function CompanyWorkspace({
                       </span>
                       <span>Projected complete: {formatLocalDateTime(broadcastMonitor.projected_completion_at)}</span>
                     </div>
+                    <section className="monitor-semantics" aria-label="Monitor status semantics">
+                      <strong>Operational labels</strong>
+                      <p>
+                        Queued rows are waiting to send, sent rows have provider outcomes, failed rows need review,
+                        retried rows already had another attempt, and dead-lettered rows are terminal until an operator
+                        investigates.
+                      </p>
+                    </section>
                   </div>
                 ) : (
                   <p className="muted">

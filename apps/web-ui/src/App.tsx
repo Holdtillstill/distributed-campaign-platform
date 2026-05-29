@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { API_BASE_URL } from './api/client'
 import { AppShell } from './components/AppShell'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
+import { DesignReviewPage } from './pages/DesignReviewPage'
 import { FeatureMarketingPage } from './pages/FeatureMarketingPage'
 import { InternalLoginPage } from './pages/InternalLoginPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
@@ -14,7 +15,7 @@ import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
 import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
 
-type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' }
+type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' } | { page: 'design-review' }
 
 function companyPageFromLocation(): CompanyPage {
   return window.location.pathname.startsWith('/app/monitor') || window.location.pathname.startsWith('/monitor')
@@ -30,6 +31,7 @@ function campaignSubpageFromLocation(): CampaignSubpage | undefined {
 
 function publicRouteFromLocation(): PublicRoute | null {
   const path = window.location.pathname
+  if (path === '/design-review' || path === '/designs') return { page: 'design-review' }
   if (path === '/kb' || path.startsWith('/kb/')) return { page: 'kb' }
   if (path === '/features' || path.startsWith('/features/')) {
     const activeSlug = path.split('/')[2]
@@ -184,6 +186,10 @@ export default function App() {
 
   if (publicRoute?.page === 'kb') {
     return <KnowledgeBasePage />
+  }
+
+  if (publicRoute?.page === 'design-review') {
+    return <DesignReviewPage />
   }
 
   if (publicRoute?.page === 'features') {

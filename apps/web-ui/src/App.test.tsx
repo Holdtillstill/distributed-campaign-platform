@@ -710,6 +710,25 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
   })
 
+  it('renders the design review index with recommended composition and all review options', () => {
+    mockFetch()
+
+    window.history.pushState(null, '', '/design-review')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /Recommended production composition/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Customer app/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/\/app-designs\/6 Minimal Enterprise Workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/\/app-designs\/7 Realtime Broadcast War Room/i)).toBeInTheDocument()
+    expect(screen.getByText(/\/app-designs\/10 Agency Multi-tenant Console/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Research rationale/i)).toHaveTextContent(/Activation, orchestration, delivery, and reporting/i)
+    expect(screen.getByRole('link', { name: '/app' })).toHaveAttribute('href', '/app')
+    expect(screen.getByRole('link', { name: '/monitor' })).toHaveAttribute('href', '/monitor')
+    expect(screen.getByRole('link', { name: '/internal' })).toHaveAttribute('href', '/internal')
+    expect(screen.getByRole('link', { name: '/1' })).toHaveAttribute('href', '/1')
+    expect(screen.getByRole('link', { name: '/app-designs/10' })).toHaveAttribute('href', '/app-designs/10')
+  })
+
   it('renders the customer knowledge base with category filters, search, articles, and CTAs', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -1004,8 +1023,14 @@ describe('App', () => {
     render(<App />)
     await loginAsInternalAdmin(user)
 
-    expect(await screen.findByText(/tenant health/i)).toBeInTheDocument()
+    expect((await screen.findAllByText(/tenant health/i)).length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', { name: /internal operator console/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/internal operator command surface/i)).toHaveTextContent(/Quota watch/i)
+    expect(screen.getByLabelText(/internal operator command surface/i)).toHaveTextContent(/Access codes ready/i)
+    expect(screen.getByLabelText(/internal operator command surface/i)).toHaveTextContent(/Highest scheduled reach/i)
     expect(screen.getByText(/scheduled reach next 30 days/i)).toBeInTheDocument()
+    expect(screen.getByText(/Tenant health, quotas, and access codes/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Access-code handoff/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Acme Retail/i)).not.toHaveLength(0)
     expect(screen.getAllByText('1,200')).not.toHaveLength(0)
     expect(screen.getAllByText('850')).not.toHaveLength(0)
@@ -1181,6 +1206,11 @@ describe('App', () => {
     await signupAsCompanyUser(user)
 
     expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/dashboard command surface/i)).toHaveTextContent(/Today's decisions/i)
+    expect(screen.getByLabelText(/decision queue/i)).toHaveTextContent(/Budget posture/i)
+    expect(screen.getByLabelText(/decision queue/i)).toHaveTextContent(/Audience posture/i)
+    expect(screen.getByLabelText(/analytics and reporting summary/i)).toHaveTextContent(/Performance summary/i)
+    expect(screen.getByLabelText(/invite and access-code framing/i)).toHaveTextContent(/Invite and budget handoff/i)
     expect(screen.queryByText(/not set/i)).not.toBeInTheDocument()
     expect(screen.getByText(/monthly send quota/i)).toBeInTheDocument()
     expect(screen.getByText(/create campaign/i)).toBeInTheDocument()
@@ -1442,6 +1472,14 @@ describe('App', () => {
     expect(screen.getByText(/2 local sample messages/i)).toBeInTheDocument()
     expect(screen.getByText(/projected\/sample/i)).toBeInTheDocument()
     expect(screen.getByText('30/min')).toBeInTheDocument()
+    expect(screen.getByText(/Refreshes every 5 seconds/i)).toBeInTheDocument()
+    const statusMetrics = screen.getByLabelText(/delivery status metrics/i)
+    expect(within(statusMetrics).getByText(/Queued/i)).toBeInTheDocument()
+    expect(within(statusMetrics).getByText(/Sent/i)).toBeInTheDocument()
+    expect(within(statusMetrics).getByText(/Failed/i)).toBeInTheDocument()
+    expect(within(statusMetrics).getAllByText(/Retried/i).length).toBeGreaterThan(0)
+    expect(within(statusMetrics).getByText(/Dead-lettered/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/monitor status semantics/i)).toHaveTextContent(/Queued rows are waiting to send/i)
 
     const countMonitorCalls = () =>
       fetchMock.mock.calls.filter(([request]) => String(request).endsWith('/campaigns/campaign-upcoming/broadcast-monitor'))
