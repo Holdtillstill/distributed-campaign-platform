@@ -46,7 +46,7 @@ Core distributed-systems behaviors:
 | IaC | Terraform |
 | Kubernetes | Helm, Argo CD, HPA, PDBs, NetworkPolicies, Karpenter later |
 | App | Python 3.12, FastAPI, async workers |
-| Data | PostgreSQL, Redis, NATS JetStream |
+| Data and queueing | PostgreSQL, Redis, NATS JetStream locally, optional SQS for AWS-native EKS dispatch |
 | Observability | OpenTelemetry Collector, Prometheus, Grafana, Loki, Tempo, Alertmanager |
 | Security | IRSA, RBAC, External Secrets later, Kyverno later, Trivy/Checkov/tflint |
 | Testing | pytest, k6, Helm lint, Terraform validation |
@@ -67,8 +67,11 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
 
 - [Product doc](docs/product/sms-saas-product-doc.md)
 - [Architecture](docs/architecture/architecture.md)
+- [Implementation status](docs/architecture/implementation-status.md)
 - [Architecture diagram](docs/architecture/architecture-diagram.mmd)
+- [AWS EKS architecture diagram](docs/architecture/aws-eks-architecture.mmd)
 - [Local demo runbook](docs/runbooks/local-demo.md)
+- [EKS dev deployment runbook](docs/runbooks/eks-dev.md)
 - [Observability runbook](docs/runbooks/observability.md)
 - [Customer user guide](docs/kb/customer-user-guide.md)
 - [Internal admin guide](docs/kb/internal-admin-guide.md)
@@ -186,4 +189,4 @@ See [`platform/observability/README.md`](platform/observability/README.md) for i
 
 ## Current next step
 
-See [`docs/plans/0008-overnight-saas-depth-run.md`](docs/plans/0008-overnight-saas-depth-run.md) for the current product-depth slice. Recommended next phase: add CI gates, Grafana dashboards/alerts, OpenTelemetry app instrumentation, and Playwright UI smoke tests.
+The EKS dev path now has Terraform, ECR image repositories, Helm EKS values, ALB ingress, External Secrets wiring, persistent demo data services, readiness checks, and CI gates. Use [`docs/runbooks/eks-dev.md`](docs/runbooks/eks-dev.md) for the ephemeral cloud deployment flow.

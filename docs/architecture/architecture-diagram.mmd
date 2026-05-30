@@ -1,7 +1,10 @@
 flowchart LR
   reviewer[Reviewer Browser] --> web[Web UI\nNginx + React]
+  handset[Prospect Phone] -->|MO keyword / ZIP / Y / STOP| inbound[Inbound SMS Webhook]
   web -->|/api/* with X-Forwarded-Prefix: /api| api[Campaign API\nFastAPI]
   web -->|/r/*| api
+  inbound --> api
+  api -->|MT reply payload| handset
 
   api --> pg[(PostgreSQL)]
   api --> redis[(Redis)]

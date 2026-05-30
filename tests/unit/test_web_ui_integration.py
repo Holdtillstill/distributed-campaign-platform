@@ -30,7 +30,7 @@ def test_web_ui_source_contains_campaign_demo_flows() -> None:
     source = read_web_ui_source()
 
     for expected in [
-        "Create campaign",
+        "New campaign",
         "Campaign status",
         "System status",
         "Dead-lettered",

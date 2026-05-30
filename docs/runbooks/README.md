@@ -1,5 +1,11 @@
 # Runbooks
 
+Active runbooks:
+
+- [Local demo](local-demo.md)
+- [EKS dev deployment](eks-dev.md)
+- [Observability](observability.md)
+
 Planned runbooks:
 
 - Provider outage or high 5xx rate

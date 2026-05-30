@@ -223,7 +223,7 @@ export function CompaniesPage({
             <div className="metric">
               <span>Monthly send limit</span>
               <strong>{formatNumber(selectedCompanyHealth.monthly_send_limit)}</strong>
-              <small>Contract throttle for scheduled sends</small>
+              <small>Hard guard for new scheduled sends</small>
             </div>
           </div>
           <div className="dashboard-grid">
@@ -237,7 +237,8 @@ export function CompaniesPage({
               </div>
               <p>
                 {formatNumber(selectedCompanyHealth.scheduled_reach)} scheduled messages against{' '}
-                {formatNumber(selectedCompanyHealth.monthly_send_limit)} monthly capacity.
+                {formatNumber(selectedCompanyHealth.monthly_send_limit)} monthly capacity. New schedules are blocked
+                when this period would exceed capacity.
               </p>
             </div>
             <EmptyState

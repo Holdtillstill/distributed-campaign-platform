@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import { API_BASE_URL } from '../../api/client'
 import { DataTable } from '../../components/DataTable'
@@ -70,6 +70,57 @@ const contentTemplates = [
   mediaKeywords: string[]
 }[]
 
+const SUBSCRIBER_SEGMENT_PLACEHOLDER_COUNT = 7
+const MEDIA_ASSET_PLACEHOLDER_COUNT = 6
+
+const campaignSubpagePaths: Record<CampaignSubpage, string> = {
+  overview: '/app/campaigns',
+  scheduled: '/app/campaigns/scheduled',
+  past: '/app/campaigns/sent',
+  create: '/app/campaigns/new',
+  followups: '/app/campaigns/follow-ups',
+  monitor: '/app/monitor',
+}
+
+type CampaignScheduleErrorDetail = {
+  message?: string
+  requested_reach?: number
+  scheduled_reach?: number
+  monthly_send_limit?: number
+  available_reach?: number
+  required_credits?: number
+  available_credits?: number
+}
+
+async function formatCampaignScheduleError(response: Response) {
+  const fallback = `Schedule campaign failed: ${response.status}`
+  let payload: { detail?: string | CampaignScheduleErrorDetail } | null = null
+  try {
+    payload = await response.json()
+  } catch {
+    return fallback
+  }
+  const detail = payload?.detail
+  if (!detail) return fallback
+  if (typeof detail === 'string') return detail
+
+  if (detail.message === 'monthly send quota exceeded') {
+    const requestedReach = formatNumber(detail.requested_reach)
+    const availableReach = formatNumber(detail.available_reach)
+    const scheduledReach = formatNumber(detail.scheduled_reach)
+    const monthlyLimit = formatNumber(detail.monthly_send_limit)
+    return `Monthly send quota exceeded: ${requestedReach} requested reach, ${availableReach} available in this quota period. Current scheduled reach is ${scheduledReach} of ${monthlyLimit}.`
+  }
+
+  if (detail.message === 'company credits exhausted' || detail.message === 'user budget exhausted') {
+    return `${detail.message}: ${formatNumber(detail.required_credits)} credits required, ${formatNumber(
+      detail.available_credits,
+    )} available.`
+  }
+
+  return detail.message ?? fallback
+}
+
 export function CompanyWorkspace({
   page,
   session,
@@ -90,6 +141,7 @@ export function CompanyWorkspace({
   const [scheduledAt, setScheduledAt] = useState('2026-05-25T16:00')
   const [smartMediaAssetId, setSmartMediaAssetId] = useState('')
   const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
+  const [subscriberListsLoaded, setSubscriberListsLoaded] = useState(false)
   const [subscribers, setSubscribers] = useState<SubscriberResult[]>([])
   const [subscriberTotal, setSubscriberTotal] = useState(0)
   const [subscriberLimit, setSubscriberLimit] = useState(25)
@@ -129,6 +181,7 @@ export function CompanyWorkspace({
   const [mediaContentType, setMediaContentType] = useState('image/png')
   const [mediaUrl, setMediaUrl] = useState('https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80')
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
+  const [mediaAssetsLoaded, setMediaAssetsLoaded] = useState(false)
   const [trackedCampaignId, setTrackedCampaignId] = useState('')
   const [trackedSubscriberId, setTrackedSubscriberId] = useState('')
   const [trackedMediaAssetId, setTrackedMediaAssetId] = useState('')
@@ -136,6 +189,7 @@ export function CompanyWorkspace({
   const [campaignLinks, setCampaignLinks] = useState<CampaignLink[]>([])
   const [campaignLink, setCampaignLink] = useState<CampaignLink | null>(null)
   const [contentFeedback, setContentFeedback] = useState<string | null>(null)
+  const campaignCreationRef = useRef<HTMLDivElement>(null)
   const [performance, setPerformance] = useState<PerformanceTotals | null>(null)
   const [reminderSourceCampaignId, setReminderSourceCampaignId] = useState('')
   const [reminderAudienceRule, setReminderAudienceRule] = useState('not_clicked')
@@ -189,8 +243,14 @@ export function CompanyWorkspace({
   )
   const hasCampaignFilters =
     campaignSearch.trim() !== '' || campaignStatusFilter !== 'all' || campaignDateFrom !== '' || campaignDateTo !== ''
+  const scheduledCampaigns = campaigns.filter((item) => item.status === 'scheduled')
+  const nonScheduledCampaigns = campaigns.filter((item) => item.status !== 'scheduled')
   const upcomingCampaigns = filteredCampaigns.filter((item) => item.status === 'scheduled')
   const pastCampaigns = filteredCampaigns.filter((item) => item.status !== 'scheduled')
+  const scheduledReach = scheduledCampaigns.reduce((total, item) => total + campaignReach(item), 0)
+  const currentMonthScheduledReach = scheduledCampaigns
+    .filter(isScheduledInCurrentMonth)
+    .reduce((total, item) => total + campaignReach(item), 0)
   const selectedSubscriberList = subscriberLists.find((list) => list.id === selectedSubscriberListId)
   const modeledAudienceTotal = subscriberLists.reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
   const sampleAudienceTotal = subscriberLists.reduce(
@@ -208,8 +268,13 @@ export function CompanyWorkspace({
   const campaignCreditMultiplier = messageType === 'smart' ? 2 : 1
   const projectedSampleCreditCost = selectedSampleAudienceCount * campaignCreditMultiplier
   const projectedModeledCreditCost = selectedModeledAudienceCount * campaignCreditMultiplier
-  const budgetExceeded =
+  const userBudgetExceeded =
     hasUserBudget && userBudgetRemaining !== null && projectedSampleCreditCost > userBudgetRemaining
+  const companyCreditExceeded =
+    dashboardSummary?.credit_balance !== null &&
+    dashboardSummary?.credit_balance !== undefined &&
+    projectedSampleCreditCost > dashboardSummary.credit_balance
+  const budgetExceeded = userBudgetExceeded || companyCreditExceeded
   const canSubmitCampaign = canCreateCampaign && selectedSampleAudienceCount > 0 && !budgetExceeded
   const restrictionCopy = isReadOnly
     ? `${roleMeta.label} access is reporting-only. Operational actions are disabled for this workspace.`
@@ -243,7 +308,7 @@ export function CompanyWorkspace({
       : 'Reporting starts after tracked sends'
   const companyBudgetRemaining = dashboardSummary?.credit_balance ?? 0
   const dashboardBudgetTone =
-    dashboardSummary?.monthly_send_limit && dashboardSummary.credits_used / dashboardSummary.monthly_send_limit >= 0.8
+    dashboardSummary?.monthly_send_limit && currentMonthScheduledReach / dashboardSummary.monthly_send_limit >= 0.8
       ? 'Review quota before approval'
       : 'Budget available for planned sends'
   const complianceReadinessItems = [
@@ -265,21 +330,32 @@ export function CompanyWorkspace({
   }, [initialCampaignSubpage, page])
 
   useEffect(() => {
+    if (page === 'campaigns' && campaignSubpage === 'create') campaignCreationRef.current?.focus()
+  }, [campaignSubpage, page])
+
+  useEffect(() => {
     async function loadCampaignPlanningData() {
-      const [listsResponse, campaignsResponse, mediaResponse, remindersResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
-        fetch(`${API_BASE_URL}/companies/${companyId}/campaigns`),
-        fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`),
-        fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`),
-      ])
-      if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
-      if (campaignsResponse.ok) {
-        const loadedCampaigns = (await campaignsResponse.json()) as CampaignListItem[]
-        setCampaigns(loadedCampaigns)
-        setSelectedMonitorCampaignId((current) => current || loadedCampaigns[0]?.id || '')
+      setSubscriberListsLoaded(false)
+      setMediaAssetsLoaded(false)
+      try {
+        const [listsResponse, campaignsResponse, mediaResponse, remindersResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/companies/${companyId}/subscriber-lists`),
+          fetch(`${API_BASE_URL}/companies/${companyId}/campaigns`),
+          fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`),
+          fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`),
+        ])
+        if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
+        if (campaignsResponse.ok) {
+          const loadedCampaigns = (await campaignsResponse.json()) as CampaignListItem[]
+          setCampaigns(loadedCampaigns)
+          setSelectedMonitorCampaignId((current) => current || loadedCampaigns[0]?.id || '')
+        }
+        if (mediaResponse.ok) setMediaAssets(await mediaResponse.json())
+        if (remindersResponse.ok) setReminderCampaigns(await remindersResponse.json())
+      } finally {
+        setSubscriberListsLoaded(true)
+        setMediaAssetsLoaded(true)
       }
-      if (mediaResponse.ok) setMediaAssets(await mediaResponse.json())
-      if (remindersResponse.ok) setReminderCampaigns(await remindersResponse.json())
     }
     void loadCampaignPlanningData()
   }, [companyId])
@@ -378,6 +454,24 @@ export function CompanyWorkspace({
     return matchingAsset ?? mediaAssets.find((asset) => asset.content_type?.startsWith('image/')) ?? null
   }
 
+  function navigateCampaignSubpage(nextSubpage: CampaignSubpage) {
+    setCampaignSubpage(nextSubpage)
+    onNavigate('campaigns', { campaignSubpage: nextSubpage, path: campaignSubpagePaths[nextSubpage] })
+  }
+
+  function openNewCampaign() {
+    navigateCampaignSubpage('create')
+  }
+
+  function copyCampaignToDraft(sourceCampaign: CampaignListItem) {
+    setCampaignName(`Copy of ${sourceCampaign.name}`)
+    if (sourceCampaign.body) setMessageBody(sourceCampaign.body)
+    setMessageType(sourceCampaign.message_type === 'smart' ? 'smart' : 'regular')
+    setSmartMediaAssetId('')
+    setCampaign(null)
+    openNewCampaign()
+  }
+
   function applyTemplate(template: (typeof contentTemplates)[number]) {
     if (!canCreateCampaign) {
       setContentFeedback(`${roleMeta.label} access cannot create campaigns from templates.`)
@@ -388,19 +482,17 @@ export function CompanyWorkspace({
     setMessageBody(template.copy)
     setMessageType(template.messageType)
     setSmartMediaAssetId(template.messageType === 'smart' ? mediaAsset?.id ?? '' : '')
-    setCampaignSubpage('create')
-    setContentFeedback(`${template.title} loaded into Campaign Builder`)
-    onNavigate('campaigns', { campaignSubpage: 'create' })
+    setContentFeedback(`${template.title} loaded into a new campaign draft`)
+    openNewCampaign()
   }
 
   function openBroadcastMonitor() {
-    setCampaignSubpage('monitor')
-    onNavigate('campaigns', { campaignSubpage: 'monitor', path: '/app/monitor' })
+    navigateCampaignSubpage('monitor')
   }
 
   function copyTemplateCopy(template: (typeof contentTemplates)[number]) {
     void navigator.clipboard?.writeText(template.copy)
-    setContentFeedback(`Copied copy for ${template.title}`)
+    setContentFeedback(`Copied SMS text for ${template.title}`)
   }
 
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
@@ -411,7 +503,11 @@ export function CompanyWorkspace({
       return
     }
     if (budgetExceeded) {
-      setError('Projected sample send exceeds your remaining budget allocation.')
+      setError(
+        companyCreditExceeded
+          ? 'Projected sample send exceeds the company credit balance.'
+          : 'Projected sample send exceeds your remaining budget allocation.',
+      )
       return
     }
     const response = await fetch(`${API_BASE_URL}/campaigns`, {
@@ -428,7 +524,7 @@ export function CompanyWorkspace({
       }),
     })
     if (!response.ok) {
-      setError(`Create campaign failed: ${response.status}`)
+      setError(await formatCampaignScheduleError(response))
       return
     }
     const result = (await response.json()) as Campaign
@@ -719,7 +815,7 @@ export function CompanyWorkspace({
         <PageHeader
           eyebrow="Company workspace"
           title="Company dashboard"
-          description={`${session.companyName} (${companyId}) / ${roleMeta.permissionSummary}`}
+          description={`${session.companyName} / ${roleMeta.permissionSummary}`}
         />
         <section className="role-aware-banner" aria-label="Workspace access summary">
           <div>
@@ -730,7 +826,7 @@ export function CompanyWorkspace({
           <div>
             <span>Market scope</span>
             <strong>{roleMeta.marketScope}</strong>
-            <p>Phase 1 models this ownership in the UI. Segment-level ACL enforcement is a backend follow-up.</p>
+            <p>This role can work across every available market and segment in the workspace.</p>
           </div>
           <div>
             <span>User allocation</span>
@@ -781,18 +877,20 @@ export function CompanyWorkspace({
             </div>
           </div>
           <aside className="dashboard-command-aside" aria-label="Next actions">
-            <div>
+            <div className="next-action-summary">
               <span>Next action</span>
-              <strong>{canCreateCampaign ? 'Approve or create a broadcast' : 'Review reporting and monitor status'}</strong>
+              <strong>{canCreateCampaign ? 'Approve a broadcast or start a new one' : 'Review monitor and reporting status'}</strong>
+              <p>
+                {canCreateCampaign
+                  ? 'Use these shortcuts to move from review into the next workspace task.'
+                  : 'Creation tools stay disabled for this role, but monitoring and reporting remain available.'}
+              </p>
             </div>
             <button
               disabled={!canCreateCampaign}
-              onClick={() => {
-                setCampaignSubpage('create')
-                onNavigate('campaigns', { campaignSubpage: 'create' })
-              }}
+              onClick={openNewCampaign}
             >
-              Create campaign
+              New campaign
             </button>
             <button className="secondary" onClick={openBroadcastMonitor}>
               Open broadcast monitor
@@ -807,7 +905,7 @@ export function CompanyWorkspace({
               View analytics
             </button>
             <a className="docs-link secondary-link" href="/kb">
-              Read customer KB
+              Read knowledge base
             </a>
             {!canCreateCampaign ? <p className="helper-text">{restrictionCopy}</p> : null}
           </aside>
@@ -815,7 +913,7 @@ export function CompanyWorkspace({
 
         <div className="metric-grid dashboard-metrics" aria-label="Workspace posture">
           <Metric label="Subscribers" value={formatCount(dashboardSummary?.subscriber_count)} trend="Confirmed and imported audience" />
-          <Metric label="Active campaigns" value={formatNumber(upcomingCampaigns.length)} trend="Scheduled or queued decision work" />
+          <Metric label="Active campaigns" value={formatNumber(scheduledCampaigns.length)} trend="Scheduled or queued decision work" />
           <Metric label="Messages" value={formatActivity(dashboardSummary?.message_count)} trend="Sent or scheduled sample rows" />
           <Metric label="Credits remaining" value={formatCount(dashboardSummary?.credit_balance)} trend="Contract balance" />
           <Metric label="Reporting" value={dashboardAnalyticsSummary} trend="Analytics summary" />
@@ -824,14 +922,14 @@ export function CompanyWorkspace({
         <div className="dashboard-grid">
           <QuotaBar
             label="Monthly send quota"
-            used={dashboardSummary?.credits_used}
+            used={currentMonthScheduledReach}
             limit={dashboardSummary?.monthly_send_limit}
             helper={
               dashboardSummary?.monthly_send_limit
-                ? `${formatCount(dashboardSummary?.credits_used)} credits used against a ${formatNumber(
+                ? `${formatCount(currentMonthScheduledReach)} scheduled reach in the current calendar month against a ${formatNumber(
                     dashboardSummary.monthly_send_limit,
                   )} monthly send limit.`
-                : 'Monthly send limit is not configured for this tenant.'
+                : 'Monthly send limit is not configured for this workspace.'
             }
           />
           <section className="panel dashboard-reporting-summary" aria-label="Analytics and reporting summary">
@@ -850,7 +948,7 @@ export function CompanyWorkspace({
               </div>
               <div>
                 <dt>Scheduled reach</dt>
-                <dd>{formatNumber(upcomingCampaigns.reduce((total, item) => total + (item.audience_count ?? item.message_count), 0))}</dd>
+                <dd>{formatNumber(scheduledReach)}</dd>
               </div>
             </dl>
             <p className="muted">Use Analytics for campaign-level click, redemption, and credit reporting.</p>
@@ -879,54 +977,75 @@ export function CompanyWorkspace({
       { id: 'overview', label: 'Overview' },
       { id: 'scheduled', label: 'Scheduled' },
       { id: 'past', label: 'Sent/Past' },
-      { id: 'create', label: 'Builder' },
       { id: 'monitor', label: 'Monitor' },
       { id: 'followups', label: 'Follow-ups' },
     ]
+    const isCampaignCreationMode = campaignSubpage === 'create'
 
     return (
       <>
         <PageHeader
-          title="Campaigns"
-          description="Plan broadcasts, review scheduled and sent campaigns, and build follow-up automations in their own workspace."
+          focusRef={isCampaignCreationMode ? campaignCreationRef : undefined}
+          tabIndex={isCampaignCreationMode ? -1 : undefined}
+          eyebrow={isCampaignCreationMode ? 'Campaigns' : undefined}
+          title={isCampaignCreationMode ? 'New campaign' : 'Campaigns'}
+          description={
+            isCampaignCreationMode
+              ? 'Choose an approved audience, write the message, and review sample cost before scheduling.'
+              : 'Review scheduled and sent broadcasts, monitor delivery, and manage follow-up automations.'
+          }
           action={
-            <button disabled={!canCreateCampaign} onClick={() => setCampaignSubpage('create')}>
-              Create campaign
-            </button>
+            isCampaignCreationMode ? (
+              <button className="secondary" type="button" onClick={() => navigateCampaignSubpage('overview')}>
+                Back to campaigns
+              </button>
+            ) : (
+              <button disabled={!canCreateCampaign} onClick={openNewCampaign}>
+                New campaign
+              </button>
+            )
           }
         />
-        <section className="budget-context" aria-label="Campaign budget and permission context">
-          <div>
-            <span>Permission</span>
-            <strong>{canCreateCampaign ? 'Campaign creation enabled' : 'Read-only campaign access'}</strong>
-            <p>{roleMeta.permissionSummary}</p>
-          </div>
-          <div>
-            <span>Market scope</span>
-            <strong>{roleMeta.marketScope}</strong>
-            <p>Campaigns should use lists within this assigned scope until segment ACLs are enforced server-side.</p>
-          </div>
-          <div>
-            <span>Budget</span>
-            <strong>{hasUserBudget ? `${formatNumber(userBudgetRemaining)} user credits` : `${formatNumber(dashboardSummary?.credit_balance)} company credits`}</strong>
-            <p>
-              {hasUserBudget
-                ? `${formatNumber(userCreditsUsed)} used from ${formatNumber(userBudgetLimit)} allocated credits.`
-                : 'No user-level limit; campaign cost draws from the company balance.'}
-            </p>
-          </div>
-        </section>
-        <div className="segmented-control" aria-label="Campaign sections">
-          {campaignTabs.map((tab) => (
-            <button
-              className={campaignSubpage === tab.id ? 'active' : ''}
-              key={tab.id}
-              onClick={() => setCampaignSubpage(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {!isCampaignCreationMode ? (
+          <>
+            <section className="budget-context" aria-label="Campaign budget and permission context">
+              <div>
+                <span>Permission</span>
+                <strong>{canCreateCampaign ? 'Campaign creation enabled' : 'Read-only campaign access'}</strong>
+                <p>{roleMeta.permissionSummary}</p>
+              </div>
+              <div>
+                <span>Market scope</span>
+                <strong>{roleMeta.marketScope}</strong>
+                <p>Campaigns should use lists approved for this role and workspace.</p>
+              </div>
+              <div>
+                <span>Budget</span>
+                <strong>
+                  {hasUserBudget
+                    ? `${formatNumber(userBudgetRemaining)} user credits`
+                    : `${formatNumber(dashboardSummary?.credit_balance)} company credits`}
+                </strong>
+                <p>
+                  {hasUserBudget
+                    ? `${formatNumber(userCreditsUsed)} used from ${formatNumber(userBudgetLimit)} allocated credits.`
+                    : 'No user-level limit; campaign cost draws from the company balance.'}
+                </p>
+              </div>
+            </section>
+            <div className="segmented-control" aria-label="Campaign sections">
+              {campaignTabs.map((tab) => (
+                <button
+                  className={campaignSubpage === tab.id ? 'active' : ''}
+                  key={tab.id}
+                  onClick={() => navigateCampaignSubpage(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
 
         {campaignSubpage === 'overview' || campaignSubpage === 'scheduled' || campaignSubpage === 'past' ? (
           <section className="panel campaign-filters" aria-label="Campaign filters">
@@ -1013,13 +1132,13 @@ export function CompanyWorkspace({
                 title="Upcoming"
                 campaigns={upcomingCampaigns.slice(0, 5)}
                 emptyText={hasCampaignFilters ? 'No upcoming campaigns match the current filters.' : undefined}
-                onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
+                onDraft={canCreateCampaign ? copyCampaignToDraft : undefined}
               />
               <CampaignColumn
                 title="Past"
                 campaigns={pastCampaigns.slice(0, 5)}
                 emptyText={hasCampaignFilters ? 'No past campaigns match the current filters.' : undefined}
-                onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
+                onDraft={canCreateCampaign ? copyCampaignToDraft : undefined}
               />
             </div>
           </>
@@ -1031,7 +1150,7 @@ export function CompanyWorkspace({
               title="Upcoming"
               campaigns={upcomingCampaigns}
               emptyText={hasCampaignFilters ? 'No scheduled campaigns match the current filters.' : undefined}
-              onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
+              onDraft={canCreateCampaign ? copyCampaignToDraft : undefined}
             />
           </div>
         ) : null}
@@ -1042,17 +1161,35 @@ export function CompanyWorkspace({
               title="Past"
               campaigns={pastCampaigns}
               emptyText={hasCampaignFilters ? 'No sent, queued, or cancelled campaigns match the current filters.' : undefined}
-              onEdit={canCreateCampaign ? () => setCampaignSubpage('create') : undefined}
+              onDraft={canCreateCampaign ? copyCampaignToDraft : undefined}
             />
           </div>
         ) : null}
 
         {campaignSubpage === 'create' ? (
-          <>
+          <div className="campaign-creation-flow">
+            <section className="campaign-creation-context" aria-label="New campaign context">
+              <div>
+                <span>Permission</span>
+                <strong>{canCreateCampaign ? 'Creation enabled' : 'Read-only access'}</strong>
+              </div>
+              <div>
+                <span>Market scope</span>
+                <strong>{roleMeta.marketScope}</strong>
+              </div>
+              <div>
+                <span>Available budget</span>
+                <strong>
+                  {hasUserBudget
+                    ? `${formatNumber(userBudgetRemaining)} user credits`
+                    : `${formatNumber(dashboardSummary?.credit_balance)} company credits`}
+                </strong>
+              </div>
+            </section>
             <form className="campaign-builder" onSubmit={createCampaign}>
-              <section className="product-help-callout" aria-label="Campaign builder help">
+              <section className="product-help-callout" aria-label="New campaign checklist">
                 <div>
-                  <strong>TCPA-aware campaign builder help</strong>
+                  <strong>Campaign scheduling checklist</strong>
                   <p>
                     Review segments, Smart SMS costs, media requirements, consent evidence, opt-out/STOP suppression,
                     quiet hours, sender identity, and modeled audience estimates before scheduling.
@@ -1112,7 +1249,7 @@ export function CompanyWorkspace({
                             checked={selectedSubscriberIds.includes(subscriber.id)}
                             onChange={() => setSelectedSubscriberIds((current) => toggleValue(current, subscriber.id))}
                           />
-                          {subscriber.phone_number} ({subscriber.consent_status})
+                          {subscriber.phone_number} ({formatSubscriberStatus(subscriber.consent_status)})
                         </label>
                       ))}
                       <p className="muted">
@@ -1201,7 +1338,7 @@ export function CompanyWorkspace({
                   <div>
                     <span>Company balance</span>
                     <strong>{formatNumber(dashboardSummary?.credit_balance)}</strong>
-                    <small>Current tenant credit balance</small>
+                    <small>Current workspace credit balance</small>
                   </div>
                   <div>
                     <span>User allocation</span>
@@ -1231,7 +1368,11 @@ export function CompanyWorkspace({
                   <p className="helper-text">Select at least one segment or subscriber before scheduling.</p>
                 ) : null}
                 {budgetExceeded ? (
-                  <p className="warning-text">Projected sample send exceeds your remaining budget allocation.</p>
+                  <p className="warning-text">
+                    {companyCreditExceeded
+                      ? 'Projected sample send exceeds the company credit balance.'
+                      : 'Projected sample send exceeds your remaining budget allocation.'}
+                  </p>
                 ) : null}
                 <button disabled={!canSubmitCampaign}>Schedule campaign</button>
               </section>
@@ -1253,10 +1394,13 @@ export function CompanyWorkspace({
                 <span>Sent: {campaign.status_counts.sent}</span>
                 <span>Retried: {campaign.status_counts.retried}</span>
                 <span>Dead-lettered: {campaign.status_counts.dead_lettered}</span>
+                <button className="secondary" type="button" onClick={openBroadcastMonitor}>
+                  Open monitor
+                </button>
               </div>
             ) : null}
             {error ? <p className="error">{error}</p> : null}
-          </>
+          </div>
         ) : null}
 
         {campaignSubpage === 'monitor' ? (
@@ -1309,7 +1453,16 @@ export function CompanyWorkspace({
                         <span>Status: {broadcastMonitor.status}</span>
                       </div>
                       <strong className="monitor-percent">{formatNumber(broadcastMonitor.percent_complete)}%</strong>
-                      <div className="progress-track" aria-label="Broadcast percent complete">
+                      <div
+                        className="progress-track"
+                        role="progressbar"
+                        aria-label="Broadcast percent complete"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(
+                          Math.min(100, Math.max(0, broadcastMonitor.percent_complete)),
+                        )}
+                      >
                         <span style={{ width: `${Math.min(100, Math.max(0, broadcastMonitor.percent_complete))}%` }} />
                       </div>
                       <p className="muted">
@@ -1320,27 +1473,27 @@ export function CompanyWorkspace({
                       <div>
                         <dt>Queued</dt>
                         <dd>{formatNumber(broadcastMonitor.queued)}</dd>
-                        <small>Waiting to send</small>
+                        <dd className="metric-note">Waiting to send</dd>
                       </div>
                       <div>
                         <dt>Sent</dt>
                         <dd>{formatNumber(broadcastMonitor.sent)}</dd>
-                        <small>Provider accepted</small>
+                        <dd className="metric-note">Provider accepted</dd>
                       </div>
                       <div>
                         <dt>Failed</dt>
                         <dd>{formatNumber(broadcastMonitor.failed)}</dd>
-                        <small>Needs review</small>
+                        <dd className="metric-note">Needs review</dd>
                       </div>
                       <div>
                         <dt>Retried</dt>
                         <dd>{formatNumber(broadcastMonitor.retried)}</dd>
-                        <small>Retried rows</small>
+                        <dd className="metric-note">Retried rows</dd>
                       </div>
                       <div>
                         <dt>Dead-lettered</dt>
                         <dd>{formatNumber(broadcastMonitor.dead_lettered)}</dd>
-                        <small>Terminal rows</small>
+                        <dd className="metric-note">Terminal rows</dd>
                       </div>
                     </dl>
                     <div className="monitor-grid">
@@ -1409,7 +1562,7 @@ export function CompanyWorkspace({
                   onChange={(event) => setReminderSourceCampaignId(event.target.value)}
                 >
                   <option value="">Choose a campaign</option>
-                  {pastCampaigns.concat(upcomingCampaigns).map((item) => (
+                  {nonScheduledCampaigns.concat(scheduledCampaigns).map((item) => (
                     <option value={item.id ?? ''} key={item.id}>
                       {item.name}
                     </option>
@@ -1487,13 +1640,10 @@ export function CompanyWorkspace({
         ) : (
           <section className="scope-note" aria-label="Market segment ownership">
             <strong>{roleMeta.marketScope}</strong>
-            <p>
-              Regional ownership is represented by list and segment selection in Phase 1. Backend segment ACLs
-              should attach these lists to memberships in a later slice.
-            </p>
+            <p>Use segment selection to keep campaign planning aligned with the markets assigned to this role.</p>
           </section>
         )}
-        <div className="metric-grid spaced">
+        <div className="metric-grid spaced subscriber-segment-grid">
           <button
             className={`segment-card ${selectedSubscriberListId === 'all' ? 'active' : ''}`}
             onClick={() => setSubscriberListFilter('all')}
@@ -1513,6 +1663,15 @@ export function CompanyWorkspace({
               <small>{formatNumber(list.sample_subscriber_count ?? 0)} loaded sample rows</small>
             </button>
           ))}
+          {!subscriberListsLoaded
+            ? Array.from({ length: SUBSCRIBER_SEGMENT_PLACEHOLDER_COUNT }, (_, index) => (
+                <span className="segment-card segment-card-placeholder" aria-hidden="true" key={`segment-placeholder-${index}`}>
+                  <span />
+                  <strong />
+                  <small />
+                </span>
+              ))
+            : null}
         </div>
 
         <section className="panel subscriber-filters" aria-label="Subscriber filters">
@@ -1609,7 +1768,11 @@ export function CompanyWorkspace({
                     .filter(Boolean)
                     .join(' / ') || 'Unknown',
               },
-              { key: 'status', header: 'Consent / status', render: (row) => `${row.consent_status ?? 'unknown'} / ${row.marketing_status ?? 'unknown'}` },
+              {
+                key: 'status',
+                header: 'Consent / status',
+                render: (row) => `${formatSubscriberStatus(row.consent_status)} / ${formatSubscriberStatus(row.marketing_status)}`,
+              },
               { key: 'created', header: 'Created/imported', render: (row) => formatLocalDateTime(row.created_at) },
             ]}
           />
@@ -1662,7 +1825,7 @@ export function CompanyWorkspace({
               <input value={subscriberSource ?? ''} onChange={(event) => setSubscriberSource(event.target.value)} />
             </label>
             <button disabled={isReadOnly}>Import subscriber</button>
-            {subscriber ? <p className="muted">{subscriber.consent_status}</p> : null}
+            {subscriber ? <p className="muted">{formatSubscriberStatus(subscriber.consent_status)}</p> : null}
           </form>
           <div className="panel">
             <form onSubmit={startOptIn}>
@@ -1700,7 +1863,7 @@ export function CompanyWorkspace({
       <>
         <PageHeader
           title="Content Library"
-          description={`Store media, offer destinations, and tracked assets for Smart SMS campaigns. ${roleMeta.permissionSummary}`}
+          description={`Review reusable media assets first, then add hosted content or start from SMS templates. ${roleMeta.permissionSummary}`}
         />
         {isReadOnly ? (
           <section className="permission-callout" aria-label="Read-only content restriction">
@@ -1708,44 +1871,53 @@ export function CompanyWorkspace({
             <p>{restrictionCopy}</p>
           </section>
         ) : null}
-        <section className="panel">
+        {contentFeedback ? <p className="notice content-notice">{contentFeedback}</p> : null}
+        <section className="panel content-library-primary">
           <div className="section-heading">
-            <span>Templates</span>
-            <strong>Marketing content starters</strong>
+            <div>
+              <span>Library</span>
+              <strong>Media assets</strong>
+            </div>
+            <button className="secondary" type="button" onClick={() => void refreshMediaAssets()}>
+              Refresh media assets
+            </button>
           </div>
-          <div className="template-grid">
-            {contentTemplates.map((template) => (
-              <article aria-label={template.title} className="template-card" key={template.title}>
-                <div className="template-preview">
-                  <span>{template.tag}</span>
-                  <strong>{template.preview}</strong>
-                </div>
-                <div>
-                  <strong>{template.title}</strong>
-                  <p>{template.copy}</p>
-                </div>
-                <div className="template-actions">
-                  <button type="button" disabled={!canCreateCampaign} onClick={() => applyTemplate(template)}>
-                    Use template
-                  </button>
-                  <button className="secondary" type="button" onClick={() => copyTemplateCopy(template)}>
-                    Copy copy
-                  </button>
-                  <button className="secondary" type="button" disabled={!canCreateCampaign} onClick={() => applyTemplate(template)}>
-                    Create campaign
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-          {contentFeedback ? <p className="notice">{contentFeedback}</p> : null}
+          {mediaAssets.length ? (
+            <ul className="asset-grid embedded-list" aria-label="Media asset library">
+              {mediaAssets.map((asset) => (
+                <li key={asset.id}>
+                  <MediaAssetPreview asset={asset} />
+                  <strong>{asset.filename}</strong>
+                  <span>{asset.content_type}</span>
+                  <span>{asset.url}</span>
+                </li>
+              ))}
+            </ul>
+          ) : !mediaAssetsLoaded ? (
+            <ul className="asset-grid embedded-list" aria-hidden="true">
+              {Array.from({ length: MEDIA_ASSET_PLACEHOLDER_COUNT }, (_, index) => (
+                <li className="asset-card-placeholder" key={`asset-placeholder-${index}`}>
+                  <div className="asset-thumb asset-thumb-generated asset-thumb-placeholder" />
+                  <strong />
+                  <span />
+                  <span />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              title="No media has been added yet"
+              description="Upload or register a hosted image, video, or PDF before building Smart SMS campaigns."
+            />
+          )}
         </section>
-        <div className="split-layout two-column">
+        <div className="split-layout two-column content-secondary-layout">
           <form className="panel" onSubmit={addMediaAsset}>
             <div className="section-heading">
-              <span>Media</span>
-              <strong>Add content</strong>
+              <span>Add media</span>
+              <strong>Register a hosted asset</strong>
             </div>
+            <p className="helper-text">Additions stay secondary to the library so teams can review existing assets first.</p>
             <label>
               Upload media file
               <input
@@ -1767,33 +1939,34 @@ export function CompanyWorkspace({
               <input value={mediaUrl ?? ''} onChange={(event) => setMediaUrl(event.target.value)} />
             </label>
             <button disabled={isReadOnly}>Add URL media</button>
-            <button className="secondary inline-action" type="button" onClick={() => void refreshMediaAssets()}>
-              Refresh media assets
-            </button>
-            {contentFeedback ? <p className="muted">{contentFeedback}</p> : null}
           </form>
           <section className="panel">
             <div className="section-heading">
-              <span>Library</span>
-              <strong>Existing media</strong>
+              <span>Templates</span>
+              <strong>SMS starters</strong>
             </div>
-            {mediaAssets.length ? (
-              <ul className="asset-grid embedded-list" aria-label="Media asset library">
-                {mediaAssets.map((asset) => (
-                  <li key={asset.id}>
-                    <MediaAssetPreview asset={asset} />
-                    <strong>{asset.filename}</strong>
-                    <span>{asset.content_type}</span>
-                    <span>{asset.url}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                title="No media has been added yet"
-                description="Upload or register a hosted image, video, or PDF before building Smart SMS campaigns."
-              />
-            )}
+            <div className="template-grid">
+              {contentTemplates.map((template) => (
+                <article aria-label={template.title} className="template-card" key={template.title}>
+                  <div className="template-preview">
+                    <span>{template.tag}</span>
+                    <strong>{template.preview}</strong>
+                  </div>
+                  <div>
+                    <strong>{template.title}</strong>
+                    <p>{template.copy}</p>
+                  </div>
+                  <div className="template-actions">
+                    <button type="button" disabled={!canCreateCampaign} onClick={() => applyTemplate(template)}>
+                      Use template
+                    </button>
+                    <button className="secondary" type="button" onClick={() => copyTemplateCopy(template)}>
+                      Copy SMS text
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
         </div>
         <details className="advanced-tools">
@@ -1849,15 +2022,14 @@ export function CompanyWorkspace({
   }
 
   if (page === 'analytics') {
-    const scheduledReach = upcomingCampaigns.reduce((total, item) => total + (item.audience_count ?? item.message_count), 0)
     const totalListSubscribers = subscriberLists.reduce((total, list) => total + (list.subscriber_count ?? 0), 0)
     const trackedClickCount = performance?.click_count ?? dashboardSummary?.click_count ?? 0
     const trackedRedemptionCount = performance?.redemption_count ?? dashboardSummary?.redemption_count ?? 0
     const chartCampaigns = campaigns.slice(0, 6)
     const trackedSourceLabel = performance
-      ? 'Tracked performance after sends from tenant reporting.'
+      ? 'Tracked performance after sends from workspace reporting.'
       : dashboardSummary
-        ? 'Tracked performance totals from dashboard summary. Refresh performance for the latest tenant report.'
+        ? 'Tracked performance totals from dashboard summary. Refresh performance for the latest workspace report.'
         : 'Tracked performance appears after campaign activity is reported.'
     const analyticsCharts = [
       {
@@ -1868,8 +2040,8 @@ export function CompanyWorkspace({
         emptyDescription: 'Create or load campaigns with modeled audiences to compare planned reach.',
         points: chartCampaigns.map((campaign) => ({
           label: campaign.name,
-          value: campaign.audience_count ?? campaign.message_count,
-          valueLabel: `${formatNumber(campaign.audience_count ?? campaign.message_count)} modeled`,
+          value: campaignReach(campaign),
+          valueLabel: `${formatNumber(campaignReach(campaign))} modeled`,
           detail: campaign.status,
         })),
       },
@@ -1889,7 +2061,7 @@ export function CompanyWorkspace({
       {
         title: 'Credit costs',
         eyebrow: 'Budget estimate',
-        sourceLabel: 'Scheduled campaign credit estimates from tenant campaign records.',
+        sourceLabel: 'Scheduled campaign credit estimates from workspace campaign records.',
         emptyTitle: 'No credit estimates yet',
         emptyDescription: 'Campaign credit costs appear when campaigns have audience selections and message type.',
         points: chartCampaigns.map((campaign) => ({
@@ -1934,7 +2106,7 @@ export function CompanyWorkspace({
       <>
         <PageHeader
           title="Analytics"
-          description={`Review campaign performance, tracked links, redemptions, and quota consumption. ${roleMeta.label} can view this reporting surface.`}
+          description={`Review campaign performance, tracked links, redemptions, and quota consumption for this workspace. ${roleMeta.label} access can view analytics.`}
           action={<button onClick={() => void refreshPerformance()}>Refresh performance</button>}
         />
         <section className="scope-note" aria-label="Analytics permission scope">
@@ -1952,7 +2124,7 @@ export function CompanyWorkspace({
             value={formatActivity(performance?.redemption_count ?? dashboardSummary?.redemption_count)}
             trend="Offer conversion"
           />
-          <Metric label="Quota usage" value={formatActivity(dashboardSummary?.credits_used)} trend="Credits consumed" />
+          <Metric label="Monthly quota reach" value={formatNumber(currentMonthScheduledReach)} trend="Current quota period" />
         </div>
         <section className="panel table-panel">
           <div className="section-heading">
@@ -1990,7 +2162,7 @@ export function CompanyWorkspace({
 
   return (
     <>
-      <PageHeader title="Settings" description="Manage tenant identity, team access, roles, invites, and regional credit budgets." />
+      <PageHeader title="Settings" description="Manage workspace identity, team access, roles, invites, and regional credit budgets." />
       <section className="product-help-callout" aria-label="Settings help">
         <div>
           <strong>Need to invite or restrict a teammate?</strong>
@@ -2172,18 +2344,19 @@ function CampaignColumn({
   title,
   campaigns,
   emptyText = 'No campaigns yet.',
-  onEdit,
+  onDraft,
 }: {
   title: string
   campaigns: CampaignListItem[]
   emptyText?: string
-  onEdit?: (campaign: CampaignListItem) => void
+  onDraft?: (campaign: CampaignListItem) => void
 }) {
   return (
     <section className="campaign-column">
-      <h2>
-        {title}
-        <span>{formatNumber(campaigns.length)}</span>
+      <h2 className="campaign-column-title">
+        <span>{title}</span>
+        {' '}
+        <span className="count-pill">{formatNumber(campaigns.length)}</span>
       </h2>
       {campaigns.length ? (
         <ul className="campaign-card-list">
@@ -2224,7 +2397,7 @@ function CampaignColumn({
                   <div>
                     <span>{formatAudienceMode(campaign.audience_mode)}</span>
                     <strong>
-                      {formatNumber(campaign.message_count)} of {formatNumber(campaign.audience_count ?? campaign.message_count)}
+                      {formatNumber(campaign.message_count)} of {formatNumber(campaignReach(campaign))}
                     </strong>
                   </div>
                   <i style={{ width: `${sampleCoveragePercent(campaign)}%` }} aria-hidden="true" />
@@ -2233,7 +2406,7 @@ function CampaignColumn({
                 <dl className="campaign-stat-grid">
                   <div>
                     <dt>Modeled audience</dt>
-                    <dd>{formatNumber(campaign.audience_count ?? campaign.message_count)}</dd>
+                    <dd>{formatNumber(campaignReach(campaign))}</dd>
                   </div>
                   <div>
                     <dt>Sample messages</dt>
@@ -2251,9 +2424,9 @@ function CampaignColumn({
 
                 <footer className="campaign-card-actions">
                   <span>{campaign.message_type === 'smart' ? 'Smart SMS with tracking support' : 'Regular SMS'}</span>
-                  {onEdit ? (
-                    <button className="secondary" type="button" onClick={() => onEdit(campaign)}>
-                      Modify campaign
+                  {onDraft ? (
+                    <button className="secondary" type="button" onClick={() => onDraft(campaign)}>
+                      Copy to draft
                     </button>
                   ) : null}
                 </footer>
@@ -2379,14 +2552,37 @@ function formatCampaignStatus(status: string) {
     .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
 }
 
+function formatSubscriberStatus(status?: string | null) {
+  if (!status) return 'Unknown'
+  const labels: Record<string, string> = {
+    company_provided: 'Company provided',
+    double_opt_in_confirmed: 'Double opt-in confirmed',
+    imported: 'Imported',
+    confirmed: 'Confirmed',
+  }
+  return labels[status] ?? formatCampaignStatus(status)
+}
+
 function formatAudienceMode(mode?: string) {
   if (!mode) return 'Audience mode'
   if (mode === 'projected_sample') return 'Projected sample'
   return formatCampaignStatus(mode)
 }
 
+function campaignReach(campaign: CampaignListItem) {
+  return campaign.audience_count ?? campaign.message_count
+}
+
+function isScheduledInCurrentMonth(campaign: CampaignListItem) {
+  if (!campaign.scheduled_at) return false
+  const scheduledAt = new Date(campaign.scheduled_at)
+  if (Number.isNaN(scheduledAt.getTime())) return false
+  const now = new Date()
+  return scheduledAt.getFullYear() === now.getFullYear() && scheduledAt.getMonth() === now.getMonth()
+}
+
 function sampleCoveragePercent(campaign: CampaignListItem) {
-  const modeledAudience = Math.max(campaign.audience_count ?? campaign.message_count, 1)
+  const modeledAudience = Math.max(campaignReach(campaign), 1)
   const sampleAudience = Math.max(campaign.message_count, 0)
   if (sampleAudience === 0) return 0
   return Math.min(100, Math.max(8, Math.round((sampleAudience / modeledAudience) * 100)))

@@ -13,7 +13,7 @@ export type RoleMeta = {
 const roleMetadata: Record<string, RoleMeta> = {
   customer_admin: {
     label: 'Company admin',
-    description: 'Owns the tenant, team access, role assignment, and user credit allocations.',
+    description: 'Owns the workspace, team access, role assignment, and user credit allocations.',
     permissionSummary: 'Full workspace control: campaigns, audiences, content, analytics, invites, and budgets.',
     marketScope: 'All company markets and segments',
     canInvite: true,

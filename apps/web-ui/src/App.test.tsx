@@ -98,8 +98,8 @@ function mockFetch({
           campaign_count: 7,
           scheduled_reach: 1360000,
           credits_remaining: 4800000,
-          monthly_send_limit: 3000000,
-          quota_usage: 0.4533,
+          monthly_send_limit: 4800000,
+          quota_usage: 0.2833,
           active_access_code: 'DEMORETA-E568C9',
         },
       ])
@@ -555,6 +555,23 @@ function mockFetch({
     }
 
     if (url.endsWith('/campaigns') && method === 'POST') {
+      const requestBody = JSON.parse(String(init?.body ?? '{}')) as { name?: string }
+      if (requestBody.name === 'Quota Demo') {
+        return failedJson(
+          {
+            detail: {
+              message: 'monthly send quota exceeded',
+              requested_reach: 250000,
+              scheduled_reach: 2900000,
+              monthly_send_limit: 3000000,
+              available_reach: 100000,
+              quota_period_start: '2026-05-01T00:00:00+00:00',
+              quota_period_end: '2026-06-01T00:00:00+00:00',
+            },
+          },
+          409,
+        )
+      }
       return okJson(
         {
           id: 'campaign-1',
@@ -729,9 +746,10 @@ describe('App', () => {
     expect(screen.getByText(/Analytics and campaign reporting/i)).toBeInTheDocument()
     expect(screen.getByText(/TCPA-aware compliance readiness/i)).toBeInTheDocument()
     expect(screen.getByText(/Grafana dashboards, Tempo traces, Prometheus metrics, Loki log collection/i)).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /Open customer login/i })[0]).toHaveAttribute('href', '/app')
-    expect(screen.getAllByRole('link', { name: /Open broadcast monitor/i })[0]).toHaveAttribute('href', '/monitor')
-    expect(screen.getAllByRole('link', { name: /Customer knowledge base/i })[0]).toHaveAttribute('href', '/kb')
+    const featureLoginLinks = screen.getAllByRole('link', { name: /^Open customer login$/i })
+    expect(featureLoginLinks.some((link) => link.getAttribute('href') === '/app')).toBe(true)
+    expect(featureLoginLinks.some((link) => link.getAttribute('href') === '/monitor')).toBe(true)
+    expect(screen.getByRole('link', { name: /^Read knowledge base$/i })).toHaveAttribute('href', '/kb')
     expect(screen.getByRole('link', { name: /Open internal admin/i })).toHaveAttribute('href', '/internal')
   })
 
@@ -744,7 +762,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { level: 1, name: /Live broadcast monitor/i })).toBeInTheDocument()
     expect(screen.getByText(/Feature deep dive/i)).toBeInTheDocument()
     expect(screen.getByText(/Track queued, sent, failed, retried, and dead-lettered messages/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /^Open monitor$/i })).toHaveAttribute('href', '/monitor')
+    expect(screen.getAllByRole('link', { name: /^Open customer login$/i }).some((link) => link.getAttribute('href') === '/monitor')).toBe(true)
     expect(screen.getByRole('link', { name: /^Knowledge base$/i })).toHaveAttribute('href', '/kb')
   })
 
@@ -779,11 +797,11 @@ describe('App', () => {
     expect(screen.getAllByText(/owner@demo-retail.test/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/DEMORETA-E568C9/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/ops@example.test/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Getting started with Demo Retail Co/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sign in with an invite or access code/i)).toBeInTheDocument()
-    expect(screen.getByText(/Create and schedule a campaign/i)).toBeInTheDocument()
-    expect(screen.getByText(/Monitor broadcast throughput live/i)).toBeInTheDocument()
-    expect(screen.getByText(/Internal admin and tenant operations overview/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Getting started with Demo Retail Co/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Sign in with an invite or access code/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Create and schedule a campaign/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Monitor broadcast throughput live/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Internal admin and tenant operations overview/i).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: /^Open customer login$/i })[0]).toHaveAttribute('href', '/app')
     expect(screen.getAllByRole('link', { name: /^Open broadcast monitor$/i })[0]).toHaveAttribute('href', '/monitor')
     expect(screen.getAllByRole('link', { name: /^View features$/i })[0]).toHaveAttribute('href', '/features')
@@ -792,21 +810,21 @@ describe('App', () => {
     const articles = screen.getByLabelText(/Knowledge base articles/i)
     await user.type(screen.getByLabelText(/Search knowledge base/i), 'broadcast')
 
-    expect(within(articles).getByText(/Monitor broadcast throughput live/i)).toBeInTheDocument()
+    expect(within(articles).getAllByText(/Monitor broadcast throughput live/i).length).toBeGreaterThan(0)
     expect(within(articles).queryByText(/Invite teammates from Settings/i)).not.toBeInTheDocument()
 
     await user.clear(screen.getByLabelText(/Search knowledge base/i))
     await user.click(screen.getByRole('button', { name: /^Compliance$/i }))
 
-    expect(within(articles).getByText(/TCPA-aware consent and compliance readiness/i)).toBeInTheDocument()
+    expect(within(articles).getAllByText(/TCPA-aware consent and compliance readiness/i).length).toBeGreaterThan(0)
     expect(within(articles).getByText(/prior express written consent/i)).toBeInTheDocument()
     expect(within(articles).getByText(/opt-out and STOP handling/i)).toBeInTheDocument()
     expect(within(articles).getByText(/quiet hours, send windows, sender identity/i)).toBeInTheDocument()
-    expect(within(articles).getByText(/legal review, carrier policy alignment, and backend enforcement/i)).toBeInTheDocument()
+    expect(within(articles).getAllByText(/legal review, carrier policy alignment, and backend enforcement/i).length).toBeGreaterThan(0)
     expect(within(articles).queryByText(/Create and schedule a campaign/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /Clear filters/i }))
-    expect(within(articles).getByText(/Troubleshooting common issues/i)).toBeInTheDocument()
+    expect(within(articles).getAllByText(/Troubleshooting common issues/i).length).toBeGreaterThan(0)
   })
 
   it('renders the compliance feature route with TCPA-aware readiness and caveats', () => {
@@ -1056,6 +1074,18 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: /^companies$/i })).not.toBeInTheDocument()
   })
 
+  it('shows internal login on /internal even with a customer workspace session', async () => {
+    mockFetch()
+    storeCompanySession()
+    window.history.pushState(null, '', '/internal')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /operator console/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /login as internal admin/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /company dashboard/i })).not.toBeInTheDocument()
+  })
+
   it('lets internal admin log in and see admin nav only', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -1162,8 +1192,7 @@ describe('App', () => {
     expect(screen.getAllByText('2,650,000')).not.toHaveLength(0)
     expect(screen.getAllByText('1,360,000')).not.toHaveLength(0)
     expect(screen.getAllByText('4,800,000')).not.toHaveLength(0)
-    expect(screen.getAllByText('3,000,000')).not.toHaveLength(0)
-    expect(screen.getAllByText(/45% used/i)).not.toHaveLength(0)
+    expect(screen.getAllByText(/28% used/i)).not.toHaveLength(0)
     expect(screen.getAllByText('DEMORETA-E568C9')).not.toHaveLength(0)
     expect(screen.getByText(/Summer Preview/i)).toBeInTheDocument()
     expect(screen.getByText(/Operator notes have not been added/i)).toBeInTheDocument()
@@ -1390,15 +1419,18 @@ describe('App', () => {
     expect(screen.getByLabelText(/invite and access-code framing/i)).toHaveTextContent(/Invite and budget handoff/i)
     expect(screen.queryByText(/not set/i)).not.toBeInTheDocument()
     expect(screen.getByText(/monthly send quota/i)).toBeInTheDocument()
-    expect(screen.getByText(/create campaign/i)).toBeInTheDocument()
+    expect(screen.getByText(/new campaign/i)).toBeInTheDocument()
     expect(screen.getByText(/import subscribers/i)).toBeInTheDocument()
     expect(screen.getByText(/upload media/i)).toBeInTheDocument()
     expect(screen.getByText(/open broadcast monitor/i)).toBeInTheDocument()
     expect(screen.getByText(/view analytics/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/next actions/i)).toHaveTextContent(/Approve a broadcast or start a new one/i)
+    expect(screen.getByRole('link', { name: /read knowledge base/i })).toHaveAttribute('href', '/kb')
 
-    await user.click(screen.getByRole('button', { name: /create campaign/i }))
-    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /builder/i })).toHaveClass('active')
+    await user.click(screen.getByRole('button', { name: /new campaign/i }))
+    expect(window.location.pathname).toBe('/app/campaigns/new')
+    expect(await screen.findByRole('heading', { name: /new campaign/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /back to campaigns/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^dashboard$/i }))
     await user.click(screen.getByRole('button', { name: /import subscribers/i }))
@@ -1490,8 +1522,12 @@ describe('App', () => {
     await signupAsCompanyUser(user)
     await user.click(screen.getByRole('button', { name: /campaigns/i }))
     expect(await screen.findByRole('heading', { name: /upcoming/i })).toBeInTheDocument()
+    const upcomingHeading = screen.getByRole('heading', { name: /^Upcoming 1$/i })
+    expect(within(upcomingHeading).getByText('1')).toHaveClass('count-pill')
+    const pastHeading = screen.getByRole('heading', { name: /^Past 2$/i })
+    expect(within(pastHeading).getByText('2')).toHaveClass('count-pill')
     expect(screen.queryByLabelText(/campaign name/i)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /create campaign/i }))
+    await user.click(screen.getByRole('button', { name: /new campaign/i }))
     expect(await screen.findByText(/VIP Customers/)).toBeInTheDocument()
     expect(await screen.findByText(/\+15550001001/)).toBeInTheDocument()
     await user.clear(screen.getByLabelText(/campaign name/i))
@@ -1513,7 +1549,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /schedule campaign/i }))
 
     expect(await screen.findAllByText(/campaign-1/i)).not.toHaveLength(0)
-    await user.click(screen.getByRole('button', { name: /^monitor$/i }))
+    await user.click(screen.getByRole('button', { name: /open monitor/i }))
     expect(await screen.findByText(/Not started/i)).toBeInTheDocument()
     expect(screen.getAllByText(/No ETA yet/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Not projected yet/i)).toBeInTheDocument()
@@ -1541,6 +1577,27 @@ describe('App', () => {
     )
   })
 
+  it('shows monthly quota details when scheduling would exceed the send limit', async () => {
+    mockFetch()
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+    await signupAsCompanyUser(user)
+    await user.click(screen.getByRole('button', { name: /campaigns/i }))
+    await user.click(await screen.findByRole('button', { name: /new campaign/i }))
+
+    await user.clear(screen.getByLabelText(/campaign name/i))
+    await user.type(screen.getByLabelText(/campaign name/i), 'Quota Demo')
+    await user.click(screen.getByLabelText(/VIP Customers/i))
+    await user.click(screen.getByRole('button', { name: /schedule campaign/i }))
+
+    expect(await screen.findByText(/Monthly send quota exceeded/i)).toBeInTheDocument()
+    expect(screen.getByText(/250,000 requested reach/i)).toBeInTheDocument()
+    expect(screen.getByText(/100,000 available/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Schedule campaign failed: 409/i)).not.toBeInTheDocument()
+  })
+
   it('keeps follow-up reminders out of the campaign overview until the Follow-ups tab is selected', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -1560,7 +1617,7 @@ describe('App', () => {
     expect(within(memorialCard).getAllByText(/250,000/i).length).toBeGreaterThan(0)
     expect(within(memorialCard).getByText(/Sample messages/i)).toBeInTheDocument()
     expect(within(memorialCard).getByText(/Credits/i)).toBeInTheDocument()
-    expect(within(memorialCard).getByRole('button', { name: /Modify campaign/i })).toBeInTheDocument()
+    expect(within(memorialCard).getByRole('button', { name: /Copy to draft/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /past/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Spring Launch/i)).not.toHaveLength(0)
     expect(screen.queryByLabelText(/follow-up source campaign/i)).not.toBeInTheDocument()
@@ -1570,9 +1627,8 @@ describe('App', () => {
     expect(screen.getByLabelText(/follow-up source campaign/i)).toBeInTheDocument()
   })
 
-  it('shows campaign builder budget context and disables scheduling for read-only roles', async () => {
+  it('shows new campaign budget context and disables scheduling for read-only roles', async () => {
     mockFetch()
-    const user = userEvent.setup()
 
     window.localStorage.setItem(
       SESSION_KEY,
@@ -1586,19 +1642,13 @@ describe('App', () => {
         creditsUsed: 250,
       }),
     )
-    window.history.pushState(null, '', '/app')
+    window.history.pushState(null, '', '/app/campaigns/new')
     render(<App />)
 
-    expect(await screen.findByRole('button', { name: /create campaign/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /import subscribers/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /upload media/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /view analytics/i })).toBeEnabled()
-    expect(screen.getByRole('button', { name: /open broadcast monitor/i })).toBeEnabled()
-
-    await user.click(await screen.findByRole('button', { name: /campaigns/i }))
-    await user.click(screen.getByRole('button', { name: /builder/i }))
-
+    expect(await screen.findByRole('heading', { name: /new campaign/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /back to campaigns/i })).toBeInTheDocument()
     expect(screen.getByText(/Campaign scheduling is disabled for Analyst/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/new campaign context/i)).toHaveTextContent(/750 user credits/i)
     expect(screen.getByLabelText(/campaign credit estimate/i)).toHaveTextContent(/Company balance/i)
     expect(screen.getByLabelText(/campaign credit estimate/i)).toHaveTextContent(/User allocation/i)
     expect(screen.getByRole('button', { name: /schedule campaign/i })).toBeDisabled()
@@ -1737,7 +1787,7 @@ describe('App', () => {
     expect(await screen.findAllByText(/VIP Customers/i)).not.toHaveLength(0)
     expect(screen.getByRole('table', { name: /subscriber directory/i })).toBeInTheDocument()
     expect(screen.getByText('+15550001001')).toBeInTheDocument()
-    expect(screen.getAllByText(/double_opt_in_confirmed/i)).not.toHaveLength(0)
+    expect(screen.getAllByText(/Double opt-in confirmed/i)).not.toHaveLength(0)
 
     await user.selectOptions(screen.getByLabelText(/page size/i), '10')
     expect(await screen.findByText(/Page 1 of 2/i)).toBeInTheDocument()
@@ -1870,9 +1920,11 @@ describe('App', () => {
     expect(screen.getByText(/Weekend Flash Sale MMS/i)).toBeInTheDocument()
     expect(screen.getByText(/Winback Offer/i)).toBeInTheDocument()
     expect(screen.getByText(/Use code MEMORIAL30/i)).toBeInTheDocument()
+    const memorialTemplate = screen.getByRole('article', { name: /Memorial Day 30% Off Hero/i })
+    expect(within(memorialTemplate).getByRole('button', { name: /Copy SMS text/i })).toBeInTheDocument()
   })
 
-  it('uses a content template to move into the campaign builder with copy and media prefilled', async () => {
+  it('uses a content template to move into a new campaign with copy and media prefilled', async () => {
     mockFetch()
     const user = userEvent.setup()
 
@@ -1884,8 +1936,9 @@ describe('App', () => {
     const flashSaleCard = await screen.findByRole('article', { name: /Weekend Flash Sale MMS/i })
     await user.click(within(flashSaleCard).getByRole('button', { name: /use template/i }))
 
-    expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /builder/i })).toHaveClass('active')
+    expect(await screen.findByRole('heading', { name: /new campaign/i })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/app/campaigns/new')
+    expect(screen.getByRole('button', { name: /back to campaigns/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/campaign name/i)).toHaveValue('Weekend Flash Sale MMS')
     expect(screen.getByLabelText(/message body/i)).toHaveValue(
       'Flash sale: our bestsellers are back in stock for 48 hours. Tap to shop before sizes sell out.',

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,20 @@ DEFAULT_DATABASE_URL = "postgresql://campaign:campaign@localhost:5432/campaign_l
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 MESSAGE_CREDIT_COSTS = {"regular": 1, "smart": 2}
 MESSAGE_STATUS_KEYS = ("queued", "sent", "failed", "retried", "dead_lettered")
+SMS_KEYWORD_SUBSCRIPTIONS = {
+    "FSUMMER": {
+        "list_name": "Fresh Summer opt-ins",
+        "campaign_name": "Fresh Summer",
+        "terms": (
+            "Fresh Summer alerts: recurring automated marketing texts. "
+            "Msg/data rates may apply. Reply STOP to cancel."
+        ),
+    }
+}
+SMS_STOP_WORDS = {"STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"}
+SMS_HELP_WORDS = {"HELP", "INFO"}
+SMS_YES_WORDS = {"Y", "YES"}
+SMS_NO_WORDS = {"N", "NO"}
 
 
 class InsufficientCreditsError(Exception):
@@ -21,6 +36,27 @@ class InsufficientCreditsError(Exception):
         self.detail = detail
         self.required_credits = required_credits
         self.available_credits = available_credits
+
+
+class MonthlyQuotaExceededError(Exception):
+    def __init__(
+        self,
+        detail: str,
+        *,
+        requested_reach: int,
+        scheduled_reach: int,
+        monthly_send_limit: int,
+        quota_period_start: datetime,
+        quota_period_end: datetime,
+    ) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.requested_reach = requested_reach
+        self.scheduled_reach = scheduled_reach
+        self.monthly_send_limit = monthly_send_limit
+        self.available_reach = max(0, monthly_send_limit - scheduled_reach)
+        self.quota_period_start = quota_period_start
+        self.quota_period_end = quota_period_end
 
 
 class AudienceSelectionError(Exception):
@@ -69,7 +105,7 @@ async def create_campaign_with_messages(
     async with pool.acquire() as connection, connection.transaction():
         company = await connection.fetchrow(
             """
-            SELECT credit_balance
+            SELECT credit_balance, monthly_send_limit
             FROM companies
             WHERE id = $1
             FOR UPDATE
@@ -88,6 +124,55 @@ async def create_campaign_with_messages(
                 required_credits=credit_cost,
                 available_credits=company["credit_balance"],
             )
+        requested_reach = max(stored_modeled_audience_count, len(messages))
+        monthly_send_limit = company["monthly_send_limit"]
+        if campaign_status == "scheduled" and monthly_send_limit:
+            quota = await connection.fetchrow(
+                """
+                WITH bounds AS (
+                    SELECT
+                        date_trunc('month', $2::timestamptz) AS quota_start,
+                        date_trunc('month', $2::timestamptz) + INTERVAL '1 month' AS quota_end
+                )
+                SELECT
+                    bounds.quota_start,
+                    bounds.quota_end,
+                    COALESCE(
+                        (
+                            SELECT SUM(
+                                GREATEST(
+                                    scheduled_campaigns.modeled_audience_count,
+                                    (
+                                        SELECT COUNT(messages_for_campaign.id)::int
+                                        FROM messages messages_for_campaign
+                                        WHERE messages_for_campaign.campaign_id =
+                                              scheduled_campaigns.id
+                                    )
+                                )
+                            )::int
+                            FROM campaigns scheduled_campaigns
+                            WHERE scheduled_campaigns.company_id = $1
+                              AND scheduled_campaigns.status = 'scheduled'
+                              AND scheduled_campaigns.scheduled_at >= bounds.quota_start
+                              AND scheduled_campaigns.scheduled_at < bounds.quota_end
+                        ),
+                        0
+                    ) AS scheduled_reach
+                FROM bounds
+                """,
+                company_id,
+                scheduled_at_value,
+            )
+            scheduled_reach = int(quota["scheduled_reach"] or 0)
+            if scheduled_reach + requested_reach > monthly_send_limit:
+                raise MonthlyQuotaExceededError(
+                    "monthly send quota exceeded",
+                    requested_reach=requested_reach,
+                    scheduled_reach=scheduled_reach,
+                    monthly_send_limit=monthly_send_limit,
+                    quota_period_start=quota["quota_start"],
+                    quota_period_end=quota["quota_end"],
+                )
         if actor_email:
             membership = await connection.fetchrow(
                 """
@@ -1178,6 +1263,503 @@ async def confirm_double_opt_in(pool: asyncpg.Pool, *, token: str) -> dict[str, 
         "phone_number": subscriber["phone_number"],
         "status": "confirmed",
     }
+
+
+async def handle_inbound_sms(
+    pool: asyncpg.Pool,
+    *,
+    company_id: str,
+    phone_number: str,
+    shortcode: str,
+    body: str,
+    provider_message_id: str | None = None,
+) -> dict[str, Any]:
+    normalized_body = normalize_sms_body(body)
+    action = "unrecognized"
+    reply_body = "Sorry, we did not recognize that. Reply FSUMMER to subscribe or HELP for help."
+    state = "idle"
+    subscriber_id: str | None = None
+    subscriber_list_id: str | None = None
+    market_segment: str | None = None
+
+    async with pool.acquire() as connection, connection.transaction():
+        await _record_inbound_sms(
+            connection,
+            company_id=company_id,
+            phone_number=phone_number,
+            shortcode=shortcode,
+            body=body,
+            normalized_body=normalized_body,
+            provider_message_id=provider_message_id,
+        )
+        conversation = await _get_sms_conversation(
+            connection,
+            company_id=company_id,
+            phone_number=phone_number,
+        )
+
+        if normalized_body in SMS_STOP_WORDS:
+            result = await _handle_sms_stop(
+                connection,
+                company_id=company_id,
+                phone_number=phone_number,
+                shortcode=shortcode,
+            )
+            action = "opted_out"
+            reply_body = (
+                "You are unsubscribed and will not receive marketing texts. Reply HELP for help."
+            )
+            state = "opted_out"
+            subscriber_id = result["subscriber_id"]
+
+        elif normalized_body in SMS_HELP_WORDS:
+            action = "help"
+            reply_body = "Reply FSUMMER to subscribe, Y to confirm terms, or STOP to cancel."
+            state, subscriber_id, subscriber_list_id, market_segment = sms_conversation_context(
+                conversation
+            )
+
+        elif normalized_body in SMS_KEYWORD_SUBSCRIPTIONS:
+            result = await _start_keyword_subscription(
+                connection,
+                company_id=company_id,
+                phone_number=phone_number,
+                shortcode=shortcode,
+                keyword=normalized_body,
+            )
+            action = "keyword_started"
+            reply_body = (
+                f"Thanks for joining {result['campaign_name']} alerts. "
+                "Reply with your 5 digit ZIP code so we can send local offers."
+            )
+            state = "awaiting_zip"
+            subscriber_id = result["subscriber_id"]
+            subscriber_list_id = result["subscriber_list_id"]
+
+        elif conversation and conversation["state"] == "awaiting_zip":
+            if re.fullmatch(r"\d{5}", normalized_body):
+                result = await _record_keyword_zip(
+                    connection,
+                    conversation=conversation,
+                    postal_code=normalized_body,
+                )
+                action = "zip_recorded"
+                state = "awaiting_terms"
+                subscriber_id = result["subscriber_id"]
+                subscriber_list_id = result["subscriber_list_id"]
+                market_segment = result["market_segment"]
+                reply_body = (
+                    f"{result['terms']} Reply Y to agree and finish subscribing, "
+                    "or STOP to cancel."
+                )
+            else:
+                action = "zip_requested"
+                state = "awaiting_zip"
+                subscriber_id = conversation["subscriber_id"]
+                subscriber_list_id = conversation["subscriber_list_id"]
+                reply_body = "Please reply with a 5 digit ZIP code, or STOP to cancel."
+
+        elif conversation and conversation["state"] == "awaiting_terms":
+            if normalized_body in SMS_YES_WORDS:
+                result = await _confirm_keyword_subscription(connection, conversation=conversation)
+                action = "subscribed"
+                state = "subscribed"
+                subscriber_id = result["subscriber_id"]
+                subscriber_list_id = result["subscriber_list_id"]
+                market_segment = result["market_segment"]
+                reply_body = (
+                    f"You're subscribed to {result['campaign_name']} alerts for "
+                    f"{market_segment}. Reply STOP to cancel."
+                )
+            elif normalized_body in SMS_NO_WORDS:
+                await _decline_keyword_terms(connection, conversation=conversation)
+                action = "terms_declined"
+                state = "idle"
+                subscriber_id = conversation["subscriber_id"]
+                subscriber_list_id = conversation["subscriber_list_id"]
+                market_segment = conversation["market_segment"]
+                reply_body = "No problem. You are not subscribed. Reply FSUMMER to start again."
+            else:
+                action = "terms_requested"
+                state = "awaiting_terms"
+                subscriber_id = conversation["subscriber_id"]
+                subscriber_list_id = conversation["subscriber_list_id"]
+                market_segment = conversation["market_segment"]
+                reply_body = "Reply Y to agree to terms and subscribe, or STOP to cancel."
+
+        else:
+            state, subscriber_id, subscriber_list_id, market_segment = sms_conversation_context(
+                conversation
+            )
+
+        await connection.execute(
+            """
+            INSERT INTO sms_outbound_messages (
+                id, company_id, phone_number, shortcode, body, reason
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            """,
+            str(uuid4()),
+            company_id,
+            phone_number,
+            shortcode,
+            reply_body,
+            action,
+        )
+
+    return {
+        "action": action,
+        "reply_body": reply_body,
+        "conversation_state": state,
+        "subscriber_id": subscriber_id,
+        "subscriber_list_id": subscriber_list_id,
+        "market_segment": market_segment,
+    }
+
+
+def normalize_sms_body(body: str) -> str:
+    return re.sub(r"\s+", " ", body.strip()).upper()
+
+
+def sms_conversation_context(
+    conversation: Mapping[str, Any] | None,
+) -> tuple[str, str | None, str | None, str | None]:
+    if conversation is None:
+        return "idle", None, None, None
+    return (
+        conversation["state"],
+        conversation["subscriber_id"],
+        conversation["subscriber_list_id"],
+        conversation["market_segment"],
+    )
+
+
+def market_segment_for_postal_code(postal_code: str) -> str:
+    prefix = postal_code[0]
+    if prefix in {"0", "1", "2"}:
+        return "East"
+    if prefix in {"3", "4", "5"}:
+        return "Central"
+    if prefix in {"6", "7", "8"}:
+        return "Mountain"
+    return "West"
+
+
+async def _record_inbound_sms(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    phone_number: str,
+    shortcode: str,
+    body: str,
+    normalized_body: str,
+    provider_message_id: str | None,
+) -> None:
+    await connection.execute(
+        """
+        INSERT INTO sms_inbound_messages (
+            id, company_id, phone_number, shortcode, body, normalized_body, provider_message_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (company_id, provider_message_id) DO NOTHING
+        """,
+        str(uuid4()),
+        company_id,
+        phone_number,
+        shortcode,
+        body,
+        normalized_body,
+        provider_message_id,
+    )
+
+
+async def _get_sms_conversation(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    phone_number: str,
+) -> asyncpg.Record | None:
+    return await connection.fetchrow(
+        """
+        SELECT *
+        FROM sms_conversations
+        WHERE company_id = $1 AND phone_number = $2
+        FOR UPDATE
+        """,
+        company_id,
+        phone_number,
+    )
+
+
+async def _start_keyword_subscription(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    phone_number: str,
+    shortcode: str,
+    keyword: str,
+) -> dict[str, Any]:
+    config = SMS_KEYWORD_SUBSCRIPTIONS[keyword]
+    subscriber_list = await _ensure_subscriber_list(
+        connection,
+        company_id=company_id,
+        name=config["list_name"],
+    )
+    subscriber = await connection.fetchrow(
+        """
+        INSERT INTO subscribers (
+            id, company_id, phone_number, marketing_status, consent_status, source
+        )
+        VALUES ($1, $2, $3, 'pending_confirmation', 'double_opt_in_requested', $4)
+        ON CONFLICT (company_id, phone_number) DO UPDATE SET
+            marketing_status = 'pending_confirmation',
+            consent_status = 'double_opt_in_requested',
+            source = EXCLUDED.source,
+            updated_at = NOW()
+        RETURNING id, company_id, phone_number
+        """,
+        str(uuid4()),
+        company_id,
+        phone_number,
+        f"sms_keyword:{keyword}",
+    )
+    await connection.execute(
+        """
+        INSERT INTO consent_events (id, company_id, subscriber_id, event_type, source)
+        VALUES ($1, $2, $3, 'double_opt_in_requested', $4)
+        """,
+        str(uuid4()),
+        company_id,
+        subscriber["id"],
+        f"sms_keyword:{keyword}",
+    )
+    await connection.execute(
+        """
+        INSERT INTO sms_conversations (
+            company_id, phone_number, shortcode, state, keyword, subscriber_id, subscriber_list_id
+        )
+        VALUES ($1, $2, $3, 'awaiting_zip', $4, $5, $6)
+        ON CONFLICT (company_id, phone_number) DO UPDATE SET
+            shortcode = EXCLUDED.shortcode,
+            state = EXCLUDED.state,
+            keyword = EXCLUDED.keyword,
+            subscriber_id = EXCLUDED.subscriber_id,
+            subscriber_list_id = EXCLUDED.subscriber_list_id,
+            updated_at = NOW()
+        """,
+        company_id,
+        phone_number,
+        shortcode,
+        keyword,
+        subscriber["id"],
+        subscriber_list["id"],
+    )
+    return {
+        "campaign_name": config["campaign_name"],
+        "subscriber_id": subscriber["id"],
+        "subscriber_list_id": subscriber_list["id"],
+    }
+
+
+async def _record_keyword_zip(
+    connection: asyncpg.Connection,
+    *,
+    conversation: asyncpg.Record,
+    postal_code: str,
+) -> dict[str, Any]:
+    keyword = conversation["keyword"] or "FSUMMER"
+    config = SMS_KEYWORD_SUBSCRIPTIONS[keyword]
+    market_segment = market_segment_for_postal_code(postal_code)
+    await connection.execute(
+        """
+        UPDATE subscribers
+        SET postal_code = $2,
+            market_segment = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        """,
+        conversation["subscriber_id"],
+        postal_code,
+        market_segment,
+    )
+    await connection.execute(
+        """
+        UPDATE sms_conversations
+        SET state = 'awaiting_terms',
+            postal_code = $3,
+            market_segment = $4,
+            updated_at = NOW()
+        WHERE company_id = $1 AND phone_number = $2
+        """,
+        conversation["company_id"],
+        conversation["phone_number"],
+        postal_code,
+        market_segment,
+    )
+    return {
+        "subscriber_id": conversation["subscriber_id"],
+        "subscriber_list_id": conversation["subscriber_list_id"],
+        "market_segment": market_segment,
+        "terms": config["terms"],
+    }
+
+
+async def _confirm_keyword_subscription(
+    connection: asyncpg.Connection,
+    *,
+    conversation: asyncpg.Record,
+) -> dict[str, Any]:
+    keyword = conversation["keyword"] or "FSUMMER"
+    config = SMS_KEYWORD_SUBSCRIPTIONS[keyword]
+    await connection.execute(
+        """
+        UPDATE subscribers
+        SET marketing_status = 'confirmed',
+            consent_status = 'double_opt_in_confirmed',
+            confirmed_at = NOW(),
+            postal_code = COALESCE($2, postal_code),
+            market_segment = COALESCE($3, market_segment),
+            updated_at = NOW()
+        WHERE id = $1
+        """,
+        conversation["subscriber_id"],
+        conversation["postal_code"],
+        conversation["market_segment"],
+    )
+    await connection.execute(
+        """
+        INSERT INTO subscriber_list_memberships (subscriber_list_id, subscriber_id)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
+        """,
+        conversation["subscriber_list_id"],
+        conversation["subscriber_id"],
+    )
+    await connection.execute(
+        """
+        INSERT INTO consent_events (id, company_id, subscriber_id, event_type, source)
+        VALUES ($1, $2, $3, 'double_opt_in_confirmed', $4)
+        """,
+        str(uuid4()),
+        conversation["company_id"],
+        conversation["subscriber_id"],
+        f"sms_reply:{keyword}:yes",
+    )
+    await connection.execute(
+        """
+        UPDATE sms_conversations
+        SET state = 'subscribed', updated_at = NOW()
+        WHERE company_id = $1 AND phone_number = $2
+        """,
+        conversation["company_id"],
+        conversation["phone_number"],
+    )
+    return {
+        "campaign_name": config["campaign_name"],
+        "subscriber_id": conversation["subscriber_id"],
+        "subscriber_list_id": conversation["subscriber_list_id"],
+        "market_segment": conversation["market_segment"],
+    }
+
+
+async def _decline_keyword_terms(
+    connection: asyncpg.Connection,
+    *,
+    conversation: asyncpg.Record,
+) -> None:
+    await connection.execute(
+        """
+        UPDATE sms_conversations
+        SET state = 'idle', updated_at = NOW()
+        WHERE company_id = $1 AND phone_number = $2
+        """,
+        conversation["company_id"],
+        conversation["phone_number"],
+    )
+
+
+async def _handle_sms_stop(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    phone_number: str,
+    shortcode: str,
+) -> dict[str, str]:
+    subscriber = await connection.fetchrow(
+        """
+        INSERT INTO subscribers (
+            id, company_id, phone_number, marketing_status, consent_status, source
+        )
+        VALUES ($1, $2, $3, 'opted_out', 'opted_out', 'sms_stop')
+        ON CONFLICT (company_id, phone_number) DO UPDATE SET
+            marketing_status = 'opted_out',
+            consent_status = 'opted_out',
+            source = 'sms_stop',
+            updated_at = NOW()
+        RETURNING id
+        """,
+        str(uuid4()),
+        company_id,
+        phone_number,
+    )
+    await connection.execute(
+        """
+        INSERT INTO suppression_list (company_id, phone_number, reason)
+        VALUES ($1, $2, 'sms_stop')
+        ON CONFLICT (company_id, phone_number) DO UPDATE SET
+            reason = EXCLUDED.reason,
+            created_at = NOW()
+        """,
+        company_id,
+        phone_number,
+    )
+    await connection.execute(
+        """
+        INSERT INTO consent_events (id, company_id, subscriber_id, event_type, source)
+        VALUES ($1, $2, $3, 'opted_out', 'sms_stop')
+        """,
+        str(uuid4()),
+        company_id,
+        subscriber["id"],
+    )
+    await connection.execute(
+        """
+        INSERT INTO sms_conversations (
+            company_id, phone_number, shortcode, state, subscriber_id
+        )
+        VALUES ($1, $2, $3, 'opted_out', $4)
+        ON CONFLICT (company_id, phone_number) DO UPDATE SET
+            shortcode = EXCLUDED.shortcode,
+            state = 'opted_out',
+            subscriber_id = EXCLUDED.subscriber_id,
+            updated_at = NOW()
+        """,
+        company_id,
+        phone_number,
+        shortcode,
+        subscriber["id"],
+    )
+    return {"subscriber_id": subscriber["id"]}
+
+
+async def _ensure_subscriber_list(
+    connection: asyncpg.Connection,
+    *,
+    company_id: str,
+    name: str,
+) -> asyncpg.Record:
+    return await connection.fetchrow(
+        """
+        INSERT INTO subscriber_lists (id, company_id, name, estimated_subscriber_count)
+        VALUES ($1, $2, $3, 0)
+        ON CONFLICT (company_id, name) DO UPDATE SET
+            name = EXCLUDED.name
+        RETURNING id, company_id, name
+        """,
+        str(uuid4()),
+        company_id,
+        name,
+    )
 
 
 async def create_media_asset(

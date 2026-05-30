@@ -44,7 +44,7 @@ def test_web_ui_implements_campaign_demo_experience() -> None:
 
     for expected_text in [
         "CampaignOS",
-        "Create campaign",
+        "New campaign",
         "Campaign status",
         "System status",
         "queued",

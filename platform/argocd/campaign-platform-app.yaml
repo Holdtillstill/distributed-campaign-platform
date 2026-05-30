@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: campaign-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/REPLACE_WITH_OWNER/distributed-campaign-platform.git
+    targetRevision: main
+    path: deploy/helm/campaign-platform
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-eks-dev.yaml
+      parameters:
+        - name: campaignApi.image.repository
+          value: REPLACE_WITH_ECR_REPOSITORY/campaign-api
+        - name: providerSimulator.image.repository
+          value: REPLACE_WITH_ECR_REPOSITORY/provider-simulator
+        - name: dispatcher.image.repository
+          value: REPLACE_WITH_ECR_REPOSITORY/dispatcher
+        - name: webUi.image.repository
+          value: REPLACE_WITH_ECR_REPOSITORY/web-ui
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: campaign-platform
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

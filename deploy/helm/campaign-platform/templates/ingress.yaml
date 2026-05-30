@@ -1,0 +1,46 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "campaign-platform.fullname" . }}-web-ui
+  labels:
+    {{- include "campaign-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web-ui
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- if .Values.ingress.hosts }}
+    {{- range .Values.ingress.hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: {{ $.Values.ingress.webUi.path | quote }}
+            pathType: {{ $.Values.ingress.webUi.pathType | quote }}
+            backend:
+              service:
+                name: {{ include "campaign-platform.fullname" $ }}-web-ui
+                port:
+                  name: http
+    {{- end }}
+    {{- else }}
+    - http:
+        paths:
+          - path: {{ .Values.ingress.webUi.path | quote }}
+            pathType: {{ .Values.ingress.webUi.pathType | quote }}
+            backend:
+              service:
+                name: {{ include "campaign-platform.fullname" . }}-web-ui
+                port:
+                  name: http
+    {{- end }}
+{{- end }}

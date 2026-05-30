@@ -7,6 +7,8 @@ from contextlib import suppress
 from pathlib import Path
 
 import pytest
+from campaign_common.observability import add_platform_endpoints
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -71,6 +73,20 @@ def test_services_expose_kubernetes_readyz(request, module_fixture: str, service
 
     assert response.status_code == 200
     assert response.json() == {"status": "ready", "service": service_name}
+
+
+def test_platform_readyz_returns_503_when_dependency_check_fails() -> None:
+    app = FastAPI()
+    add_platform_endpoints(app, service_name="sample-service", readiness_check=lambda: False)
+    client = TestClient(app)
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "status": "not_ready",
+        "service": "sample-service",
+    }
 
 
 @pytest.mark.parametrize(

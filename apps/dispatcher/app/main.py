@@ -69,6 +69,18 @@ class NatsConsumerConfig:
     use_jetstream: bool = True
 
 
+@dataclass(frozen=True)
+class SqsConsumerConfig:
+    queue_url: str
+    retry_queue_url: str | None = None
+    dead_letter_queue_url: str | None = None
+    region_name: str | None = None
+    endpoint_url: str | None = None
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    wait_time_seconds: int = 20
+    max_number_of_messages: int = 10
+
+
 class MessageRepository(Protocol):
     async def update_status(self, message_id: str, status: str) -> None: ...
 
@@ -95,7 +107,49 @@ async def lifespan(app_instance: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Dispatcher", version="0.1.0", lifespan=lifespan)
 instrument_fastapi_app(app, SERVICE_NAME)
-add_platform_endpoints(app, service_name=SERVICE_NAME)
+
+
+async def dependencies_ready() -> bool:
+    if not _env_bool(os.getenv("READINESS_REQUIRE_DEPENDENCIES"), default=False):
+        return True
+
+    resolved_database_url = os.getenv("DATABASE_URL")
+    if resolved_database_url is None:
+        return False
+
+    connection = await asyncpg.connect(dsn=resolved_database_url, timeout=2)
+    try:
+        await connection.fetchval("SELECT 1")
+    finally:
+        await connection.close()
+
+    queue_provider = queue_provider_from_env()
+    if queue_provider == "sqs":
+        config = sqs_consumer_config_from_env()
+        sqs_client = create_sqs_client(
+            region_name=config.region_name,
+            endpoint_url=config.endpoint_url,
+        )
+        await asyncio.to_thread(
+            sqs_client.get_queue_attributes,
+            QueueUrl=config.queue_url,
+            AttributeNames=["QueueArn"],
+        )
+    elif queue_provider == "nats":
+        import nats
+
+        config = nats_consumer_config_from_env()
+        nc = await nats.connect(config.nats_url, connect_timeout=2)
+        await nc.drain()
+
+    provider_url = os.getenv("PROVIDER_URL", DEFAULT_PROVIDER_URL)
+    async with httpx.AsyncClient(base_url=provider_url, timeout=2.0) as client:
+        response = await client.get("/readyz")
+        response.raise_for_status()
+    return True
+
+
+add_platform_endpoints(app, service_name=SERVICE_NAME, readiness_check=dependencies_ready)
 
 
 @app.get("/healthz")
@@ -232,6 +286,16 @@ def _env_bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def queue_provider_from_env(env: Mapping[str, str] | None = None) -> str:
+    source = os.environ if env is None else env
+    provider = source.get("QUEUE_PROVIDER", "nats").strip().lower()
+    if provider in {"", "none", "noop", "disabled"}:
+        return "none"
+    if provider not in {"nats", "sqs"}:
+        raise RuntimeError("QUEUE_PROVIDER must be one of: nats, sqs, none")
+    return provider
+
+
 def nats_consumer_config_from_env(env: Mapping[str, str] | None = None) -> NatsConsumerConfig:
     source = os.environ if env is None else env
     return NatsConsumerConfig(
@@ -246,6 +310,43 @@ def nats_consumer_config_from_env(env: Mapping[str, str] | None = None) -> NatsC
     )
 
 
+def sqs_consumer_config_from_env(env: Mapping[str, str] | None = None) -> SqsConsumerConfig:
+    source = os.environ if env is None else env
+    queue_url = source.get("SQS_BROADCAST_QUEUE_URL") or source.get("SQS_QUEUE_URL")
+    if not queue_url:
+        raise RuntimeError(
+            "SQS_BROADCAST_QUEUE_URL or SQS_QUEUE_URL is required when QUEUE_PROVIDER=sqs"
+        )
+    return SqsConsumerConfig(
+        queue_url=queue_url,
+        retry_queue_url=source.get("SQS_RETRY_QUEUE_URL"),
+        dead_letter_queue_url=source.get("SQS_DEAD_LETTER_QUEUE_URL"),
+        region_name=source.get("AWS_REGION") or source.get("AWS_DEFAULT_REGION"),
+        endpoint_url=source.get("SQS_ENDPOINT_URL"),
+        max_attempts=int(source.get("DISPATCHER_MAX_ATTEMPTS", str(DEFAULT_MAX_ATTEMPTS))),
+        wait_time_seconds=int(source.get("SQS_WAIT_TIME_SECONDS", "20")),
+        max_number_of_messages=int(source.get("SQS_MAX_NUMBER_OF_MESSAGES", "10")),
+    )
+
+
+def create_sqs_client(
+    *,
+    region_name: str | None = None,
+    endpoint_url: str | None = None,
+) -> Any:
+    try:
+        import boto3
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("boto3 is required when QUEUE_PROVIDER=sqs") from exc
+
+    kwargs = {}
+    if region_name:
+        kwargs["region_name"] = region_name
+    if endpoint_url:
+        kwargs["endpoint_url"] = endpoint_url
+    return boto3.client("sqs", **kwargs)
+
+
 async def ensure_stream_subjects(js: Any, *, stream: str, subjects: list[str]) -> None:
     try:
         await js.add_stream(name=stream, subjects=subjects)
@@ -254,6 +355,26 @@ async def ensure_stream_subjects(js: Any, *, stream: str, subjects: list[str]) -
 
 
 async def run_worker(
+    *,
+    nats_url: str | None = None,
+    subject: str | None = None,
+    provider_url: str | None = None,
+    database_url: str | None = None,
+) -> None:
+    if nats_url is not None or subject is not None or queue_provider_from_env() == "nats":
+        await run_nats_worker(
+            nats_url=nats_url,
+            subject=subject,
+            provider_url=provider_url,
+            database_url=database_url,
+        )
+    elif queue_provider_from_env() == "sqs":
+        await run_sqs_worker(provider_url=provider_url, database_url=database_url)
+    else:
+        await asyncio.Event().wait()
+
+
+async def run_nats_worker(
     *,
     nats_url: str | None = None,
     subject: str | None = None,
@@ -356,6 +477,91 @@ async def run_worker(
         await asyncio.Event().wait()
     finally:
         await nc.drain()
+        await pool.close()
+
+
+async def send_sqs_payload(
+    client: Any,
+    queue_url: str,
+    payload: dict[str, Any],
+) -> None:
+    await asyncio.to_thread(
+        client.send_message,
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(payload),
+    )
+
+
+async def run_sqs_worker(
+    *,
+    provider_url: str | None = None,
+    database_url: str | None = None,
+) -> None:
+    config = sqs_consumer_config_from_env()
+    resolved_provider_url = provider_url or os.getenv("PROVIDER_URL", DEFAULT_PROVIDER_URL)
+    resolved_database_url = database_url or os.getenv("DATABASE_URL")
+    if resolved_database_url is None:
+        raise RuntimeError("DATABASE_URL is required to run the dispatcher worker")
+
+    pool = await asyncpg.create_pool(dsn=resolved_database_url)
+    repository = AsyncpgMessageRepository(pool)
+    sqs_client = create_sqs_client(region_name=config.region_name, endpoint_url=config.endpoint_url)
+    poll_queue_urls = [config.queue_url]
+    if config.retry_queue_url and config.retry_queue_url != config.queue_url:
+        poll_queue_urls.append(config.retry_queue_url)
+
+    async def provider_sender(provider_job: MessageJob) -> ProviderResult:
+        with tracer.start_as_current_span("provider.send"):
+            return await send_to_provider_http(provider_job, resolved_provider_url)
+
+    async def publish_retry(payload: dict[str, Any]) -> None:
+        await send_sqs_payload(sqs_client, config.retry_queue_url or config.queue_url, payload)
+
+    async def publish_dead_letter(payload: dict[str, Any]) -> None:
+        if config.dead_letter_queue_url is None:
+            logger.warning(
+                "sqs_dead_letter_queue_not_configured",
+                message_id=payload.get("message_id"),
+            )
+            return
+        await send_sqs_payload(sqs_client, config.dead_letter_queue_url, payload)
+
+    try:
+        while True:
+            received_any = False
+            for queue_url in poll_queue_urls:
+                response = await asyncio.to_thread(
+                    sqs_client.receive_message,
+                    QueueUrl=queue_url,
+                    MaxNumberOfMessages=config.max_number_of_messages,
+                    WaitTimeSeconds=config.wait_time_seconds,
+                    MessageAttributeNames=["All"],
+                    AttributeNames=["All"],
+                )
+                for message in response.get("Messages", []):
+                    received_any = True
+                    raw_payload = json.loads(message["Body"])
+                    job = MessageJob.model_validate(raw_payload)
+                    with tracer.start_as_current_span(
+                        "message.consume",
+                        context=context_from_payload(raw_payload),
+                    ):
+                        await dispatch_message(
+                            job,
+                            provider_sender,
+                            repository.update_status,
+                            max_attempts=config.max_attempts,
+                            publish_retry=publish_retry,
+                            publish_dead_letter=publish_dead_letter,
+                        )
+                    await asyncio.to_thread(
+                        sqs_client.delete_message,
+                        QueueUrl=queue_url,
+                        ReceiptHandle=message["ReceiptHandle"],
+                    )
+            if not received_any:
+                await asyncio.sleep(0.1)
+    finally:
         await pool.close()
 
 

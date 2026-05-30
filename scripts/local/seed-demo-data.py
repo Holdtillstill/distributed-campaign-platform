@@ -302,7 +302,7 @@ async def seed_company(connection: asyncpg.Connection) -> None:
     await connection.execute(
         """
         INSERT INTO companies (id, name, slug, monthly_send_limit, credit_balance)
-        VALUES ($1, 'Demo Retail Co', $2, 3000000, 4800000)
+        VALUES ($1, 'Demo Retail Co', $2, 4800000, 4800000)
         ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
             slug = EXCLUDED.slug,

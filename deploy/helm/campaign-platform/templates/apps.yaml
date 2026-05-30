@@ -28,15 +28,29 @@ spec:
       labels:
         {{- include "campaign-platform.labels" $root | nindent 8 }}
         app.kubernetes.io/component: {{ $service.component }}
+      {{- if ne $service.component "web-ui" }}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: /metrics
         prometheus.io/port: "8080"
+      {{- end }}
     spec:
+      serviceAccountName: {{ include "campaign-platform.serviceAccountName" $root }}
+      {{- with $root.Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $service.component }}
+          {{- if and $root.Values.eks.enabled (contains "REPLACE_WITH" $service.values.image.repository) }}
+          {{- fail (printf "%s image.repository must be set to an ECR repository for EKS deployments" $service.component) }}
+          {{- end }}
           image: "{{ $service.values.image.repository }}:{{ $service.values.image.tag }}"
           imagePullPolicy: {{ $root.Values.global.imagePullPolicy }}
+          {{- with $root.Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ ternary 80 8080 (eq $service.component "web-ui") }}
@@ -44,7 +58,7 @@ spec:
             - configMapRef:
                 name: {{ include "campaign-platform.fullname" $root }}-app-config
             - secretRef:
-                name: {{ include "campaign-platform.fullname" $root }}-app-env
+                name: {{ include "campaign-platform.appEnvSecretName" $root }}
           env:
             {{- if and $root.Values.observability.otel.enabled (ne $service.component "web-ui") }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT

@@ -48,9 +48,12 @@ services:
       dockerfile: apps/campaign-api/Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-campaign}:${POSTGRES_PASSWORD:-campaign}@postgres:5432/${POSTGRES_DB:-campaign_local}
+      QUEUE_PROVIDER: ${QUEUE_PROVIDER:-nats}
       NATS_URL: nats://nats:4222
       NATS_SUBJECT: messages.dispatch
       NATS_STREAM: CAMPAIGN_MESSAGES
+      SQS_BROADCAST_QUEUE_URL: ${SQS_BROADCAST_QUEUE_URL:-}
+      SQS_ENDPOINT_URL: ${SQS_ENDPOINT_URL:-}
     ports:
       - "127.0.0.1:8081:8080"
     depends_on:
@@ -100,11 +103,16 @@ services:
       dockerfile: apps/dispatcher/Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-campaign}:${POSTGRES_PASSWORD:-campaign}@postgres:5432/${POSTGRES_DB:-campaign_local}
+      QUEUE_PROVIDER: ${QUEUE_PROVIDER:-nats}
       NATS_URL: nats://nats:4222
       NATS_SUBJECT: messages.dispatch
       NATS_RETRY_SUBJECT: messages.dispatch.retry
       NATS_DEAD_LETTER_SUBJECT: messages.dispatch.dead_letter
       NATS_STREAM: CAMPAIGN_MESSAGES
+      SQS_BROADCAST_QUEUE_URL: ${SQS_BROADCAST_QUEUE_URL:-}
+      SQS_RETRY_QUEUE_URL: ${SQS_RETRY_QUEUE_URL:-}
+      SQS_DEAD_LETTER_QUEUE_URL: ${SQS_DEAD_LETTER_QUEUE_URL:-}
+      SQS_ENDPOINT_URL: ${SQS_ENDPOINT_URL:-}
       DISPATCHER_MAX_ATTEMPTS: ${DISPATCHER_MAX_ATTEMPTS:-3}
       PROVIDER_URL: http://provider-simulator:8080
       DISPATCHER_WORKER_ENABLED: "true"

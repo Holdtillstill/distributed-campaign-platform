@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 
 import { API_BASE_URL } from '../api/client'
 
@@ -7,14 +7,18 @@ export function PageHeader({
   description,
   eyebrow,
   action,
+  focusRef,
+  tabIndex,
 }: {
   title: string
   description: string
   eyebrow?: string
   action?: ReactNode
+  focusRef?: Ref<HTMLDivElement>
+  tabIndex?: number
 }) {
   return (
-    <div className="page-header">
+    <div className="page-header" ref={focusRef} tabIndex={tabIndex}>
       <div>
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         <h1>{title}</h1>

@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import inspect
+from collections.abc import Awaitable, Callable
+
+from fastapi import HTTPException
 from opentelemetry import trace
 from prometheus_client import CollectorRegistry, Info, generate_latest
 from prometheus_client.exposition import CONTENT_TYPE_LATEST
 from starlette.responses import Response
+
+ReadinessCheck = Callable[[], bool | Awaitable[bool]]
 
 
 def metric_prefix_for_service(service_name: str) -> str:
     return service_name.replace("-", "_")
 
 
-def add_platform_endpoints(app, *, service_name: str) -> None:
+def add_platform_endpoints(
+    app,
+    *,
+    service_name: str,
+    readiness_check: ReadinessCheck | None = None,
+) -> None:
     """Add Kubernetes readiness and Prometheus scrape endpoints to a FastAPI app."""
     metric_prefix = metric_prefix_for_service(service_name)
     registry = CollectorRegistry()
@@ -22,7 +33,22 @@ def add_platform_endpoints(app, *, service_name: str) -> None:
     service_info.info({"service": metric_prefix})
 
     @app.get("/readyz")
-    def readyz() -> dict[str, str]:
+    async def readyz() -> dict[str, str]:
+        if readiness_check is not None:
+            try:
+                result = readiness_check()
+                if inspect.isawaitable(result):
+                    result = await result
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail={"status": "not_ready", "service": service_name},
+                ) from exc
+            if not result:
+                raise HTTPException(
+                    status_code=503,
+                    detail={"status": "not_ready", "service": service_name},
+                )
         return {"status": "ready", "service": service_name}
 
     @app.get("/metrics")

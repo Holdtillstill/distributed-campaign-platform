@@ -26,7 +26,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     proof: 'Monitor projected/sample broadcasts before the full modeled audience is moved.',
     bullets: ['Messages per minute and per second', 'Projected completion and ETA', 'Provider outcome counters'],
     ctaHref: '/monitor',
-    ctaLabel: 'Open monitor',
+    ctaLabel: 'Open customer login',
   },
   {
     slug: 'audience-segments',
@@ -37,7 +37,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     proof: 'Demo Retail Co carries 2.65M modeled subscribers with representative local sample rows.',
     bullets: ['Segment cards by list', 'Consent-aware subscriber directory', 'CSV import for sample data'],
     ctaHref: '/app',
-    ctaLabel: 'Open audience tools',
+    ctaLabel: 'Open customer login',
   },
   {
     slug: 'role-based-access',
@@ -48,7 +48,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     proof: 'Settings exposes company admin, campaign manager, regional manager, analyst, and viewer guardrails.',
     bullets: ['Invite codes carry role and budget', 'Read-only roles keep operations disabled', 'Budget context follows the user'],
     ctaHref: '/app',
-    ctaLabel: 'Open settings',
+    ctaLabel: 'Open customer login',
   },
   {
     slug: 'analytics',
@@ -56,10 +56,10 @@ const featureSpotlights: FeatureSpotlight[] = [
     title: 'Analytics and campaign reporting',
     summary:
       'Review scheduled reach, campaign volume, Smart SMS clicks, offer redemptions, follow-ups, and credit usage in one workspace.',
-    proof: 'Analytics combines campaign history, tracked links, redemptions, and quota usage from tenant APIs.',
+    proof: 'Analytics combines campaign history, tracked links, redemptions, and quota usage from workspace APIs.',
     bullets: ['Campaign performance table', 'Tracked link and redemption totals', 'Quota and message activity'],
     ctaHref: '/app',
-    ctaLabel: 'View analytics',
+    ctaLabel: 'Open customer login',
   },
   {
     slug: 'compliance',
@@ -137,11 +137,8 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
             <a className="docs-link" href="/app">
               Open customer login
             </a>
-            <a className="docs-link secondary-link" href="/monitor">
-              Open broadcast monitor
-            </a>
             <a className="docs-link secondary-link" href="/kb">
-              Read customer KB
+              Read knowledge base
             </a>
           </div>
         </div>
@@ -254,9 +251,6 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
             <a className="docs-link" href="/internal">
               Open internal admin
             </a>
-            <a className="docs-link secondary-link" href="/kb">
-              Browse KB
-            </a>
           </div>
         </div>
         <ul className="capability-list">
@@ -267,24 +261,6 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="feature-final-cta" aria-label="Feature calls to action">
-        <div>
-          <p className="eyebrow">Evaluate the demo</p>
-          <h2>Open the app, monitor a broadcast, or hand customers the KB.</h2>
-        </div>
-        <div className="hero-actions">
-          <a className="docs-link" href="/app">
-            Customer login
-          </a>
-          <a className="docs-link secondary-link" href="/monitor">
-            Broadcast monitor
-          </a>
-          <a className="docs-link secondary-link" href="/kb">
-            Customer knowledge base
-          </a>
-        </div>
       </section>
     </main>
   )

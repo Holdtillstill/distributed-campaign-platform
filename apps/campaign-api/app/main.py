@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from collections.abc import Iterable, Mapping, Sequence
@@ -267,6 +268,23 @@ class DoubleOptInConfirmResponse(BaseModel):
     status: str
 
 
+class SmsInboundRequest(BaseModel):
+    company_id: str = Field(min_length=1)
+    phone_number: str = Field(min_length=3)
+    shortcode: str = Field(min_length=3)
+    body: str = Field(min_length=1)
+    provider_message_id: str | None = None
+
+
+class SmsInboundResponse(BaseModel):
+    action: str
+    reply_body: str
+    conversation_state: str
+    subscriber_id: str | None = None
+    subscriber_list_id: str | None = None
+    market_segment: str | None = None
+
+
 class MediaAssetCreateRequest(BaseModel):
     filename: str = Field(min_length=1)
     content_type: str = Field(min_length=1)
@@ -471,6 +489,16 @@ class CampaignRepository(Protocol):
 
     async def confirm_double_opt_in(self, *, token: str) -> dict[str, Any] | None: ...
 
+    async def handle_inbound_sms(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        shortcode: str,
+        body: str,
+        provider_message_id: str | None,
+    ) -> dict[str, Any]: ...
+
     async def create_media_asset(
         self,
         *,
@@ -546,6 +574,14 @@ class NatsPublisherConfig:
     use_jetstream: bool = True
 
 
+@dataclass(frozen=True)
+class SqsPublisherConfig:
+    queue_url: str
+    region_name: str | None = None
+    endpoint_url: str | None = None
+    batch_size: int = 10
+
+
 class NatsMessagePublisher:
     def __init__(
         self,
@@ -569,6 +605,32 @@ class NatsMessagePublisher:
             rows,
             stream=self.config.stream,
             use_jetstream=self.config.use_jetstream,
+        )
+
+
+class SqsMessagePublisher:
+    def __init__(
+        self,
+        queue_url: str,
+        *,
+        region_name: str | None = None,
+        endpoint_url: str | None = None,
+        batch_size: int = 10,
+    ) -> None:
+        self.config = SqsPublisherConfig(
+            queue_url=queue_url,
+            region_name=region_name,
+            endpoint_url=endpoint_url,
+            batch_size=batch_size,
+        )
+
+    async def publish(self, rows: Sequence[MessageRow]) -> None:
+        await publish_message_jobs_to_sqs(
+            self.config.queue_url,
+            rows,
+            region_name=self.config.region_name,
+            endpoint_url=self.config.endpoint_url,
+            batch_size=self.config.batch_size,
         )
 
 
@@ -640,7 +702,7 @@ class AsyncpgCampaignRepository:
             audience_mode=audience_scale["audience_mode"],
         )
         if credit_result["status"] != "scheduled":
-            with tracer.start_as_current_span("nats.publish.messages.dispatch"):
+            with tracer.start_as_current_span("queue.publish.messages.dispatch"):
                 await self._publisher.publish(message_rows)
         logger.info(
             "campaign_created",
@@ -810,6 +872,24 @@ class AsyncpgCampaignRepository:
     async def confirm_double_opt_in(self, *, token: str) -> dict[str, Any] | None:
         return await db.confirm_double_opt_in(self._pool, token=token)
 
+    async def handle_inbound_sms(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        shortcode: str,
+        body: str,
+        provider_message_id: str | None,
+    ) -> dict[str, Any]:
+        return await db.handle_inbound_sms(
+            self._pool,
+            company_id=company_id,
+            phone_number=phone_number,
+            shortcode=shortcode,
+            body=body,
+            provider_message_id=provider_message_id,
+        )
+
     async def create_media_asset(
         self,
         *,
@@ -936,16 +1016,46 @@ def swagger_docs(request: Request) -> HTMLResponse:
 
 
 instrument_fastapi_app(app, SERVICE_NAME)
-add_platform_endpoints(app, service_name=SERVICE_NAME)
 
 
 async def get_pool() -> asyncpg.Pool:
-    pool = app.state.pool
+    pool = getattr(app.state, "pool", None)
     if pool is None:
         pool = await asyncpg.create_pool(dsn=db.database_url_from_env())
         await db.init_db(pool)
         app.state.pool = pool
     return pool
+
+
+async def dependencies_ready() -> bool:
+    if not _env_bool(os.getenv("READINESS_REQUIRE_DEPENDENCIES"), default=False):
+        return True
+
+    pool = await get_pool()
+    async with pool.acquire() as connection:
+        await connection.fetchval("SELECT 1")
+
+    queue_provider = queue_provider_from_env()
+    if queue_provider == "sqs":
+        config = sqs_publisher_config_from_env()
+        sqs_client = create_sqs_client(
+            region_name=config.region_name,
+            endpoint_url=config.endpoint_url,
+        )
+        await asyncio.to_thread(
+            sqs_client.get_queue_attributes,
+            QueueUrl=config.queue_url,
+            AttributeNames=["QueueArn"],
+        )
+    elif queue_provider == "nats" and (nats_url := os.getenv("NATS_URL")):
+        import nats
+
+        nc = await nats.connect(nats_url, connect_timeout=2)
+        await nc.drain()
+    return True
+
+
+add_platform_endpoints(app, service_name=SERVICE_NAME, readiness_check=dependencies_ready)
 
 
 async def get_repository() -> AsyncpgCampaignRepository:
@@ -1006,6 +1116,19 @@ async def create_campaign(
                 "message": exc.detail,
                 "required_credits": exc.required_credits,
                 "available_credits": exc.available_credits,
+            },
+        ) from exc
+    except db.MonthlyQuotaExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": exc.detail,
+                "requested_reach": exc.requested_reach,
+                "scheduled_reach": exc.scheduled_reach,
+                "monthly_send_limit": exc.monthly_send_limit,
+                "available_reach": exc.available_reach,
+                "quota_period_start": exc.quota_period_start.isoformat(),
+                "quota_period_end": exc.quota_period_end.isoformat(),
             },
         ) from exc
     except db.AudienceSelectionError as exc:
@@ -1290,6 +1413,24 @@ async def confirm_double_opt_in(
 
 
 @app.post(
+    "/public/sms/inbound",
+    response_model=SmsInboundResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def handle_inbound_sms(
+    request: SmsInboundRequest,
+    repository: CampaignRepository = REPOSITORY_DEPENDENCY,
+) -> dict[str, Any]:
+    return await repository.handle_inbound_sms(
+        company_id=request.company_id,
+        phone_number=request.phone_number,
+        shortcode=request.shortcode,
+        body=request.body,
+        provider_message_id=request.provider_message_id,
+    )
+
+
+@app.post(
     "/companies/{company_id}/media-assets",
     response_model=MediaAssetResponse,
     status_code=status.HTTP_201_CREATED,
@@ -1546,10 +1687,77 @@ async def publish_message_jobs(
         await nc.drain()
 
 
+def _chunked_rows(
+    rows: Sequence[MessageRow | dict[str, Any]],
+    batch_size: int,
+) -> Iterable[Sequence[MessageRow | dict[str, Any]]]:
+    if batch_size < 1 or batch_size > 10:
+        raise ValueError("SQS batch_size must be between 1 and 10")
+    for start in range(0, len(rows), batch_size):
+        yield rows[start : start + batch_size]
+
+
+def create_sqs_client(
+    *,
+    region_name: str | None = None,
+    endpoint_url: str | None = None,
+) -> Any:
+    try:
+        import boto3
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("boto3 is required when QUEUE_PROVIDER=sqs") from exc
+
+    kwargs = {}
+    if region_name:
+        kwargs["region_name"] = region_name
+    if endpoint_url:
+        kwargs["endpoint_url"] = endpoint_url
+    return boto3.client("sqs", **kwargs)
+
+
+async def publish_message_jobs_to_sqs(
+    queue_url: str,
+    rows: Sequence[MessageRow | dict[str, Any]],
+    *,
+    channel: str = "sms",
+    region_name: str | None = None,
+    endpoint_url: str | None = None,
+    batch_size: int = 10,
+    client: Any | None = None,
+) -> None:
+    sqs_client = client or create_sqs_client(region_name=region_name, endpoint_url=endpoint_url)
+    for batch in _chunked_rows(rows, batch_size):
+        entries = [
+            {
+                "Id": str(index),
+                "MessageBody": json.dumps(message_job_from_row(row, channel=channel)),
+            }
+            for index, row in enumerate(batch)
+        ]
+        response = await asyncio.to_thread(
+            sqs_client.send_message_batch,
+            QueueUrl=queue_url,
+            Entries=entries,
+        )
+        failed = response.get("Failed", [])
+        if failed:
+            raise RuntimeError(f"SQS failed to accept {len(failed)} message batch entries")
+
+
 def _env_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def queue_provider_from_env(env: Mapping[str, str] | None = None) -> str:
+    source = os.environ if env is None else env
+    provider = source.get("QUEUE_PROVIDER", "nats").strip().lower()
+    if provider in {"", "none", "noop", "disabled"}:
+        return "none"
+    if provider not in {"nats", "sqs"}:
+        raise RuntimeError("QUEUE_PROVIDER must be one of: nats, sqs, none")
+    return provider
 
 
 def nats_publisher_config_from_env(
@@ -1567,8 +1775,36 @@ def nats_publisher_config_from_env(
     )
 
 
-def publisher_from_env() -> MessagePublisher:
-    config = nats_publisher_config_from_env()
+def sqs_publisher_config_from_env(
+    env: Mapping[str, str] | None = None,
+) -> SqsPublisherConfig:
+    source = os.environ if env is None else env
+    queue_url = source.get("SQS_BROADCAST_QUEUE_URL") or source.get("SQS_QUEUE_URL")
+    if not queue_url:
+        raise RuntimeError(
+            "SQS_BROADCAST_QUEUE_URL or SQS_QUEUE_URL is required when QUEUE_PROVIDER=sqs"
+        )
+    return SqsPublisherConfig(
+        queue_url=queue_url,
+        region_name=source.get("AWS_REGION") or source.get("AWS_DEFAULT_REGION"),
+        endpoint_url=source.get("SQS_ENDPOINT_URL"),
+        batch_size=int(source.get("SQS_SEND_BATCH_SIZE", "10")),
+    )
+
+
+def publisher_from_env(env: Mapping[str, str] | None = None) -> MessagePublisher:
+    provider = queue_provider_from_env(env)
+    if provider == "none":
+        return NoopMessagePublisher()
+    if provider == "sqs":
+        config = sqs_publisher_config_from_env(env)
+        return SqsMessagePublisher(
+            config.queue_url,
+            region_name=config.region_name,
+            endpoint_url=config.endpoint_url,
+            batch_size=config.batch_size,
+        )
+    config = nats_publisher_config_from_env(env)
     if config is None:
         return NoopMessagePublisher()
     return NatsMessagePublisher(

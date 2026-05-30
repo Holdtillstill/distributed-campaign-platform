@@ -32,6 +32,7 @@ class FakeSubscriberRepository:
         self.imported_subscriber: dict[str, object] | None = None
         self.started_opt_in: dict[str, object] | None = None
         self.confirmed_token: str | None = None
+        self.inbound_sms: dict[str, object] | None = None
 
     async def create_subscriber_list(self, *, company_id: str, name: str) -> dict[str, object]:
         self.created_list = {"company_id": company_id, "name": name}
@@ -95,6 +96,31 @@ class FakeSubscriberRepository:
             "status": "confirmed",
         }
 
+    async def handle_inbound_sms(
+        self,
+        *,
+        company_id: str,
+        phone_number: str,
+        shortcode: str,
+        body: str,
+        provider_message_id: str | None,
+    ) -> dict[str, object]:
+        self.inbound_sms = {
+            "company_id": company_id,
+            "phone_number": phone_number,
+            "shortcode": shortcode,
+            "body": body,
+            "provider_message_id": provider_message_id,
+        }
+        return {
+            "action": "keyword_started",
+            "reply_body": "Thanks for joining Fresh Summer alerts. Reply with your ZIP code.",
+            "conversation_state": "awaiting_zip",
+            "subscriber_id": "subscriber-3",
+            "subscriber_list_id": "list-summer",
+            "market_segment": None,
+        }
+
     async def create_campaign_with_messages(self, **kwargs):
         raise NotImplementedError
 
@@ -128,13 +154,19 @@ def test_schema_defines_subscribers_consent_suppression_and_double_opt_in_tables
         "consent_events",
         "suppression_list",
         "double_opt_in_tokens",
+        "sms_inbound_messages",
+        "sms_outbound_messages",
+        "sms_conversations",
     ]:
         assert f"CREATE TABLE IF NOT EXISTS {table}" in schema
 
     assert "double_opt_in_requested" in schema
     assert "double_opt_in_confirmed" in schema
     assert "estimated_subscriber_count INTEGER NOT NULL DEFAULT 0" in schema
+    assert "postal_code TEXT" in schema
+    assert "market_segment TEXT" in schema
     assert "idx_subscribers_company_phone" in schema
+    assert "idx_sms_inbound_company_phone_created" in schema
 
 
 def test_customer_can_create_subscriber_list(campaign_module, fake_repo) -> None:
@@ -229,3 +261,52 @@ def test_unknown_double_opt_in_token_returns_404(campaign_module, fake_repo) -> 
 
     assert response.status_code == 404
     assert response.json() == {"detail": "confirmation token not found"}
+
+
+def test_public_sms_inbound_keyword_starts_conversation(campaign_module, fake_repo) -> None:
+    client = TestClient(campaign_module.app)
+
+    response = client.post(
+        "/public/sms/inbound",
+        json={
+            "company_id": "company-1",
+            "phone_number": "+15550001001",
+            "shortcode": "12345",
+            "body": "FSummer",
+            "provider_message_id": "mo-1",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {
+        "action": "keyword_started",
+        "reply_body": "Thanks for joining Fresh Summer alerts. Reply with your ZIP code.",
+        "conversation_state": "awaiting_zip",
+        "subscriber_id": "subscriber-3",
+        "subscriber_list_id": "list-summer",
+        "market_segment": None,
+    }
+    assert fake_repo.inbound_sms == {
+        "company_id": "company-1",
+        "phone_number": "+15550001001",
+        "shortcode": "12345",
+        "body": "FSummer",
+        "provider_message_id": "mo-1",
+    }
+
+
+def test_sms_body_normalization_and_zip_segmentation(campaign_module) -> None:
+    assert campaign_module.db.normalize_sms_body("  fsummer\n") == "FSUMMER"
+    assert campaign_module.db.market_segment_for_postal_code("94105") == "West"
+    assert campaign_module.db.market_segment_for_postal_code("85001") == "Mountain"
+
+
+def test_sms_unknown_reply_preserves_existing_conversation_context(campaign_module) -> None:
+    assert campaign_module.db.sms_conversation_context(
+        {
+            "state": "subscribed",
+            "subscriber_id": "subscriber-1",
+            "subscriber_list_id": "list-summer",
+            "market_segment": "West",
+        }
+    ) == ("subscribed", "subscriber-1", "list-summer", "West")

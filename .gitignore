@@ -39,6 +39,7 @@ crash.*.log
 !.env.example
 
 # Local generated artifacts
+.cache/
 dist/
 build/
 .tmp/

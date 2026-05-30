@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 from contextlib import suppress
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,15 @@ class FakeCreditRepository:
         scheduled_at: str | None = None,
     ) -> dict[str, object]:
         resolved_recipients = recipients or []
+        if name == "Over quota":
+            raise self._campaign_module.db.MonthlyQuotaExceededError(
+                "monthly send quota exceeded",
+                requested_reach=250_000,
+                scheduled_reach=2_900_000,
+                monthly_send_limit=3_000_000,
+                quota_period_start=datetime.fromisoformat("2026-05-01T00:00:00+00:00"),
+                quota_period_end=datetime.fromisoformat("2026-06-01T00:00:00+00:00"),
+            )
         if message_type == "smart" and len(resolved_recipients) > 2:
             raise self._campaign_module.db.InsufficientCreditsError(
                 "company credits exhausted",
@@ -216,6 +226,37 @@ def test_campaign_creation_blocks_when_credits_are_exhausted(campaign_module, fa
             "message": "company credits exhausted",
             "required_credits": 6,
             "available_credits": 4,
+        }
+    }
+
+
+def test_campaign_creation_blocks_when_monthly_quota_is_exhausted(
+    campaign_module,
+    fake_repo,
+) -> None:
+    client = TestClient(campaign_module.app)
+
+    response = client.post(
+        "/campaigns",
+        headers={"X-Company-Id": "company-1"},
+        json={
+            "name": "Over quota",
+            "message_type": "regular",
+            "recipients": ["+15550001001"],
+            "scheduled_at": "2026-05-25T16:00:00Z",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": {
+            "message": "monthly send quota exceeded",
+            "requested_reach": 250_000,
+            "scheduled_reach": 2_900_000,
+            "monthly_send_limit": 3_000_000,
+            "available_reach": 100_000,
+            "quota_period_start": "2026-05-01T00:00:00+00:00",
+            "quota_period_end": "2026-06-01T00:00:00+00:00",
         }
     }
 

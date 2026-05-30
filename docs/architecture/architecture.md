@@ -4,12 +4,13 @@
 
 This repository implements a local-first, Kubernetes-ready SMS campaign platform. It is designed to demonstrate SaaS product flows and platform engineering controls without using real SMS providers or cloud resources during local review.
 
-See the Mermaid diagram in [architecture-diagram.mmd](architecture-diagram.mmd).
+See the local/Kubernetes Mermaid diagram in [architecture-diagram.mmd](architecture-diagram.mmd) and the AWS EKS Mermaid diagram in [aws-eks-architecture.mmd](aws-eks-architecture.mmd).
 
 ## Application Components
 
 - Web UI: Vite/React app served by Nginx. It proxies `/api/*` to Campaign API and `/r/*` to public tracked-link redirects.
 - Campaign API: FastAPI service for companies, access codes, memberships, subscribers, campaigns, media assets, tracked links, analytics, readiness, metrics, OpenAPI docs, and trace smoke checks.
+- Inbound SMS webhook: public endpoint for carrier/provider MO callbacks. It handles keyword opt-ins, ZIP capture, terms confirmation, STOP/HELP, and unrecognized replies.
 - Dispatcher: async worker that consumes NATS messages, calls the provider simulator, updates PostgreSQL message status, and publishes retry or dead-letter jobs.
 - Provider Simulator: FastAPI service that simulates SMS provider success, rate limiting, server errors, latency, and flaky failure modes.
 - PostgreSQL: tenant, campaign, subscriber, media, link, usage, and status data store.
@@ -33,6 +34,41 @@ Then open <http://127.0.0.1:18080>. Through this proxy:
 - API docs are available at `/api/docs`.
 - OpenAPI JSON is available at `/api/openapi.json`.
 - Public tracked links are available under `/r/{token}`.
+
+## AWS EKS Topology
+
+The EKS dev environment is designed for a brand-new AWS account and builds the network from scratch:
+
+- VPC CIDR `10.42.0.0/16`
+- public subnets across Availability Zones for internet-facing ALBs and NAT gateways
+- private subnets across Availability Zones for EKS managed nodes and pods
+- dedicated small control-plane subnets for EKS cross-account ENIs
+- one NAT gateway by default for cost-controlled dev demos, with a one-per-AZ switch for higher availability
+- VPC endpoints for ECR, S3, STS, EC2, SQS, ELB, CloudWatch Logs, SSM, and Secrets Manager
+- EKS API private endpoint access enabled, with public endpoint access restricted by operator CIDR
+- public subnet tag `kubernetes.io/role/elb=1`
+- private subnet tag `kubernetes.io/role/internal-elb=1`
+
+The AWS architecture diagram is stored in [aws-eks-architecture.mmd](aws-eks-architecture.mmd).
+
+For the job-landing AWS story, the intended managed-service evolution is:
+
+- SQS Standard for massive broadcast shard queues, inbound MO events, and outbound MT jobs
+- Redis/ElastiCache for hot-path idempotency and short-lived conversation locks
+- RDS PostgreSQL as the durable source of truth for subscribers, consent, campaigns, billing, and analytics
+
+The app now has an optional `QUEUE_PROVIDER=sqs` path for the Campaign API publisher and dispatcher worker. The default local and Helm path still uses NATS JetStream and in-cluster Redis/PostgreSQL so the full demo runs without AWS spend. See [implementation-status.md](implementation-status.md) for the exact implemented-vs-roadmap boundary.
+
+## Inbound MO / MT Conversation Flow
+
+1. A prospect sees an ad: `Text FSUMMER to 12345`.
+2. Provider sends an MO webhook to `POST /public/sms/inbound`.
+3. Campaign API records the inbound message and creates or updates a pending subscriber.
+4. API records a conversation state of `awaiting_zip` and returns an MT reply asking for ZIP code.
+5. Prospect replies with a ZIP code; API stores `postal_code`, derives `market_segment`, and asks for terms confirmation.
+6. Prospect replies `Y` or `YES`; API records double opt-in consent, adds the subscriber to the keyword list, and returns a confirmation MT.
+7. `STOP` opts out and writes the suppression list.
+8. `HELP` and unrecognized messages return deterministic support/fallback replies.
 
 ## Observability Topology
 

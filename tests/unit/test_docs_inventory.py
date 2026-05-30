@@ -9,6 +9,7 @@ EXPECTED_DOCS = [
     "docs/product/sms-saas-product-doc.md",
     "docs/architecture/architecture.md",
     "docs/architecture/architecture-diagram.mmd",
+    "docs/architecture/aws-eks-architecture.mmd",
     "docs/runbooks/local-demo.md",
     "docs/runbooks/observability.md",
     "docs/kb/customer-user-guide.md",
@@ -49,7 +50,15 @@ def test_observability_runbook_documents_trace_review_flow() -> None:
 def test_architecture_doc_links_the_mermaid_diagram() -> None:
     content = (REPO_ROOT / "docs" / "architecture" / "architecture.md").read_text()
     diagram = (REPO_ROOT / "docs" / "architecture" / "architecture-diagram.mmd").read_text()
+    aws_diagram = (
+        REPO_ROOT / "docs" / "architecture" / "aws-eks-architecture.mmd"
+    ).read_text()
 
     assert "architecture-diagram.mmd" in content
+    assert "aws-eks-architecture.mmd" in content
     assert "flowchart" in diagram
     assert "OpenTelemetry Collector" in diagram
+    assert "flowchart" in aws_diagram
+    assert "NAT Gateway" in aws_diagram
+    assert "Private subnet" in aws_diagram
+    assert "AWS Application Load Balancer" in aws_diagram

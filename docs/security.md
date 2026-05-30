@@ -8,15 +8,16 @@
 - Avoid real customer/company names in code and docs
 - Use least-privilege IAM for EKS add-ons and workloads
 - Use IRSA for AWS access from Kubernetes workloads
+- Terraform creates a dedicated app IRSA role for the `campaign-platform` service account when the app uses SQS
 - Use Kubernetes RBAC for operational access
-- Add NetworkPolicies once namespaces/services stabilize
+- Use NetworkPolicies for default-deny traffic and explicit app/data-plane paths
+- Use External Secrets Operator backed by AWS Secrets Manager or SSM Parameter Store for EKS
 - Run containers as non-root where possible
 - Avoid `latest` image tags
 - Require requests/limits for workloads
 
 ## Later controls
 
-- External Secrets Operator backed by AWS Secrets Manager or SSM Parameter Store
 - Kyverno policies for baseline workload controls
 - Trivy image scanning
 - Checkov/tflint for IaC validation

@@ -6,6 +6,18 @@
 {{- .Release.Name -}}
 {{- end -}}
 
+{{- define "campaign-platform.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "campaign-platform.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "campaign-platform.appEnvSecretName" -}}
+{{- default (printf "%s-app-env" (include "campaign-platform.fullname" .)) .Values.secrets.existingSecretName -}}
+{{- end -}}
+
 {{- define "campaign-platform.labels" -}}
 app.kubernetes.io/name: {{ include "campaign-platform.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}

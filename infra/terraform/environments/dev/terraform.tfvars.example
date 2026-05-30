@@ -1,0 +1,23 @@
+aws_region      = "us-west-2"
+aws_profile     = "your-profile"
+name            = "campaign-platform-dev"
+cluster_version = "1.35"
+
+# Replace with your current VPN, office, or home IP /32 before apply.
+cluster_endpoint_public_access_cidrs = ["203.0.113.10/32"]
+
+availability_zone_count = 3
+
+node_instance_types = ["t3.medium"]
+node_min_size       = 1
+node_desired_size   = 2
+node_max_size       = 4
+
+enable_nat_gateway     = true
+single_nat_gateway     = true
+one_nat_gateway_per_az = false
+enable_vpc_endpoints   = true
+
+tags = {
+  owner = "your-name"
+}

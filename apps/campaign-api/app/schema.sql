@@ -203,6 +203,12 @@ CREATE TABLE IF NOT EXISTS subscriber_list_memberships (
 ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS subscriber_id TEXT REFERENCES subscribers(id) ON DELETE SET NULL;
 
+ALTER TABLE subscribers
+    ADD COLUMN IF NOT EXISTS postal_code TEXT;
+
+ALTER TABLE subscribers
+    ADD COLUMN IF NOT EXISTS market_segment TEXT;
+
 CREATE TABLE IF NOT EXISTS consent_events (
     id TEXT PRIMARY KEY,
     company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -229,6 +235,45 @@ CREATE TABLE IF NOT EXISTS double_opt_in_tokens (
     expires_at TIMESTAMPTZ NOT NULL,
     confirmed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sms_inbound_messages (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    phone_number TEXT NOT NULL,
+    shortcode TEXT NOT NULL,
+    body TEXT NOT NULL,
+    normalized_body TEXT NOT NULL,
+    provider_message_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (company_id, provider_message_id)
+);
+
+CREATE TABLE IF NOT EXISTS sms_outbound_messages (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    phone_number TEXT NOT NULL,
+    shortcode TEXT NOT NULL,
+    body TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sms_conversations (
+    company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    phone_number TEXT NOT NULL,
+    shortcode TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (
+        state IN ('idle', 'awaiting_zip', 'awaiting_terms', 'subscribed', 'opted_out')
+    ),
+    keyword TEXT,
+    subscriber_id TEXT REFERENCES subscribers(id) ON DELETE SET NULL,
+    subscriber_list_id TEXT REFERENCES subscriber_lists(id) ON DELETE SET NULL,
+    postal_code TEXT,
+    market_segment TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (company_id, phone_number)
 );
 
 CREATE TABLE IF NOT EXISTS media_assets (
@@ -285,6 +330,9 @@ CREATE INDEX IF NOT EXISTS idx_subscriber_list_memberships_subscriber_created ON
 CREATE INDEX IF NOT EXISTS idx_subscriber_list_memberships_list_subscriber ON subscriber_list_memberships(subscriber_list_id, subscriber_id);
 CREATE INDEX IF NOT EXISTS idx_consent_events_subscriber_created ON consent_events(subscriber_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_double_opt_in_tokens_subscriber ON double_opt_in_tokens(subscriber_id);
+CREATE INDEX IF NOT EXISTS idx_sms_inbound_company_phone_created ON sms_inbound_messages(company_id, phone_number, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sms_outbound_company_phone_created ON sms_outbound_messages(company_id, phone_number, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sms_conversations_state ON sms_conversations(company_id, state);
 CREATE INDEX IF NOT EXISTS idx_media_assets_company_id ON media_assets(company_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_links_company_id ON campaign_links(company_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_links_campaign_id ON campaign_links(campaign_id);

@@ -1,7 +1,8 @@
+{{- if eq .Values.secrets.mode "helm" }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "campaign-platform.fullname" . }}-app-env
+  name: {{ include "campaign-platform.appEnvSecretName" . }}
   labels:
     {{- include "campaign-platform.labels" . | nindent 4 }}
 type: Opaque
@@ -11,6 +12,7 @@ stringData:
   POSTGRES_USER: {{ .Values.global.postgres.user | quote }}
   POSTGRES_PASSWORD: {{ .Values.global.postgres.password | quote }}
 ---
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,6 +20,16 @@ metadata:
   labels:
     {{- include "campaign-platform.labels" . | nindent 4 }}
 data:
+  READINESS_REQUIRE_DEPENDENCIES: {{ .Values.readiness.requireDependencies | quote }}
+  AWS_REGION: {{ .Values.global.awsRegion | quote }}
+  QUEUE_PROVIDER: {{ .Values.global.queue.provider | quote }}
+  SQS_BROADCAST_QUEUE_URL: {{ .Values.global.queue.sqs.broadcastQueueUrl | quote }}
+  SQS_RETRY_QUEUE_URL: {{ .Values.global.queue.sqs.retryQueueUrl | quote }}
+  SQS_DEAD_LETTER_QUEUE_URL: {{ .Values.global.queue.sqs.deadLetterQueueUrl | quote }}
+  SQS_ENDPOINT_URL: {{ .Values.global.queue.sqs.endpointUrl | quote }}
+  SQS_SEND_BATCH_SIZE: {{ .Values.global.queue.sqs.sendBatchSize | quote }}
+  SQS_WAIT_TIME_SECONDS: {{ .Values.global.queue.sqs.waitTimeSeconds | quote }}
+  SQS_MAX_NUMBER_OF_MESSAGES: {{ .Values.global.queue.sqs.maxNumberOfMessages | quote }}
   NATS_URL: {{ .Values.global.nats.url | quote }}
   NATS_SUBJECT: {{ .Values.global.nats.subject | quote }}
   NATS_RETRY_SUBJECT: {{ .Values.global.nats.retrySubject | quote }}

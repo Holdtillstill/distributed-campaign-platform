@@ -51,17 +51,19 @@ export function AdminDashboard({
           <div>
             <dt>Quota watch</dt>
             <dd>{formatNumber(quotaWatchCount)}</dd>
-            <small>Tenants at 80%+ monthly usage</small>
+            <dd className="metric-note">Tenants at 80%+ scheduled-send quota</dd>
           </div>
           <div>
             <dt>Access codes ready</dt>
             <dd>{formatNumber(accessCodeReadyCount)}</dd>
-            <small>Customer handoffs with active codes</small>
+            <dd className="metric-note">Customer handoffs with active codes</dd>
           </div>
           <div>
             <dt>Highest scheduled reach</dt>
             <dd>{busiestTenant ? busiestTenant.company_name : 'No tenant loaded'}</dd>
-            <small>{busiestTenant ? `${formatNumber(busiestTenant.scheduled_reach)} upcoming messages` : 'Load tenant health'}</small>
+            <dd className="metric-note">
+              {busiestTenant ? `${formatNumber(busiestTenant.scheduled_reach)} upcoming messages` : 'Load tenant health'}
+            </dd>
           </div>
         </dl>
       </section>
@@ -102,7 +104,7 @@ export function AdminDashboard({
               header: 'Health',
               render: (row) => {
                 const pct = Math.round(row.quota_usage * 100)
-                const label = pct >= 95 ? 'Quota critical' : pct >= 80 ? 'Quota watch' : 'Stable'
+                const label = pct >= 100 ? 'Quota blocked' : pct >= 95 ? 'Quota critical' : pct >= 80 ? 'Quota watch' : 'Stable'
                 const tone = pct >= 95 ? 'status-pill danger' : pct >= 80 ? 'status-pill warning' : 'status-pill'
                 return <span className={tone}>{label}</span>
               },

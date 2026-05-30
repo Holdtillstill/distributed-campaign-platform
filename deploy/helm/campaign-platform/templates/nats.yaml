@@ -1,11 +1,12 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "campaign-platform.fullname" . }}-nats
   labels:
     {{- include "campaign-platform.labels" . | nindent 4 }}
     app.kubernetes.io/component: nats
 spec:
+  serviceName: {{ include "campaign-platform.fullname" . }}-nats
   replicas: 1
   selector:
     matchLabels:
@@ -20,12 +21,15 @@ spec:
       containers:
         - name: nats
           image: {{ .Values.nats.image | quote }}
-          args: ["-js", "-m", "8222"]
+          args: ["-js", "-sd", "/data", "-m", "8222"]
           ports:
             - name: nats
               containerPort: 4222
             - name: monitor
               containerPort: 8222
+          volumeMounts:
+            - name: nats-data
+              mountPath: /data
           readinessProbe:
             httpGet:
               path: /healthz?js-enabled-only=true
@@ -38,6 +42,24 @@ spec:
               port: monitor
             initialDelaySeconds: 15
             periodSeconds: 10
+      {{- if not .Values.nats.persistence.enabled }}
+      volumes:
+        - name: nats-data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.nats.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: nats-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.nats.persistence.storageClassName }}
+        storageClassName: {{ .Values.nats.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.nats.persistence.size | quote }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: Service

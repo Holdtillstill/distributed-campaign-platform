@@ -8,6 +8,7 @@ WORKDIR /app
 
 RUN pip install --default-timeout=100 --no-cache-dir \
     "asyncpg>=0.29" \
+    "boto3>=1.34" \
     "fastapi>=0.115" \
     "nats-py>=2.8" \
     "opentelemetry-api>=1.26" \

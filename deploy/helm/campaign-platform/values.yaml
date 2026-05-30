@@ -1,5 +1,16 @@
 global:
   imagePullPolicy: IfNotPresent
+  awsRegion: us-west-2
+  queue:
+    provider: nats
+    sqs:
+      broadcastQueueUrl: ""
+      retryQueueUrl: ""
+      deadLetterQueueUrl: ""
+      endpointUrl: ""
+      sendBatchSize: "10"
+      waitTimeSeconds: "20"
+      maxNumberOfMessages: "10"
   nats:
     url: nats://campaign-platform-nats:4222
     subject: messages.dispatch
@@ -13,6 +24,49 @@ global:
     password: campaigns
     host: campaign-platform-postgres
     port: 5432
+
+eks:
+  enabled: false
+
+readiness:
+  requireDependencies: "true"
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext: {}
+
+containerSecurityContext: {}
+
+secrets:
+  mode: helm
+  existingSecretName: ""
+  externalSecret:
+    refreshInterval: 1h
+    secretStoreRef:
+      name: campaign-platform
+      kind: ClusterSecretStore
+    remoteRefs:
+      databaseUrl:
+        key: /campaign-platform/dev/database-url
+      postgresDb:
+        key: /campaign-platform/dev/postgres-db
+      postgresUser:
+        key: /campaign-platform/dev/postgres-user
+      postgresPassword:
+        key: /campaign-platform/dev/postgres-password
+
+ingress:
+  enabled: false
+  className: alb
+  annotations: {}
+  hosts: []
+  tls: []
+  webUi:
+    path: /
+    pathType: Prefix
 
 campaignApi:
   image:
@@ -31,6 +85,11 @@ campaignApi:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
 
 providerSimulator:
   image:
@@ -49,6 +108,11 @@ providerSimulator:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
   providerMode: success
   latencyMs: "0"
   failureRate: "0.0"
@@ -72,6 +136,11 @@ dispatcher:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
 
 webUi:
   image:
@@ -92,6 +161,11 @@ webUi:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
 
 observability:
   namespace: observability
@@ -105,13 +179,22 @@ observability:
 
 networkPolicy:
   enabled: true
+  publicIngressCidrs: []
 
 postgres:
+  enabled: true
   image: postgres:16-alpine
-  storage: 1Gi
+  persistence:
+    enabled: false
+    storageClassName: ""
+    size: 1Gi
 
 redis:
   image: redis:7-alpine
 
 nats:
   image: nats:2.10-alpine
+  persistence:
+    enabled: false
+    storageClassName: ""
+    size: 1Gi

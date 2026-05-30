@@ -21,7 +21,15 @@ export function QuotaBar({
         <strong>{label}</strong>
         <span>{hasLimit ? percentageLabel : 'Not configured'}</span>
       </div>
-      <div className="quota-track" aria-label={`${label} quota usage`}>
+      <div
+        className="quota-track"
+        role="progressbar"
+        aria-label={`${label} quota usage`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percentage}
+        aria-valuetext={hasLimit ? percentageLabel : 'Not configured'}
+      >
         <span style={{ width: `${Math.max(percentage, hasLimit && safeUsed > 0 ? 1 : 0)}%` }} />
       </div>
       <p>{helper ?? (hasLimit ? `${safeUsed.toLocaleString()} of ${limit.toLocaleString()} credits used.` : 'Add a monthly send limit to enable quota tracking.')}</p>

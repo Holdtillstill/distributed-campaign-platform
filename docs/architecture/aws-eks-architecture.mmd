@@ -1,0 +1,129 @@
+flowchart TB
+  internet["Internet"] --> route53["Optional Route 53 / ACM"]
+  route53 --> alb["AWS Application Load Balancer"]
+  internet --> alb
+  handset["Mobile subscriber"] --> provider_webhook["SMS provider webhook"]
+  provider_webhook --> alb
+
+  ci["Developer or CI"] --> ecr["Amazon ECR"]
+  ci --> eks_api["EKS API endpoint"]
+
+  subgraph aws_account["Brand New AWS Account"]
+    subgraph region["AWS Region us-west-2"]
+      subgraph vpc["Campaign Platform VPC 10.42.0.0/16"]
+        igw["Internet Gateway"]
+
+        subgraph az_a["Availability Zone A"]
+          public_a["Public subnet\nALB + NAT"]
+          nat_a["NAT Gateway A\ndev default"]
+          private_a["Private subnet\nEKS nodes + pods"]
+          control_a["Control-plane subnet\nEKS X-ENI"]
+        end
+
+        subgraph az_b["Availability Zone B"]
+          public_b["Public subnet\nALB + optional NAT"]
+          nat_b["Optional NAT Gateway B"]
+          private_b["Private subnet\nEKS nodes + pods"]
+          control_b["Control-plane subnet\nEKS X-ENI"]
+        end
+
+        subgraph az_c["Availability Zone C"]
+          public_c["Public subnet\nALB + optional NAT"]
+          nat_c["Optional NAT Gateway C"]
+          private_c["Private subnet\nEKS nodes + pods"]
+          control_c["Control-plane subnet\nEKS X-ENI"]
+        end
+
+        endpoints["VPC endpoints\nECR, S3, STS, EC2, SQS, ELB,\nLogs, SSM, Secrets Manager"]
+
+        alb --> public_a
+        alb --> public_b
+        alb --> public_c
+
+        public_a --> igw
+        public_b --> igw
+        public_c --> igw
+
+        private_a --> nat_a --> public_a
+        private_b --> nat_b --> public_b
+        private_c --> nat_c --> public_c
+
+        private_a --> endpoints
+        private_b --> endpoints
+        private_c --> endpoints
+      end
+
+      subgraph eks["Amazon EKS"]
+        eks_api
+        oidc["IAM OIDC provider"]
+        node_group["Managed node group\nprivate subnets"]
+      end
+
+      subgraph k8s["campaign-platform namespace"]
+        web["Web UI"]
+        api["Campaign API"]
+        dispatcher["Dispatcher"]
+        provider["Provider Simulator"]
+        pg["PostgreSQL StatefulSet"]
+        nats["NATS JetStream StatefulSet"]
+        redis["Redis"]
+      end
+
+      subgraph platform["Platform add-ons"]
+        lbc["AWS Load Balancer Controller\nIRSA"]
+        eso["External Secrets Operator\nIRSA"]
+        ebs["EBS CSI Driver\nIRSA"]
+        otel["OpenTelemetry Collector"]
+        prometheus["Prometheus / Grafana / Loki / Tempo"]
+      end
+
+      secrets["AWS Secrets Manager or SSM"]
+      sqs["Amazon SQS Standard\nbroadcast shards + MO/MT jobs"]
+      redis_cache["Redis / ElastiCache\nhot dedupe + conversation locks"]
+      ebs_volumes["EBS gp3 volumes"]
+    end
+  end
+
+  public_a -. "subnet tag kubernetes.io/role/elb" .- lbc
+  public_b -. "subnet tag kubernetes.io/role/elb" .- lbc
+  public_c -. "subnet tag kubernetes.io/role/elb" .- lbc
+  private_a -. "subnet tag kubernetes.io/role/internal-elb" .- lbc
+  private_b -. "subnet tag kubernetes.io/role/internal-elb" .- lbc
+  private_c -. "subnet tag kubernetes.io/role/internal-elb" .- lbc
+
+  control_a --> eks_api
+  control_b --> eks_api
+  control_c --> eks_api
+  node_group --> private_a
+  node_group --> private_b
+  node_group --> private_c
+
+  alb --> web
+  web --> api
+  provider_webhook --> api
+  api --> pg
+  api --> nats
+  api --> sqs
+  api --> redis_cache
+  nats --> dispatcher
+  sqs --> dispatcher
+  dispatcher --> provider
+  dispatcher --> pg
+  dispatcher --> redis_cache
+  api --> redis
+
+  ecr --> node_group
+  oidc --> lbc
+  oidc --> eso
+  oidc --> ebs
+  eso --> secrets
+  ebs --> ebs_volumes
+  pg --> ebs_volumes
+  nats --> ebs_volumes
+
+  api --> otel
+  dispatcher --> otel
+  provider --> otel
+  prometheus --> api
+  prometheus --> dispatcher
+  prometheus --> provider

@@ -71,7 +71,15 @@ function adminPageFromLocation(): AdminPage {
 }
 
 function campaignSubpageFromLocation(): CampaignSubpage | undefined {
-  return isCampaignMonitorPath(window.location.pathname) ? 'monitor' : undefined
+  const path = window.location.pathname
+  if (isCampaignMonitorPath(path)) return 'monitor'
+
+  const campaignSegment = firstRouteSegment(path, '/app/campaigns')
+  if (campaignSegment === 'new') return 'create'
+  if (campaignSegment === 'scheduled') return 'scheduled'
+  if (campaignSegment === 'sent') return 'past'
+  if (campaignSegment === 'follow-ups') return 'followups'
+  return undefined
 }
 
 function unavailableAuthenticatedRouteFromLocation(): AuthenticatedRouteUnavailable | null {
@@ -318,6 +326,16 @@ export default function App() {
     return customerAccess
   }
 
+  if (surface === 'internal' && session.role !== 'internal_admin') {
+    return (
+      <InternalLoginPage
+        adminEmail={adminEmail}
+        onAdminEmail={setAdminEmail}
+        onLogin={loginInternalAdmin}
+      />
+    )
+  }
+
   if (session.role === 'internal_admin' && surface === 'marketing') {
     return <MarketingPage onCustomerAccess={() => navigate('app')} onInternalAccess={() => navigate('internal')} />
   }
@@ -359,7 +377,7 @@ function AuthenticatedRoutePlaceholder({ route }: { route: AuthenticatedRouteUna
   const homePath = isInternal ? adminPagePaths.dashboard : companyPagePaths.dashboard
   const availableRoutes = isInternal
     ? Object.values(adminPagePaths).join(', ')
-    : [...Object.values(companyPagePaths), '/app/monitor', '/monitor'].join(', ')
+    : [...Object.values(companyPagePaths), '/app/campaigns/new', '/app/monitor', '/monitor'].join(', ')
 
   return (
     <section className="panel route-placeholder" aria-label="Unavailable route">

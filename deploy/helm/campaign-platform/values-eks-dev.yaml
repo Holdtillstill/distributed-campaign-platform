@@ -1,0 +1,86 @@
+eks:
+  enabled: true
+
+global:
+  imagePullPolicy: IfNotPresent
+
+campaignApi:
+  image:
+    repository: REPLACE_WITH_ECR_REPOSITORY/campaign-api
+    tag: dev
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+providerSimulator:
+  image:
+    repository: REPLACE_WITH_ECR_REPOSITORY/provider-simulator
+    tag: dev
+  replicas: 2
+
+dispatcher:
+  image:
+    repository: REPLACE_WITH_ECR_REPOSITORY/dispatcher
+    tag: dev
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+webUi:
+  image:
+    repository: REPLACE_WITH_ECR_REPOSITORY/web-ui
+    tag: dev
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+secrets:
+  mode: externalSecret
+  externalSecret:
+    refreshInterval: 1h
+    secretStoreRef:
+      name: campaign-platform
+      kind: ClusterSecretStore
+    remoteRefs:
+      databaseUrl:
+        key: /campaign-platform/dev/database-url
+      postgresDb:
+        key: /campaign-platform/dev/postgres-db
+      postgresUser:
+        key: /campaign-platform/dev/postgres-user
+      postgresPassword:
+        key: /campaign-platform/dev/postgres-password
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+  hosts: []
+
+networkPolicy:
+  publicIngressCidrs:
+    - 0.0.0.0/0
+
+postgres:
+  persistence:
+    enabled: true
+    storageClassName: gp3
+    size: 8Gi
+
+nats:
+  persistence:
+    enabled: true
+    storageClassName: gp3
+    size: 8Gi

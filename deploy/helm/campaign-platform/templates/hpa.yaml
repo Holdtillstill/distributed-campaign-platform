@@ -1,0 +1,32 @@
+{{- $root := . -}}
+{{- range $service := list
+  (dict "component" "campaign-api" "values" .Values.campaignApi)
+  (dict "component" "provider-simulator" "values" .Values.providerSimulator)
+  (dict "component" "dispatcher" "values" .Values.dispatcher)
+  (dict "component" "web-ui" "values" .Values.webUi)
+}}
+{{- if $service.values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "campaign-platform.fullname" $root }}-{{ $service.component }}
+  labels:
+    {{- include "campaign-platform.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $service.component }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "campaign-platform.fullname" $root }}-{{ $service.component }}
+  minReplicas: {{ $service.values.autoscaling.minReplicas }}
+  maxReplicas: {{ $service.values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $service.values.autoscaling.targetCPUUtilizationPercentage }}
+---
+{{- end }}
+{{- end }}

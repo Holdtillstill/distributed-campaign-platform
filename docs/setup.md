@@ -76,3 +76,9 @@ make destroy-dev
 ```
 
 Until those targets exist, manually run Terraform destroy after every EKS test.
+
+## EKS deployment path
+
+The executable EKS dev flow now lives in [`docs/runbooks/eks-dev.md`](runbooks/eks-dev.md). It provisions AWS with Terraform, builds/pushes ECR images, installs required cluster add-ons, deploys the Helm EKS overlay, and tears everything down afterward.
+
+For a brand-new AWS account, the Terraform dev environment creates the VPC, public subnets, private subnets, dedicated EKS control-plane subnets, NAT, VPC endpoints, ECR repositories, SQS queues, IRSA roles, and EKS cluster from scratch. Dev defaults use one NAT gateway to control cost; set `single_nat_gateway=false` and `one_nat_gateway_per_az=true` when you want the higher-availability network shape. Before apply, replace the example `cluster_endpoint_public_access_cidrs` value with your trusted operator IP range.
