@@ -15,8 +15,7 @@ permissions:
 
 env:
   AWS_REGION: us-west-2
-  AWS_ROLE_TO_ASSUME: arn:aws:iam::<AWS_ACCOUNT_ID>:role/bozhi-campaign-platform-image-publish
-  ECR_REGISTRY: <AWS_ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com
+  AWS_ROLE_TO_ASSUME: ${{ vars.AWS_ROLE_TO_ASSUME }}
 
 jobs:
   publish:
@@ -48,6 +47,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
 
       - uses: docker/build-push-action@v6
         with:
@@ -56,5 +56,5 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ matrix.repository }}:main
-            ${{ env.ECR_REGISTRY }}/${{ matrix.repository }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:main
+            ${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:${{ github.sha }}
