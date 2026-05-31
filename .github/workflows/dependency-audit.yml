@@ -1,0 +1,48 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "37 8 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  python-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: python -m pip install uv
+
+      - name: Audit Python dependencies
+        run: |
+          uv export --format requirements-txt --no-hashes > /tmp/distributed-campaign-platform-requirements.txt
+          uvx pip-audit --no-deps --disable-pip -r /tmp/distributed-campaign-platform-requirements.txt
+
+  web-ui-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web-ui/package-lock.json
+
+      - run: npm ci
+        working-directory: apps/web-ui
+
+      - name: Audit web UI dependencies
+        run: npm audit --audit-level=high
+        working-directory: apps/web-ui
