@@ -1,0 +1,60 @@
+name: Publish Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/**
+      - .github/workflows/image-publish.yaml
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ROLE_TO_ASSUME: arn:aws:iam::958924735403:role/bozhi-campaign-platform-image-publish
+  ECR_REGISTRY: 958924735403.dkr.ecr.us-west-2.amazonaws.com
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: campaign-api
+            dockerfile: apps/campaign-api/Dockerfile
+            repository: distributed-campaign-platform/campaign-api
+          - name: dispatcher
+            dockerfile: apps/dispatcher/Dockerfile
+            repository: distributed-campaign-platform/dispatcher
+          - name: provider-simulator
+            dockerfile: apps/provider-simulator/Dockerfile
+            repository: distributed-campaign-platform/provider-simulator
+          - name: web-ui
+            dockerfile: apps/web-ui/Dockerfile
+            repository: distributed-campaign-platform/web-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ matrix.repository }}:main
+            ${{ env.ECR_REGISTRY }}/${{ matrix.repository }}:${{ github.sha }}
