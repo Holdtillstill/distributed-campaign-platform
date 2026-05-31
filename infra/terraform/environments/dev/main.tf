@@ -264,7 +264,7 @@ module "eks" {
 
 module "ebs_csi_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
+  version = "~> 6.6"
 
   role_name             = "${var.name}-ebs-csi"
   attach_ebs_csi_policy = true
@@ -285,7 +285,7 @@ resource "aws_eks_addon" "ebs_csi" {
 
 module "load_balancer_controller_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
+  version = "~> 6.6"
 
   role_name                              = "${var.name}-aws-lbc"
   attach_load_balancer_controller_policy = true
