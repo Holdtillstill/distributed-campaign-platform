@@ -62,6 +62,12 @@ ALTER TABLE companies
 ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS credit_balance INTEGER NOT NULL DEFAULT 0;
 
+UPDATE companies
+SET
+    monthly_send_limit = COALESCE(monthly_send_limit, 50000),
+    credit_balance = GREATEST(credit_balance, 5000)
+WHERE id = 'demo-company';
+
 ALTER TABLE company_memberships
     ADD COLUMN IF NOT EXISTS credit_limit INTEGER;
 
