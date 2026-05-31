@@ -172,6 +172,12 @@ observability:
   serviceMonitor:
     enabled: true
     interval: 15s
+  alerts:
+    enabled: true
+    apiErrorRateThreshold: 0.05
+    apiLatencyP95Seconds: 0.5
+    natsPendingMessagesThreshold: 100
+    natsAckPendingMessagesThreshold: 25
   otel:
     enabled: true
     endpoint: http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317
@@ -194,6 +200,17 @@ redis:
 
 nats:
   image: nats:2.10-alpine
+  exporter:
+    enabled: true
+    image: natsio/prometheus-nats-exporter:0.20.0
+    port: 7777
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
   persistence:
     enabled: false
     storageClassName: ""

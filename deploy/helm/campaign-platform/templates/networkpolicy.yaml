@@ -135,4 +135,27 @@ spec:
           port: 5432
         - protocol: TCP
           port: 4222
+{{- if .Values.nats.exporter.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "campaign-platform.fullname" . }}-nats-metrics
+  labels:
+    {{- include "campaign-platform.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: nats
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.observability.namespace | quote }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.nats.exporter.port }}
+{{- end }}
 {{- end }}

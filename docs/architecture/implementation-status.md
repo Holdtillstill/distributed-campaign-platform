@@ -13,7 +13,7 @@ This project is a portfolio platform demo. It is intentionally local-first, with
 | Database | PostgreSQL schema covers tenants, subscribers, consent, campaigns, messages, links, reminders, and SMS conversations. | Local/kind/EKS demo chart runs a single in-cluster PostgreSQL StatefulSet. | Use RDS PostgreSQL for automated backup, Multi-AZ failover, patching, and durable production operations. |
 | Inbound SMS | `POST /public/sms/inbound` handles keyword, ZIP, Y/N, STOP, HELP, and unknown replies. | Provider simulator is not a real carrier integration. | Add provider signature validation, provider-specific payload adapters, webhook replay protection, and async inbound queueing. |
 | AWS network | Terraform creates VPC, public/private/control-plane subnets, EKS, ECR, SQS, VPC endpoints, NAT, and IRSA roles. | Dev defaults optimize cost with one NAT gateway while retaining multi-AZ subnets. | For higher availability, set `single_nat_gateway=false` and `one_nat_gateway_per_az=true`; add RDS and ElastiCache subnets/security groups. |
-| Observability | OpenTelemetry, Prometheus annotations, Grafana/Loki/Tempo values, and runbooks are present. | Queue depth and SQS-specific dashboards are not yet first-class. | Add SQS queue age/depth alerts, Redis hit-rate metrics, RDS metrics, and DLQ redrive runbooks. |
+| Observability | OpenTelemetry, trace/log correlation, Prometheus ServiceMonitors, RED metrics, workflow counters, NATS JetStream exporter metrics, Grafana/Loki/Tempo values, app dashboards, PrometheusRule alerts, and runbooks are present. | The default demo observes the in-cluster NATS path directly and the optional SQS path through app-level counters. | Add AWS SQS queue age/depth alerts, Redis hit-rate metrics, RDS metrics, and DLQ redrive runbooks before calling it production coverage. |
 
 ## Deployment Claims
 
@@ -43,4 +43,3 @@ AWS_REGION=us-west-2
 ```
 
 Use NATS when reviewing the project without AWS. Use SQS when proving the managed AWS queue path.
-

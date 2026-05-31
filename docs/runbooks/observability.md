@@ -157,6 +157,23 @@ campaign_api_service_info
 dispatcher_service_info
 provider_simulator_service_info
 up
+sum by (route, status_code) (rate(campaign_api_http_requests_total[5m]))
+histogram_quantile(0.95, sum(rate(campaign_api_http_request_duration_seconds_bucket[5m])) by (le, route))
+sum by (status, message_type, audience_mode) (increase(campaign_api_campaigns_created_total[15m]))
+sum by (status, message_type) (increase(campaign_api_campaign_messages_total[15m]))
+sum by (status, retry, dead_letter) (increase(dispatcher_dispatcher_messages_total[15m]))
+sum by (http_status, provider_status) (increase(provider_simulator_provider_requests_total[15m]) or increase(dispatcher_provider_requests_total[15m]))
+sum by (operation) (increase(campaign_api_workflow_exceptions_total[15m]) or increase(dispatcher_workflow_exceptions_total[15m]))
+sum by (stream_name, consumer_name) (jetstream_consumer_num_pending{stream_name="CAMPAIGN_MESSAGES"})
+sum by (stream_name, consumer_name) (jetstream_consumer_num_ack_pending{stream_name="CAMPAIGN_MESSAGES"})
+sum by (stream_name, consumer_name) (jetstream_consumer_num_redelivered{stream_name="CAMPAIGN_MESSAGES"})
+```
+
+The app chart also installs PrometheusRule alerts when
+`observability.alerts.enabled=true`. Check them in Prometheus:
+
+```promql
+ALERTS{alertname=~"Campaign.*"}
 ```
 
 ## Check Logs In Loki
@@ -165,9 +182,14 @@ In Grafana Explore, select Loki and query:
 
 ```logql
 {app_kubernetes_io_component="campaign-api"}
+| json
 ```
 
 Try the same label for `dispatcher` and `provider-simulator`.
+
+Application logs include `trace_id` and `span_id` when a request is inside an
+active OpenTelemetry span. Use those IDs to pivot from Loki to Tempo during a
+failure investigation.
 
 ## Troubleshooting Missing Traces
 
@@ -212,6 +234,18 @@ kubectl -n campaign-platform describe networkpolicy campaign-platform-app-depend
 ```
 
 Look for egress to namespace `observability` on ports `4317` and `4318`, and ingress from namespace `observability` on port `8080`.
+
+For NATS JetStream backlog metrics, also confirm the NATS exporter sidecar and
+ServiceMonitor are present:
+
+```bash
+kubectl -n campaign-platform get pod -l app.kubernetes.io/component=nats -o jsonpath='{.items[0].spec.containers[*].name}'
+kubectl -n campaign-platform get servicemonitor campaign-platform-nats
+```
+
+The expected containers are `nats` and `nats-exporter`. Prometheus should show
+`jetstream_consumer_num_pending`, `jetstream_consumer_num_ack_pending`, and
+`jetstream_consumer_num_redelivered` after a JetStream consumer exists.
 
 If Grafana shows no traces:
 

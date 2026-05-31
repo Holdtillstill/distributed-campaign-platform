@@ -113,6 +113,32 @@ def test_services_expose_prometheus_metrics(
 
 
 @pytest.mark.parametrize(
+    "module_fixture,metric_prefix",
+    [
+        ("campaign_module", "campaign_api"),
+        ("provider_module", "provider_simulator"),
+        ("dispatcher_module", "dispatcher"),
+    ],
+)
+def test_services_record_http_red_metrics(
+    request,
+    module_fixture: str,
+    metric_prefix: str,
+) -> None:
+    module = request.getfixturevalue(module_fixture)
+    client = TestClient(module.app)
+
+    client.get("/readyz")
+    response = client.get("/metrics")
+
+    assert f"{metric_prefix}_http_requests_total" in response.text
+    assert 'method="GET"' in response.text
+    assert 'route="/readyz"' in response.text
+    assert 'status_code="200"' in response.text
+    assert f"{metric_prefix}_http_request_duration_seconds_bucket" in response.text
+
+
+@pytest.mark.parametrize(
     "module_fixture,service_name",
     [
         ("campaign_module", "campaign-api"),

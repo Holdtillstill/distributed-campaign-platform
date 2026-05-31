@@ -19,4 +19,23 @@ spec:
       interval: {{ $root.Values.observability.serviceMonitor.interval }}
 ---
 {{- end }}
+{{- if $root.Values.nats.exporter.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "campaign-platform.fullname" $root }}-nats
+  labels:
+    {{- include "campaign-platform.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: nats
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $root.Release.Name }}
+      app.kubernetes.io/component: nats
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ $root.Values.observability.serviceMonitor.interval }}
+---
+{{- end }}
 {{- end }}

@@ -5,6 +5,16 @@ import sys
 from typing import Any
 
 import structlog
+from opentelemetry import trace
+
+
+def add_trace_context(_, __, event_dict: dict[str, Any]) -> dict[str, Any]:
+    span = trace.get_current_span()
+    context = span.get_span_context()
+    if context.is_valid:
+        event_dict["trace_id"] = f"{context.trace_id:032x}"
+        event_dict["span_id"] = f"{context.span_id:016x}"
+    return event_dict
 
 
 def configure_logging(service_name: str) -> None:
@@ -24,6 +34,7 @@ def configure_logging(service_name: str) -> None:
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
+            add_trace_context,
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.JSONRenderer(),
         ],

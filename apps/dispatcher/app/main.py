@@ -12,7 +12,7 @@ import asyncpg
 import httpx
 from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
-from campaign_common.observability import add_platform_endpoints
+from campaign_common.observability import add_platform_endpoints, get_platform_metrics
 from campaign_common.tracing import context_from_payload, get_tracer, instrument_fastapi_app
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -30,6 +30,7 @@ DEFAULT_PROVIDER_URL = "http://provider-simulator:8080"
 configure_logging(SERVICE_NAME)
 logger = get_logger(__name__)
 tracer = get_tracer(__name__)
+metrics = get_platform_metrics(SERVICE_NAME)
 
 
 class MessageJob(BaseModel):
@@ -209,14 +210,17 @@ async def dispatch_message(
     publish_retry: PublishMessageJob | None = None,
     publish_dead_letter: PublishMessageJob | None = None,
 ) -> str:
+    provider_http_status = "exception"
     try:
         provider_result = await send_to_provider(job)
+        provider_http_status = str(provider_result.http_status)
         outcome = dispatch_outcome_from_provider_result(
             provider_result,
             retry_count=job.retry_count,
             max_attempts=max_attempts,
         )
     except Exception:
+        metrics.workflow_exceptions_total.labels(operation="provider.send").inc()
         next_retry_count = job.retry_count + 1
         outcome = DispatchOutcome(
             status=(
@@ -230,6 +234,15 @@ async def dispatch_message(
         )
 
     await update_status(job.message_id, outcome.status)
+    metrics.dispatcher_messages_total.labels(
+        status=outcome.status,
+        retry=str(outcome.should_retry).lower(),
+        dead_letter=str(outcome.should_dead_letter).lower(),
+    ).inc()
+    metrics.provider_requests_total.labels(
+        http_status=provider_http_status,
+        provider_status=outcome.status,
+    ).inc()
     payload = retry_job_payload(job, retry_count=outcome.retry_count)
     if outcome.should_retry and publish_retry is not None:
         await publish_retry(payload)

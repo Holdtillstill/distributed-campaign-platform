@@ -1,0 +1,101 @@
+{{- if .Values.observability.alerts.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "campaign-platform.fullname" . }}-slo-alerts
+  labels:
+    {{- include "campaign-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: observability
+spec:
+  groups:
+    - name: campaign-platform.slo
+      rules:
+        - alert: CampaignApiTargetDown
+          expr: absent(up{namespace="{{ .Release.Namespace }}", service="{{ include "campaign-platform.fullname" . }}-campaign-api"}) or min(up{namespace="{{ .Release.Namespace }}", service="{{ include "campaign-platform.fullname" . }}-campaign-api"}) == 0
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: Campaign API target is down.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignDispatcherTargetDown
+          expr: absent(up{namespace="{{ .Release.Namespace }}", service="{{ include "campaign-platform.fullname" . }}-dispatcher"}) or min(up{namespace="{{ .Release.Namespace }}", service="{{ include "campaign-platform.fullname" . }}-dispatcher"}) == 0
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: Dispatcher target is down.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignProviderTargetDown
+          expr: absent(up{namespace="{{ .Release.Namespace }}", service="{{ include "campaign-platform.fullname" . }}-provider-simulator"}) or min(up{namespace="{{ .Release.Namespace }}", service="{{ include "campaign-platform.fullname" . }}-provider-simulator"}) == 0
+          for: 2m
+          labels:
+            severity: ticket
+          annotations:
+            summary: Provider simulator target is down.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignApiHigh5xxRate
+          expr: (sum(rate(campaign_api_http_requests_total{status_code=~"5.."}[5m])) / clamp_min(sum(rate(campaign_api_http_requests_total[5m])), 1)) > {{ .Values.observability.alerts.apiErrorRateThreshold }}
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: Campaign API 5xx rate is above the SLO threshold.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignApiHighLatencyP95
+          expr: histogram_quantile(0.95, sum(rate(campaign_api_http_request_duration_seconds_bucket[5m])) by (le)) > {{ .Values.observability.alerts.apiLatencyP95Seconds }}
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: Campaign API p95 latency is above the demo SLO threshold.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignDispatchDeadLetters
+          expr: increase(dispatcher_dispatcher_messages_total{status="dead_lettered"}[5m]) > 0
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: Messages are reaching the dead-letter path.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignProviderRateLimited
+          expr: increase(provider_simulator_provider_requests_total{http_status="429"}[5m]) > 0
+          for: 2m
+          labels:
+            severity: ticket
+          annotations:
+            summary: Provider rate limiting is being observed.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignQueuedWithoutDispatch
+          expr: increase(campaign_api_campaign_messages_total{status="queued"}[10m]) > 0 and increase(dispatcher_dispatcher_messages_total[10m]) == 0
+          for: 10m
+          labels:
+            severity: page
+          annotations:
+            summary: Campaign messages were queued but no dispatcher outcomes were observed.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignNatsConsumerBacklog
+          expr: max(jetstream_consumer_num_pending{stream_name="CAMPAIGN_MESSAGES"}) > {{ .Values.observability.alerts.natsPendingMessagesThreshold }}
+          for: 10m
+          labels:
+            severity: page
+          annotations:
+            summary: NATS JetStream consumer backlog is above the demo threshold.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignNatsAckPending
+          expr: max(jetstream_consumer_num_ack_pending{stream_name="CAMPAIGN_MESSAGES"}) > {{ .Values.observability.alerts.natsAckPendingMessagesThreshold }}
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: NATS JetStream has messages delivered but waiting for acknowledgements.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignNatsRedeliveries
+          expr: increase(jetstream_consumer_num_redelivered{stream_name="CAMPAIGN_MESSAGES"}[10m]) > 0
+          for: 5m
+          labels:
+            severity: ticket
+          annotations:
+            summary: NATS JetStream is redelivering campaign messages.
+            runbook_url: docs/runbooks/observability.md
+{{- end }}

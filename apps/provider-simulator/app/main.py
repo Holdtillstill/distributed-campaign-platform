@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from campaign_common.logging import configure_logging, get_logger
-from campaign_common.observability import add_platform_endpoints
+from campaign_common.observability import add_platform_endpoints, get_platform_metrics
 from campaign_common.tracing import instrument_fastapi_app
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -18,6 +18,7 @@ VALID_PROVIDER_MODES = {"success", "rate_limit", "server_error", "flaky"}
 
 configure_logging("provider-simulator")
 logger = get_logger(__name__)
+metrics = get_platform_metrics("provider-simulator")
 
 
 class SendRequest(BaseModel):
@@ -79,6 +80,10 @@ async def send_message(request: SendRequest) -> JSONResponse:
         await asyncio.sleep(settings.latency_ms / 1000)
 
     result = simulate_provider_response(request, settings)
+    metrics.provider_requests_total.labels(
+        http_status=str(result.http_status),
+        provider_status=result.body.status,
+    ).inc()
     logger.info(
         "provider_send_simulated",
         message_id=request.message_id,

@@ -10,7 +10,7 @@ Components:
 - Tempo for traces
 - OpenTelemetry Collector for OTLP ingest and fan-out
 
-The app chart can emit `ServiceMonitor` resources for Campaign API, Provider Simulator, and Dispatcher when the Prometheus Operator CRDs are installed.
+The app chart can emit `ServiceMonitor` resources for Campaign API, Provider Simulator, Dispatcher, and the NATS exporter when the Prometheus Operator CRDs are installed. It also ships app-level PrometheusRule alerts for target health, API error rate, API latency, provider rate limits, dispatch dead letters, queued messages with no dispatcher outcomes, and JetStream backlog/ack-pending/redelivery pressure.
 
 ## Local install sketch
 
@@ -111,6 +111,8 @@ This installs two starter dashboards:
 
 - `Campaign Platform Essential Overview`
 - `Kubernetes Essential Overview`
+
+The campaign dashboard includes service health, API RED metrics, campaign creation, queued messages, dispatcher outcomes, provider responses, and NATS JetStream pending/ack-pending/redelivery signals. AWS-native SQS queue age/depth dashboards are still a production evolution item for the optional SQS mode.
 
 Grafana dashboard URLs:
 

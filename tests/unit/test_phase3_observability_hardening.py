@@ -36,9 +36,28 @@ def test_app_chart_can_emit_service_monitor_resources() -> None:
     templates = _template_text()
 
     assert "serviceMonitor:" in values
+    assert "natsio/prometheus-nats-exporter" in values
     assert "kind: ServiceMonitor" in templates
     assert "endpoints:" in templates
     assert "path: /metrics" in templates
+    assert "app.kubernetes.io/component: nats" in templates
+    assert "port: metrics" in templates
+
+
+def test_app_chart_includes_actionable_prometheus_rules() -> None:
+    values = (CHART_DIR / "values.yaml").read_text()
+    templates = _template_text()
+
+    assert "alerts:" in values
+    assert "kind: PrometheusRule" in templates
+    assert "CampaignApiHigh5xxRate" in templates
+    assert "CampaignApiHighLatencyP95" in templates
+    assert "CampaignDispatchDeadLetters" in templates
+    assert "CampaignQueuedWithoutDispatch" in templates
+    assert "CampaignNatsConsumerBacklog" in templates
+    assert "jetstream_consumer_num_pending" in templates
+    assert "CampaignNatsAckPending" in templates
+    assert "CampaignNatsRedeliveries" in templates
 
 
 def test_observability_stack_values_document_prometheus_loki_tempo_and_otel() -> None:

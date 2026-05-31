@@ -34,6 +34,14 @@ def test_campaign_dashboard_contains_portfolio_service_queries() -> None:
     assert "campaign_api_service_info" in queries
     assert "dispatcher_service_info" in queries
     assert "provider_simulator_service_info" in queries
+    assert "campaign_api_http_requests_total" in queries
+    assert "campaign_api_http_request_duration_seconds_bucket" in queries
+    assert "campaign_api_campaign_messages_total" in queries
+    assert "dispatcher_dispatcher_messages_total" in queries
+    assert "provider_simulator_provider_requests_total" in queries
+    assert "jetstream_consumer_num_pending" in queries
+    assert "jetstream_consumer_num_ack_pending" in queries
+    assert "jetstream_consumer_num_redelivered" in queries
 
 
 def test_dashboard_install_script_labels_configmap_for_grafana_sidecar() -> None:

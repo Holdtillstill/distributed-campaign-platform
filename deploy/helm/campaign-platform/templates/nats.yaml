@@ -42,6 +42,34 @@ spec:
               port: monitor
             initialDelaySeconds: 15
             periodSeconds: 10
+        {{- if .Values.nats.exporter.enabled }}
+        - name: nats-exporter
+          image: {{ .Values.nats.exporter.image | quote }}
+          args:
+            - -varz
+            - -connz
+            - -subz
+            - -jsz=all
+            - -healthz
+            - http://localhost:8222
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.nats.exporter.port }}
+          resources:
+            {{- toYaml .Values.nats.exporter.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 20
+        {{- end }}
       {{- if not .Values.nats.persistence.enabled }}
       volumes:
         - name: nats-data
@@ -79,3 +107,8 @@ spec:
     - name: monitor
       port: 8222
       targetPort: monitor
+    {{- if .Values.nats.exporter.enabled }}
+    - name: metrics
+      port: {{ .Values.nats.exporter.port }}
+      targetPort: metrics
+    {{- end }}

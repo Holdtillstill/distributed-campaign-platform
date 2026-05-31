@@ -15,7 +15,7 @@ import db
 from campaign_common.idempotency import generate_idempotency_key
 from campaign_common.logging import configure_logging, get_logger
 from campaign_common.models import MessageStatus
-from campaign_common.observability import add_platform_endpoints
+from campaign_common.observability import add_platform_endpoints, get_platform_metrics
 from campaign_common.tracing import get_tracer, inject_trace_context, instrument_fastapi_app
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -30,6 +30,7 @@ STATUS_VALUES = tuple(status_value.value for status_value in MessageStatus)
 configure_logging(SERVICE_NAME)
 logger = get_logger(__name__)
 tracer = get_tracer(__name__)
+metrics = get_platform_metrics(SERVICE_NAME)
 
 
 class CampaignCreateRequest(BaseModel):
@@ -704,6 +705,15 @@ class AsyncpgCampaignRepository:
         if credit_result["status"] != "scheduled":
             with tracer.start_as_current_span("queue.publish.messages.dispatch"):
                 await self._publisher.publish(message_rows)
+            metrics.campaign_messages_total.labels(
+                status=MessageStatus.QUEUED.value,
+                message_type=message_type,
+            ).inc(len(message_rows))
+        metrics.campaigns_created_total.labels(
+            status=credit_result["status"],
+            message_type=message_type,
+            audience_mode=credit_result["audience_mode"],
+        ).inc()
         logger.info(
             "campaign_created",
             campaign_id=campaign_id,

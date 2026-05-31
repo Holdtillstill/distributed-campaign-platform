@@ -33,6 +33,14 @@ def test_trace_context_round_trip_in_message_metadata() -> None:
     assert tracing.extract_trace_context(carrier) == {"traceparent": "00-abc-123-01"}
 
 
+def test_structured_logging_can_add_trace_context_fields() -> None:
+    logging = importlib.import_module("campaign_common.logging")
+
+    event = logging.add_trace_context(None, None, {"event": "sample"})
+
+    assert event["event"] == "sample"
+
+
 def test_campaign_platform_chart_sets_otel_env_for_python_services() -> None:
     rendered = _helm_template(CHART_DIR)
     deployments = {
