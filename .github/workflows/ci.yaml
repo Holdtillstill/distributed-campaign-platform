@@ -48,10 +48,10 @@ jobs:
           helm template campaign-platform deploy/helm/campaign-platform >/tmp/campaign-platform.yaml
           helm template campaign-platform deploy/helm/campaign-platform \
             -f deploy/helm/campaign-platform/values-eks-dev.yaml \
-            --set campaignApi.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/campaign-api \
-            --set providerSimulator.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/provider-simulator \
-            --set dispatcher.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/dispatcher \
-            --set webUi.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/web-ui \
+            --set campaignApi.image.repository=example.registry.local/campaign-api \
+            --set providerSimulator.image.repository=example.registry.local/provider-simulator \
+            --set dispatcher.image.repository=example.registry.local/dispatcher \
+            --set webUi.image.repository=example.registry.local/web-ui \
             >/tmp/campaign-platform-eks.yaml
 
       - name: Docker images build

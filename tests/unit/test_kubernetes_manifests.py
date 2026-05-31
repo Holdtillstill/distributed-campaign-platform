@@ -42,13 +42,13 @@ def test_eks_values_render_cloud_deployment_primitives() -> None:
         "-f",
         str(CHART_DIR / "values-eks-dev.yaml"),
         "--set",
-        "campaignApi.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/campaign-api",
+        "campaignApi.image.repository=example.registry.local/campaign-api",
         "--set",
-        "providerSimulator.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/provider-simulator",
+        "providerSimulator.image.repository=example.registry.local/provider-simulator",
         "--set",
-        "dispatcher.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/dispatcher",
+        "dispatcher.image.repository=example.registry.local/dispatcher",
         "--set",
-        "webUi.image.repository=123456789012.dkr.ecr.us-west-2.amazonaws.com/web-ui",
+        "webUi.image.repository=example.registry.local/web-ui",
     )
     kinds = {item["kind"] for item in rendered}
 
@@ -71,7 +71,7 @@ def test_eks_values_render_cloud_deployment_primitives() -> None:
         and item["metadata"]["labels"]["app.kubernetes.io/component"] in app_components
     ]
     assert all(
-        "123456789012.dkr.ecr.us-west-2.amazonaws.com"
+        "example.registry.local"
         in item["spec"]["template"]["spec"]["containers"][0]["image"]
         for item in deployments
     )
