@@ -25,7 +25,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "pytest>=8.3",
-  "pytest-asyncio>=0.23",
+  "pytest-asyncio>=1.4.0",
   "ruff>=0.6",
   "mypy>=1.11",
 ]
