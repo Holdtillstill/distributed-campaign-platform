@@ -49,12 +49,28 @@ jobs:
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
 
-      - uses: docker/build-push-action@v6
+      - name: Build image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: true
+          push: false
+          load: true
           platforms: linux/amd64
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:main
             ${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:${{ github.sha }}
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Push image
+        run: |
+          docker push "${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:main"
+          docker push "${{ steps.ecr.outputs.registry }}/${{ matrix.repository }}:${{ github.sha }}"

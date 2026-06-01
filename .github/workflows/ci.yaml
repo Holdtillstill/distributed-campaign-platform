@@ -60,3 +60,39 @@ jobs:
           docker build -t dispatcher:ci -f apps/dispatcher/Dockerfile .
           docker build -t provider-simulator:ci -f apps/provider-simulator/Dockerfile .
           docker build -t web-ui:ci -f apps/web-ui/Dockerfile .
+
+      - name: Scan campaign-api image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: campaign-api:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan dispatcher image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: dispatcher:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan provider-simulator image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: provider-simulator:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan web-ui image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: web-ui:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
