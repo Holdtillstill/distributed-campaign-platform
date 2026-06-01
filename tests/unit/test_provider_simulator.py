@@ -55,6 +55,9 @@ def test_send_success_accepts_message(provider_module, payload: dict[str, str]) 
     assert body["status"] == "accepted"
     assert body["provider_message_id"].startswith("prov_msg-123_")
     assert "reason" not in body or body["reason"] is None
+    metrics = client.get("/metrics").text
+    assert "provider_simulator_provider_request_duration_seconds_bucket" in metrics
+    assert 'provider_status="accepted"' in metrics
 
 
 def test_send_rate_limit_mode_returns_429(

@@ -53,6 +53,8 @@ def test_app_chart_includes_actionable_prometheus_rules() -> None:
     assert "CampaignApiHigh5xxRate" in templates
     assert "CampaignApiHighLatencyP95" in templates
     assert "CampaignDispatchDeadLetters" in templates
+    assert "CampaignDispatcherHighLatencyP95" in templates
+    assert "CampaignProviderHighLatencyP95" in templates
     assert "CampaignQueuedWithoutDispatch" in templates
     assert "CampaignNatsConsumerBacklog" in templates
     assert "jetstream_consumer_num_pending" in templates

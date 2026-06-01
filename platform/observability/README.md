@@ -112,7 +112,7 @@ This installs two starter dashboards:
 - `Campaign Platform Essential Overview`
 - `Kubernetes Essential Overview`
 
-The campaign dashboard includes service health, API RED metrics, campaign creation, queued messages, dispatcher outcomes, provider responses, and NATS JetStream pending/ack-pending/redelivery signals. AWS-native SQS queue age/depth dashboards are still a production evolution item for the optional SQS mode.
+The campaign dashboard includes service health, API RED metrics, campaign creation, queued messages, dispatcher outcomes, dispatcher p95 handling latency, provider responses, provider p95 latency, and NATS JetStream pending/ack-pending/redelivery signals. AWS-native SQS queue age/depth dashboards are still a production evolution item for the optional SQS mode.
 
 Grafana dashboard URLs:
 

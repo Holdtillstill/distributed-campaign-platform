@@ -703,7 +703,12 @@ class AsyncpgCampaignRepository:
             audience_mode=audience_scale["audience_mode"],
         )
         if credit_result["status"] != "scheduled":
-            with tracer.start_as_current_span("queue.publish.messages.dispatch"):
+            with tracer.start_as_current_span("queue.publish.messages.dispatch") as span:
+                span.set_attribute("campaign.id", campaign_id)
+                span.set_attribute("campaign.company_id", company_id)
+                span.set_attribute("campaign.message_count", len(message_rows))
+                span.set_attribute("campaign.message_type", message_type)
+                span.set_attribute("campaign.audience_mode", credit_result["audience_mode"])
                 await self._publisher.publish(message_rows)
             metrics.campaign_messages_total.labels(
                 status=MessageStatus.QUEUED.value,

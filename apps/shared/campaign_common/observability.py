@@ -29,7 +29,9 @@ class PlatformMetrics:
     campaigns_created_total: Counter
     campaign_messages_total: Counter
     dispatcher_messages_total: Counter
+    dispatcher_message_duration_seconds: Histogram
     provider_requests_total: Counter
+    provider_request_duration_seconds: Histogram
     workflow_exceptions_total: Counter
 
 
@@ -86,10 +88,24 @@ def get_platform_metrics(service_name: str) -> PlatformMetrics:
             ["status", "retry", "dead_letter"],
             registry=registry,
         ),
+        dispatcher_message_duration_seconds=Histogram(
+            f"{metric_prefix}_dispatcher_message_duration_seconds",
+            "End-to-end dispatcher message handling duration in seconds.",
+            ["status", "retry", "dead_letter"],
+            buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30),
+            registry=registry,
+        ),
         provider_requests_total=Counter(
             f"{metric_prefix}_provider_requests_total",
             "Provider calls by HTTP status and provider/application status.",
             ["http_status", "provider_status"],
+            registry=registry,
+        ),
+        provider_request_duration_seconds=Histogram(
+            f"{metric_prefix}_provider_request_duration_seconds",
+            "Provider call duration in seconds by HTTP status and provider/application status.",
+            ["http_status", "provider_status"],
+            buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
             registry=registry,
         ),
         workflow_exceptions_total=Counter(

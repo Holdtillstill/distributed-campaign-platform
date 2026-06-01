@@ -162,7 +162,10 @@ histogram_quantile(0.95, sum(rate(campaign_api_http_request_duration_seconds_buc
 sum by (status, message_type, audience_mode) (increase(campaign_api_campaigns_created_total[15m]))
 sum by (status, message_type) (increase(campaign_api_campaign_messages_total[15m]))
 sum by (status, retry, dead_letter) (increase(dispatcher_dispatcher_messages_total[15m]))
+histogram_quantile(0.95, sum(rate(dispatcher_dispatcher_message_duration_seconds_bucket[5m])) by (le, status))
 sum by (http_status, provider_status) (increase(provider_simulator_provider_requests_total[15m]) or increase(dispatcher_provider_requests_total[15m]))
+histogram_quantile(0.95, sum(rate(provider_simulator_provider_request_duration_seconds_bucket[5m])) by (le, provider_status))
+histogram_quantile(0.95, sum(rate(dispatcher_provider_request_duration_seconds_bucket[5m])) by (le, provider_status))
 sum by (operation) (increase(campaign_api_workflow_exceptions_total[15m]) or increase(dispatcher_workflow_exceptions_total[15m]))
 sum by (stream_name, consumer_name) (jetstream_consumer_num_pending{stream_name="CAMPAIGN_MESSAGES"})
 sum by (stream_name, consumer_name) (jetstream_consumer_num_ack_pending{stream_name="CAMPAIGN_MESSAGES"})
@@ -188,8 +191,9 @@ In Grafana Explore, select Loki and query:
 Try the same label for `dispatcher` and `provider-simulator`.
 
 Application logs include `trace_id` and `span_id` when a request is inside an
-active OpenTelemetry span. Use those IDs to pivot from Loki to Tempo during a
-failure investigation.
+active OpenTelemetry span. Campaign dispatch spans also attach campaign ID,
+message ID, retry count, and terminal status attributes so a reviewer can pivot
+from a campaign issue to the exact async message path in Tempo.
 
 ## Troubleshooting Missing Traces
 

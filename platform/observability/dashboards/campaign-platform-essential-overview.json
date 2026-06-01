@@ -525,13 +525,97 @@
     },
     {
       "type": "timeseries",
+      "title": "Dispatcher message p95 duration",
+      "description": "End-to-end async message handling latency grouped by outcome.",
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(dispatcher_dispatcher_message_duration_seconds_bucket[5m])) by (le, status))",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "id": 15
+    },
+    {
+      "type": "timeseries",
+      "title": "Provider p95 latency",
+      "description": "Provider simulator and dispatcher-observed provider call latency.",
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(provider_simulator_provider_request_duration_seconds_bucket[5m])) by (le, provider_status)) or histogram_quantile(0.95, sum(rate(dispatcher_provider_request_duration_seconds_bucket[5m])) by (le, provider_status))",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "id": 16
+    },
+    {
+      "type": "timeseries",
       "title": "NATS JetStream pending messages",
       "description": "",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 56
       },
       "targets": [
         {
@@ -576,7 +660,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 48
+        "y": 56
       },
       "targets": [
         {
@@ -631,5 +715,5 @@
   "timezone": "browser",
   "title": "Campaign Platform Essential Overview",
   "uid": "campaign-platform-essential",
-  "version": 4
+  "version": 5
 }

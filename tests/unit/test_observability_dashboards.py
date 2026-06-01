@@ -38,7 +38,10 @@ def test_campaign_dashboard_contains_portfolio_service_queries() -> None:
     assert "campaign_api_http_request_duration_seconds_bucket" in queries
     assert "campaign_api_campaign_messages_total" in queries
     assert "dispatcher_dispatcher_messages_total" in queries
+    assert "dispatcher_dispatcher_message_duration_seconds_bucket" in queries
     assert "provider_simulator_provider_requests_total" in queries
+    assert "provider_simulator_provider_request_duration_seconds_bucket" in queries
+    assert "dispatcher_provider_request_duration_seconds_bucket" in queries
     assert "jetstream_consumer_num_pending" in queries
     assert "jetstream_consumer_num_ack_pending" in queries
     assert "jetstream_consumer_num_redelivered" in queries

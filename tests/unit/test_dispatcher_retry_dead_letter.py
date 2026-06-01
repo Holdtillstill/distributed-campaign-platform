@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from prometheus_client import generate_latest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DISPATCHER_MAIN = REPO_ROOT / "apps" / "dispatcher" / "app" / "main.py"
@@ -122,6 +123,9 @@ async def test_dispatch_message_publishes_retry_job_for_transient_failure(
     assert updates == [("message-retry", "retried")]
     assert retry_jobs == [dispatcher_module.retry_job_payload(job, retry_count=1)]
     assert dead_letters == []
+    metrics = generate_latest(dispatcher_module.metrics.registry).decode()
+    assert "dispatcher_dispatcher_message_duration_seconds_bucket" in metrics
+    assert 'status="retried"' in metrics
 
 
 @pytest.mark.asyncio()

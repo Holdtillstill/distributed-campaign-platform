@@ -176,6 +176,8 @@ observability:
     enabled: true
     apiErrorRateThreshold: 0.05
     apiLatencyP95Seconds: 0.5
+    dispatcherLatencyP95Seconds: 2
+    providerLatencyP95Seconds: 1
     natsPendingMessagesThreshold: 100
     natsAckPendingMessagesThreshold: 25
   otel:

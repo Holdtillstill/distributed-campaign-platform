@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import uuid4
@@ -75,6 +76,7 @@ def healthz() -> dict[str, str]:
 
 @app.post("/send")
 async def send_message(request: SendRequest) -> JSONResponse:
+    started_at = time.perf_counter()
     settings = ProviderSettings.from_env()
     if settings.latency_ms > 0:
         await asyncio.sleep(settings.latency_ms / 1000)
@@ -84,6 +86,10 @@ async def send_message(request: SendRequest) -> JSONResponse:
         http_status=str(result.http_status),
         provider_status=result.body.status,
     ).inc()
+    metrics.provider_request_duration_seconds.labels(
+        http_status=str(result.http_status),
+        provider_status=result.body.status,
+    ).observe(time.perf_counter() - started_at)
     logger.info(
         "provider_send_simulated",
         message_id=request.message_id,

@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import os
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -15,6 +16,7 @@ from campaign_common.models import MessageStatus
 from campaign_common.observability import add_platform_endpoints, get_platform_metrics
 from campaign_common.tracing import context_from_payload, get_tracer, instrument_fastapi_app
 from fastapi import FastAPI
+from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 SERVICE_NAME = "dispatcher"
@@ -210,6 +212,7 @@ async def dispatch_message(
     publish_retry: PublishMessageJob | None = None,
     publish_dead_letter: PublishMessageJob | None = None,
 ) -> str:
+    started_at = time.perf_counter()
     provider_http_status = "exception"
     try:
         provider_result = await send_to_provider(job)
@@ -234,11 +237,23 @@ async def dispatch_message(
         )
 
     await update_status(job.message_id, outcome.status)
+    active_span = trace.get_current_span()
+    active_span.set_attribute("campaign.id", job.campaign_id)
+    active_span.set_attribute("campaign.message_id", job.message_id)
+    active_span.set_attribute("campaign.message_status", outcome.status)
+    active_span.set_attribute("campaign.retry_count", outcome.retry_count)
+    active_span.set_attribute("campaign.should_retry", outcome.should_retry)
+    active_span.set_attribute("campaign.dead_letter", outcome.should_dead_letter)
     metrics.dispatcher_messages_total.labels(
         status=outcome.status,
         retry=str(outcome.should_retry).lower(),
         dead_letter=str(outcome.should_dead_letter).lower(),
     ).inc()
+    metrics.dispatcher_message_duration_seconds.labels(
+        status=outcome.status,
+        retry=str(outcome.should_retry).lower(),
+        dead_letter=str(outcome.should_dead_letter).lower(),
+    ).observe(time.perf_counter() - started_at)
     metrics.provider_requests_total.labels(
         http_status=provider_http_status,
         provider_status=outcome.status,
@@ -268,11 +283,24 @@ async def send_to_provider_http(
         "body": job.body,
         "channel": job.channel,
     }
-    async with httpx.AsyncClient(base_url=provider_url, timeout=10.0) as client:
-        response = await client.post("/send", json=payload)
+    started_at = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(base_url=provider_url, timeout=10.0) as client:
+            response = await client.post("/send", json=payload)
+    except Exception:
+        metrics.provider_request_duration_seconds.labels(
+            http_status="exception",
+            provider_status="exception",
+        ).observe(time.perf_counter() - started_at)
+        raise
 
     body = _response_json(response)
     accepted = response.status_code in {200, 202} and body.get("status") == "accepted"
+    provider_status = str(body.get("status") or ("accepted" if accepted else "unknown"))
+    metrics.provider_request_duration_seconds.labels(
+        http_status=str(response.status_code),
+        provider_status=provider_status,
+    ).observe(time.perf_counter() - started_at)
     return ProviderResult(http_status=response.status_code, accepted=accepted, body=body)
 
 
@@ -442,13 +470,21 @@ async def run_nats_worker(
         job = MessageJob.model_validate(raw_payload)
 
         async def provider_sender(provider_job: MessageJob) -> ProviderResult:
-            with tracer.start_as_current_span("provider.send"):
+            with tracer.start_as_current_span("provider.send") as span:
+                span.set_attribute("campaign.id", provider_job.campaign_id)
+                span.set_attribute("campaign.message_id", provider_job.message_id)
+                span.set_attribute("messaging.system", "nats")
                 return await send_to_provider_http(provider_job, resolved_provider_url)
 
         with tracer.start_as_current_span(
             "message.consume",
             context=context_from_payload(raw_payload),
-        ):
+        ) as span:
+            span.set_attribute("campaign.id", job.campaign_id)
+            span.set_attribute("campaign.message_id", job.message_id)
+            span.set_attribute("campaign.retry_count", job.retry_count)
+            span.set_attribute("messaging.system", "nats")
+            span.set_attribute("messaging.destination", config.subject)
             await dispatch_message(
                 job,
                 provider_sender,
@@ -524,7 +560,10 @@ async def run_sqs_worker(
         poll_queue_urls.append(config.retry_queue_url)
 
     async def provider_sender(provider_job: MessageJob) -> ProviderResult:
-        with tracer.start_as_current_span("provider.send"):
+        with tracer.start_as_current_span("provider.send") as span:
+            span.set_attribute("campaign.id", provider_job.campaign_id)
+            span.set_attribute("campaign.message_id", provider_job.message_id)
+            span.set_attribute("messaging.system", "sqs")
             return await send_to_provider_http(provider_job, resolved_provider_url)
 
     async def publish_retry(payload: dict[str, Any]) -> None:
@@ -558,7 +597,11 @@ async def run_sqs_worker(
                     with tracer.start_as_current_span(
                         "message.consume",
                         context=context_from_payload(raw_payload),
-                    ):
+                    ) as span:
+                        span.set_attribute("campaign.id", job.campaign_id)
+                        span.set_attribute("campaign.message_id", job.message_id)
+                        span.set_attribute("campaign.retry_count", job.retry_count)
+                        span.set_attribute("messaging.system", "sqs")
                         await dispatch_message(
                             job,
                             provider_sender,

@@ -58,6 +58,14 @@ spec:
           annotations:
             summary: Messages are reaching the dead-letter path.
             runbook_url: docs/runbooks/observability.md
+        - alert: CampaignDispatcherHighLatencyP95
+          expr: histogram_quantile(0.95, sum(rate(dispatcher_dispatcher_message_duration_seconds_bucket[5m])) by (le)) > {{ .Values.observability.alerts.dispatcherLatencyP95Seconds }}
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: Dispatcher message handling p95 latency is above the demo threshold.
+            runbook_url: docs/runbooks/observability.md
         - alert: CampaignProviderRateLimited
           expr: increase(provider_simulator_provider_requests_total{http_status="429"}[5m]) > 0
           for: 2m
@@ -65,6 +73,14 @@ spec:
             severity: ticket
           annotations:
             summary: Provider rate limiting is being observed.
+            runbook_url: docs/runbooks/observability.md
+        - alert: CampaignProviderHighLatencyP95
+          expr: histogram_quantile(0.95, sum(rate(provider_simulator_provider_request_duration_seconds_bucket[5m])) by (le)) > {{ .Values.observability.alerts.providerLatencyP95Seconds }}
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: Provider simulator p95 latency is above the demo threshold.
             runbook_url: docs/runbooks/observability.md
         - alert: CampaignQueuedWithoutDispatch
           expr: increase(campaign_api_campaign_messages_total{status="queued"}[10m]) > 0 and increase(dispatcher_dispatcher_messages_total[10m]) == 0
