@@ -1,4 +1,8 @@
-# Demo Credentials
+# Local Demo Access
+
+These values are seeded local demo fixtures for reviewer convenience. They are not
+production credentials and should not be reused outside the disposable local or
+ephemeral demo environment.
 
 ## Customer tenant
 
@@ -28,13 +32,13 @@ Email:
 owner@demo-retail.test
 ```
 
-Access code:
+Seeded access code:
 
 ```text
 DEMORETA-E568C9
 ```
 
-## Internal admin
+## Internal admin demo flow
 
 URL:
 
@@ -51,7 +55,7 @@ ops@example.test
 Password:
 
 ```text
-None. This demo flow only asks for the internal admin email.
+None. The local demo flow only asks for the internal admin email.
 ```
 
 ## Portfolio design routes
@@ -88,7 +92,7 @@ Grafana:
 http://127.0.0.1:13000
 ```
 
-Grafana login:
+Local Grafana login:
 
 ```text
 admin
