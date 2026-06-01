@@ -245,6 +245,9 @@ export type SystemCheck = {
   label: string
   state: 'checking' | 'ok' | 'error'
   detail: string
+  traceId?: string | null
+  spanId?: string | null
+  sampled?: boolean
 }
 
 export type AdminPage = 'dashboard' | 'companies' | 'usage'

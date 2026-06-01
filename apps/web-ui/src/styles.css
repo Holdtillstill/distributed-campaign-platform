@@ -1792,6 +1792,34 @@ textarea {
   color: #64748b;
 }
 
+.trace-chip {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  border: 1px solid rgba(20, 184, 166, 0.42);
+  border-radius: 8px;
+  background: #ecfeff;
+  color: #0f766e;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 10px;
+}
+
+.trace-chip:hover {
+  border-color: rgba(13, 148, 136, 0.72);
+  background: #ccfbf1;
+}
+
+.compact-list .trace-meta {
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
 .compact-list small,
 .subtle-id,
 .compact-id-strip small {

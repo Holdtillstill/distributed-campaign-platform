@@ -6,6 +6,10 @@ import { DataTable } from '../../components/DataTable'
 import type { AdminDashboardSummary, CompanyHealthRow, CompanyResult, SystemCheck, UsageRow } from '../../types'
 import { formatCount, formatNumber } from '../../utils'
 
+function shortTraceId(traceId: string): string {
+  return traceId.length > 12 ? `${traceId.slice(0, 12)}...` : traceId
+}
+
 export function AdminDashboard({
   adminSummary,
   companyResult,
@@ -205,6 +209,16 @@ export function AdminDashboard({
             <li className={check.state} key={check.path}>
               <strong>{check.label}</strong>
               <span>{check.detail}</span>
+              {check.traceId ? (
+                <button
+                  className="trace-chip"
+                  title={`Copy trace ${check.traceId}`}
+                  onClick={() => void navigator.clipboard?.writeText(check.traceId ?? '')}
+                >
+                  Trace {shortTraceId(check.traceId)}
+                </button>
+              ) : null}
+              {check.spanId ? <span className="trace-meta">Span {shortTraceId(check.spanId)}</span> : null}
             </li>
           ))}
         </ul>

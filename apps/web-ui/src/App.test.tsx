@@ -1154,7 +1154,9 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: /refresh checks/i }))
 
-    expect(await screen.findByText('/observability/trace-smoke responded 200')).toBeInTheDocument()
+    expect(await screen.findByText('Trace smoke responded 200')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /trace 000000000000/i })).toBeInTheDocument()
+    expect(screen.getByText(/span 000000000000/i)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/observability/trace-smoke')
   })
 

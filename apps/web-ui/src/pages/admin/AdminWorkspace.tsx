@@ -78,14 +78,28 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
     return { path, label, state: 'ok', detail: `${path} responded ${response.status}` }
   }
 
+  async function toTraceSystemCheck(response: Response): Promise<SystemCheck> {
+    const base = toSystemCheck(response, '/observability/trace-smoke', 'Trace smoke')
+    if (!response.ok) return base
+    const body = await response.json().catch(() => null)
+    const traceId = typeof body?.trace_id === 'string' ? body.trace_id : null
+    const spanId = typeof body?.span_id === 'string' ? body.span_id : null
+    const sampled = typeof body?.sampled === 'boolean' ? body.sampled : undefined
+    return {
+      ...base,
+      detail: traceId ? `Trace smoke responded ${response.status}` : base.detail,
+      traceId,
+      spanId,
+      sampled,
+    }
+  }
+
   async function refreshSystemStatus() {
     const checks = await Promise.all([
       fetch(`${API_BASE_URL}/healthz`).then((response) => toSystemCheck(response, '/healthz', 'Campaign API liveness')),
       fetch(`${API_BASE_URL}/readyz`).then((response) => toSystemCheck(response, '/readyz', 'Campaign API readiness')),
       fetch(`${API_BASE_URL}/metrics`).then((response) => toSystemCheck(response, '/metrics', 'Prometheus metrics')),
-      fetch(`${API_BASE_URL}/observability/trace-smoke`).then((response) =>
-        toSystemCheck(response, '/observability/trace-smoke', 'Trace smoke'),
-      ),
+      fetch(`${API_BASE_URL}/observability/trace-smoke`).then(toTraceSystemCheck),
     ])
     setSystemChecks(checks)
   }
