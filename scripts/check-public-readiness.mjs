@@ -244,6 +244,10 @@ if (fs.existsSync(dependabotPath)) {
       }
     }
   }
+  const terraformBlock = dependabotBlock(dependabot, "terraform", "/infra/terraform/environments/dev")
+  if (!terraformBlock.includes("version-update:semver-major")) {
+    findings.push(".github/dependabot.yml: Terraform updates must ignore semver-major changes")
+  }
 } else {
   findings.push(".github/dependabot.yml: missing")
 }
