@@ -41,6 +41,7 @@ const bannedText = [
   { label: "assistant/tooling name", pattern: /\b(Codex|Gemini|Claude|ChatGPT|LLM)\b/i },
   { label: "internal workspace artifact", pattern: /\b(antigravity|portfolio_review|ybz\.dev)\b/i },
   { label: "interview/meta phrasing", pattern: /\b(interviews?|hiring manager|case study|proof points?)\b/i },
+  { label: "runtime status mislabel", pattern: /\bLive static demo\b/i },
   { label: "GitHub Actions badge URL", pattern: /actions\/workflows\/[^\s)]+\/badge\.svg|badge\.svg/i },
 ]
 
@@ -55,6 +56,8 @@ const sensitiveText = [
 const allowedAccounts = new Set(["000000000000", "111122223333", "123456789012"])
 const findings = []
 const visitorScriptPath = path.join(root, "apps/web-ui/index.html")
+const publicDir = path.join(root, "apps/web-ui/public")
+const publicEnvPath = path.join(publicDir, "env.js")
 
 function relative(filePath) {
   return path.relative(root, filePath)
@@ -108,8 +111,54 @@ if (fs.existsSync(visitorScriptPath)) {
   if (!shell.includes('data-project="distributed-campaign-platform"')) {
     findings.push("apps/web-ui/index.html: missing distributed-campaign-platform visitor project id")
   }
+  const requiredShellMarkers = [
+    ['canonical metadata', '<link rel="canonical" href="https://distributed-campaign-platform.bozhi.dev/"'],
+    ['OpenGraph URL metadata', 'property="og:url" content="https://distributed-campaign-platform.bozhi.dev/"'],
+    ['OpenGraph preview image', 'property="og:image" content="https://distributed-campaign-platform.bozhi.dev/social-preview.jpg"'],
+    ['Twitter large preview card', 'name="twitter:card" content="summary_large_image"'],
+    ['Twitter preview image', 'name="twitter:image" content="https://distributed-campaign-platform.bozhi.dev/social-preview.jpg"'],
+  ]
+  for (const [label, marker] of requiredShellMarkers) {
+    if (!shell.includes(marker)) findings.push(`apps/web-ui/index.html: missing ${label}`)
+  }
 } else {
   findings.push("apps/web-ui/index.html: missing public web shell")
+}
+
+if (fs.existsSync(publicEnvPath)) {
+  const env = fs.readFileSync(publicEnvPath, "utf8")
+  if (!env.includes("staticPortfolioHost: true")) {
+    findings.push("apps/web-ui/public/env.js: missing staticPortfolioHost public boundary")
+  }
+  if (!env.includes("enableDesignRoutes: false")) {
+    findings.push("apps/web-ui/public/env.js: public design routes should be disabled")
+  }
+} else {
+  findings.push("apps/web-ui/public/env.js: missing public static host config")
+}
+
+const robotsPath = path.join(publicDir, "robots.txt")
+const sitemapPath = path.join(publicDir, "sitemap.xml")
+const socialPreviewPath = path.join(publicDir, "social-preview.jpg")
+if (fs.existsSync(robotsPath)) {
+  const robots = fs.readFileSync(robotsPath, "utf8")
+  if (!robots.includes("Sitemap: https://distributed-campaign-platform.bozhi.dev/sitemap.xml")) {
+    findings.push("apps/web-ui/public/robots.txt: missing sitemap reference")
+  }
+} else {
+  findings.push("apps/web-ui/public/robots.txt: missing")
+}
+if (fs.existsSync(sitemapPath)) {
+  const sitemap = fs.readFileSync(sitemapPath, "utf8")
+  for (const route of ["/", "/features", "/features/broadcast-monitor", "/app/dashboard", "/app/campaigns/scheduled", "/kb"]) {
+    const expected = `https://distributed-campaign-platform.bozhi.dev${route === "/" ? "/" : route}`
+    if (!sitemap.includes(expected)) findings.push(`apps/web-ui/public/sitemap.xml: missing ${route}`)
+  }
+} else {
+  findings.push("apps/web-ui/public/sitemap.xml: missing")
+}
+if (!fs.existsSync(socialPreviewPath)) {
+  findings.push("apps/web-ui/public/social-preview.jpg: missing social preview image")
 }
 
 if (findings.length) {

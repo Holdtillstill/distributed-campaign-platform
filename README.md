@@ -4,7 +4,7 @@ CampaignOS is a local-first, EKS-ready campaign delivery simulator for showing
 distributed workflows, GitOps, autoscaling, distributed tracing, open-source
 observability, SLOs, and incident runbooks.
 
-Live static demo: <https://distributed-campaign-platform.bozhi.dev>
+Public UI preview: <https://distributed-campaign-platform.bozhi.dev>
 Runtime preview: request-only through <https://bozhi.dev/#request>
 
 ![CampaignOS public product surface](docs/screenshots/campaignos-overview.png)

@@ -1,4 +1,5 @@
 window.__APP_CONFIG__ = {
   apiBaseUrl: '/api',
-  enableDesignRoutes: false
+  enableDesignRoutes: false,
+  staticPortfolioHost: true
 };
