@@ -1,5 +1,6 @@
 const WEB_BASE = normalizeBase(process.env.WEB_BASE || process.env.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev')
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 15000)
+const EXPECT_SECURITY_HEADERS = process.env.SMOKE_EXPECT_SECURITY_HEADERS !== 'false'
 
 function normalizeBase(value) {
   return value.replace(/\/+$/, '')
@@ -16,6 +17,7 @@ async function fetchText(path, options = {}) {
     return {
       body: await response.text(),
       contentType: response.headers.get('content-type') || '',
+      headers: Object.fromEntries(response.headers.entries()),
       status: response.status,
     }
   } finally {
@@ -25,6 +27,42 @@ async function fetchText(path, options = {}) {
 
 function isAppShell({ body, contentType, status }) {
   return status === 200 && contentType.toLowerCase().includes('text/html') && body.includes('<div id="root"></div>')
+}
+
+function requireHeader(headers, name, expected) {
+  const value = headers[name.toLowerCase()] || ''
+  if (!value) throw new Error(`Expected ${name} security header on ${WEB_BASE}`)
+  if (expected instanceof RegExp && !expected.test(value)) {
+    throw new Error(`Expected ${name} to match ${expected}, got "${value}"`)
+  }
+  if (typeof expected === 'string' && value !== expected) {
+    throw new Error(`Expected ${name} to be "${expected}", got "${value}"`)
+  }
+  return value
+}
+
+function assertSecurityHeaders(result) {
+  if (!EXPECT_SECURITY_HEADERS) return
+
+  const csp = requireHeader(result.headers, 'content-security-policy', /default-src 'self'/)
+  for (const requiredDirective of [
+    "base-uri 'self'",
+    "connect-src 'self' https://on-demand-demos.bozhi.dev",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "script-src 'self' https://on-demand-demos.bozhi.dev",
+    'upgrade-insecure-requests',
+  ]) {
+    if (!csp.includes(requiredDirective)) throw new Error(`CSP should include ${requiredDirective}`)
+  }
+  if (/script-src[^;]*'unsafe-inline'/.test(csp)) {
+    throw new Error("CSP script-src should not allow unsafe-inline")
+  }
+
+  requireHeader(result.headers, 'strict-transport-security', /max-age=31536000/)
+  requireHeader(result.headers, 'x-content-type-options', 'nosniff')
+  requireHeader(result.headers, 'x-frame-options', 'DENY')
+  requireHeader(result.headers, 'referrer-policy', 'strict-origin-when-cross-origin')
 }
 
 const htmlRoutes = [
@@ -56,6 +94,7 @@ for (const [route, expectedText] of htmlRoutes) {
   if (!result.body.includes('data-project="distributed-campaign-platform"')) {
     throw new Error(`${route} should tag visitor events with the distributed-campaign-platform project id`)
   }
+  if (route === '/') assertSecurityHeaders(result)
 }
 
 for (const route of ['/api/health', '/api/healthz', '/api/me/memberships', '/r/static-host-smoke']) {

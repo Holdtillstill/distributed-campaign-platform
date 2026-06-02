@@ -17,6 +17,12 @@ run `.github/workflows/static-deploy.yml`. The workflow publishes the
 CloudFront Function and associates it with the distribution's viewer-request
 event before syncing assets and running the static-host smoke test.
 
+The static-host smoke verifies representative deep links, the visitor telemetry
+tag, JSON 404 behavior for fake API/tracking routes, and CloudFront response
+headers including CSP, HSTS, frame protection, referrer policy, and MIME
+sniffing protection. Set `SMOKE_EXPECT_SECURITY_HEADERS=false` only when using
+the script against a local dev server that does not attach edge headers.
+
 Edge security for the static host belongs to that existing CloudFront
 distribution. If the shared portfolio WAF is enabled, attach its web ACL there;
 otherwise keep the static preview on the cheaper CloudFront-only path and rely
