@@ -60,6 +60,7 @@ const publicDir = path.join(root, "apps/web-ui/public")
 const publicEnvPath = path.join(publicDir, "env.js")
 const issueTemplateConfigPath = path.join(root, ".github/ISSUE_TEMPLATE/config.yml")
 const contributingPath = path.join(root, "CONTRIBUTING.md")
+const codeOfConductPath = path.join(root, "CODE_OF_CONDUCT.md")
 const dependabotPath = path.join(root, ".github/dependabot.yml")
 
 function relative(filePath) {
@@ -195,6 +196,18 @@ if (fs.existsSync(contributingPath)) {
   }
 } else {
   findings.push("CONTRIBUTING.md: missing")
+}
+
+if (fs.existsSync(codeOfConductPath)) {
+  const codeOfConduct = fs.readFileSync(codeOfConductPath, "utf8")
+  if (!codeOfConduct.includes("Respect privacy and operational safety")) {
+    findings.push("CODE_OF_CONDUCT.md: missing privacy and operational safety boundary")
+  }
+  if (!codeOfConduct.includes("SECURITY.md")) {
+    findings.push("CODE_OF_CONDUCT.md: missing security policy escalation path")
+  }
+} else {
+  findings.push("CODE_OF_CONDUCT.md: missing")
 }
 
 if (fs.existsSync(dependabotPath)) {
