@@ -59,6 +59,7 @@ const visitorScriptPath = path.join(root, "apps/web-ui/index.html")
 const publicDir = path.join(root, "apps/web-ui/public")
 const publicEnvPath = path.join(publicDir, "env.js")
 const issueTemplateConfigPath = path.join(root, ".github/ISSUE_TEMPLATE/config.yml")
+const contributingPath = path.join(root, "CONTRIBUTING.md")
 
 function relative(filePath) {
   return path.relative(root, filePath)
@@ -172,6 +173,18 @@ if (fs.existsSync(issueTemplateConfigPath)) {
   }
 } else {
   findings.push(".github/ISSUE_TEMPLATE/config.yml: missing")
+}
+
+if (fs.existsSync(contributingPath)) {
+  const contributing = fs.readFileSync(contributingPath, "utf8")
+  if (!contributing.includes("Do not include secrets")) {
+    findings.push("CONTRIBUTING.md: missing public-safety contribution boundary")
+  }
+  if (!contributing.includes("node scripts/check-public-readiness.mjs")) {
+    findings.push("CONTRIBUTING.md: missing public-readiness validation command")
+  }
+} else {
+  findings.push("CONTRIBUTING.md: missing")
 }
 
 if (findings.length) {

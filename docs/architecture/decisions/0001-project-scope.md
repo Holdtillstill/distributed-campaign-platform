@@ -8,7 +8,7 @@ Accepted
 
 The goal is to build a portfolio project that demonstrates EKS, Kubernetes operations, open-source observability, GitOps, reliability engineering, and AWS platform skills.
 
-A basic `API → queue → worker → database` app would be too small for a senior DevOps/platform portfolio. A full SaaS product with billing, auth, compliance, real SMS/email providers, and a complex UI would distract from the platform goals.
+A basic `API -> queue -> worker -> database` app would be too small for the distributed workflow and platform-operations goals. A full SaaS product with billing, auth, compliance, real SMS/email providers, and a complex UI would distract from the platform goals.
 
 ## Decision
 

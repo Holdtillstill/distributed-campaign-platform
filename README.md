@@ -29,7 +29,7 @@ my responsibility.
 
 ## Goals
 
-CampaignOS focuses on domain-relevant distributed-system and platform engineering work:
+CampaignOS focuses on domain-relevant distributed workflows and platform operations:
 
 - AWS EKS platform design and operation
 - Terraform-managed AWS infrastructure
