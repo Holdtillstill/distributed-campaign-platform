@@ -82,7 +82,15 @@ jobs:
             --cache-control "public,max-age=31536000,immutable"
 
       - name: Invalidate CloudFront
-        run: aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*"
+        run: |
+          invalidation_id="$(aws cloudfront create-invalidation \
+            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)"
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+            --id "${invalidation_id}"
 
       - name: Smoke deployed static host
         run: WEB_BASE="${SITE_URL}" node scripts/smoke-static-host.mjs

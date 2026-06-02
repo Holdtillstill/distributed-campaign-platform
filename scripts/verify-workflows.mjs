@@ -83,6 +83,8 @@ assertAll(
     "scripts/deploy-static-edge-router.sh",
     "aws s3 sync apps/web-ui/dist/",
     "aws cloudfront create-invalidation",
+    "aws cloudfront wait invalidation-completed",
+    "--query 'Invalidation.Id'",
     "WEB_BASE=\"${SITE_URL}\" node scripts/smoke-static-host.mjs",
     "WEB_BASE=\"${SITE_URL}\" npm run smoke:browser-host",
   ],
