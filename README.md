@@ -4,6 +4,10 @@ A production-style Kubernetes platform running an event-driven campaign delivery
 
 > Status: SaaS product-depth demo slice in progress: local-first multi-tenant SMS workflows, admin health, content templates, and analytics are covered by targeted UI/API tests.
 
+## AI-Assisted Development Disclosure
+
+This repository was developed with AI coding assistance. The product direction, architecture decisions, validation, deployment, operations, and maintenance are my responsibility.
+
 ## Goals
 
 This project demonstrates senior DevOps / platform engineering skills with a domain-relevant distributed system:
