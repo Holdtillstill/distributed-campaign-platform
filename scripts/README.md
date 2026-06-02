@@ -10,4 +10,4 @@ Bootstrap, validation, local development, and teardown helpers.
 - `local/wait-for-local-stack.sh`: waits for local service readiness.
 - `deploy-static-edge-router.sh`: creates or updates the CloudFront Function used by the static portfolio host and associates it with the configured distribution.
 - `validate-static-spa-router.mjs`: validates the CloudFront Function source used by the static portfolio host.
-- `smoke-static-host.mjs`: checks a deployed static host and fails if `/api/*` or `/r/*` returns the HTML app shell.
+- `smoke-static-host.mjs`: checks a deployed static host and fails unless `/api/*` and `/r/*` return the expected JSON 404 instead of the HTML app shell.

@@ -41,8 +41,14 @@ for (const route of ['/api/healthz', '/api/me/memberships', '/r/static-host-smok
       accept: 'application/json',
     },
   })
+  if (result.status !== 404 || !result.contentType.toLowerCase().includes('application/json')) {
+    throw new Error(`${route} should return a JSON 404 on the static host, got ${result.status} ${result.contentType}`)
+  }
   if (isAppShell(result)) {
     throw new Error(`${route} returned the HTML app shell. Static hosting must reject or proxy API routes instead.`)
+  }
+  if (!result.body.includes('Campaign API')) {
+    throw new Error(`${route} JSON 404 should explain that the static host is not connected to the Campaign API.`)
   }
 }
 

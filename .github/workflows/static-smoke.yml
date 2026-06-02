@@ -1,0 +1,26 @@
+name: Static Host Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 14 * * *"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  SITE_URL: ${{ vars.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev' }}
+
+jobs:
+  smoke-static-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Smoke public static host
+        run: WEB_BASE="${SITE_URL}" node scripts/smoke-static-host.mjs
