@@ -10,7 +10,7 @@ type FeatureSpotlight = {
   kicker: string
   title: string
   summary: string
-  proof: string
+  note: string
   bullets: string[]
   ctaHref: string
   ctaLabel: string
@@ -23,7 +23,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     title: 'Live broadcast monitor',
     summary:
       'Track queued, sent, failed, retried, and dead-lettered messages with throughput, progress, and projected ETA.',
-    proof: 'Monitor projected/sample broadcasts before the full modeled audience is moved.',
+    note: 'Monitor projected/sample broadcasts before the full modeled audience is moved.',
     bullets: ['Messages per minute and per second', 'Projected completion and ETA', 'Provider outcome counters'],
     ctaHref: '/monitor',
     ctaLabel: 'Open customer login',
@@ -34,7 +34,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     title: 'Subscriber segments and modeled audiences',
     summary:
       'Plan campaigns against regional lists, sample subscriber rows, and modeled reach without loading millions of rows into the browser.',
-    proof: 'Demo Retail Co carries 2.65M modeled subscribers with representative local sample rows.',
+    note: 'Demo Retail Co carries 2.65M modeled subscribers with representative local sample rows.',
     bullets: ['Segment cards by list', 'Consent-aware subscriber directory', 'CSV import for sample data'],
     ctaHref: '/app',
     ctaLabel: 'Open customer login',
@@ -45,7 +45,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     title: 'Role-based access, invites, and budgets',
     summary:
       'Company owners can issue access codes, assign roles, and set per-user credit allocations for campaign work.',
-    proof: 'Settings exposes company admin, campaign manager, regional manager, analyst, and viewer guardrails.',
+    note: 'Settings exposes company admin, campaign manager, regional manager, analyst, and viewer guardrails.',
     bullets: ['Invite codes carry role and budget', 'Read-only roles keep operations disabled', 'Budget context follows the user'],
     ctaHref: '/app',
     ctaLabel: 'Open customer login',
@@ -56,7 +56,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     title: 'Analytics and campaign reporting',
     summary:
       'Review scheduled reach, campaign volume, Smart SMS clicks, offer redemptions, follow-ups, and credit usage in one workspace.',
-    proof: 'Analytics combines campaign history, tracked links, redemptions, and quota usage from workspace APIs.',
+    note: 'Analytics combines campaign history, tracked links, redemptions, and quota usage from workspace APIs.',
     bullets: ['Campaign performance table', 'Tracked link and redemption totals', 'Quota and message activity'],
     ctaHref: '/app',
     ctaLabel: 'Open customer login',
@@ -67,7 +67,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     title: 'TCPA-aware compliance readiness',
     summary:
       'Keep consent evidence, opt-out readiness, suppression, sender identity, audience source, and send-window checks visible before teams schedule SMS sends.',
-    proof: 'Built for TCPA-aware readiness, not a legal compliance guarantee.',
+    note: 'Built for TCPA-aware readiness, not a legal compliance guarantee.',
     bullets: [
       'Prior express written consent and audience source review',
       'STOP opt-out, suppression, and revocation checks',
@@ -174,7 +174,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
         </aside>
       </section>
 
-      <section className="feature-proof-band" aria-label="Platform proof points">
+      <section className="feature-check-band" aria-label="Platform operating checks">
         <div>
           <span>Modeled reach</span>
           <strong>2,650,000</strong>
@@ -223,7 +223,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
               <span>{feature.kicker}</span>
               <h3>{feature.title}</h3>
               <p>{feature.summary}</p>
-              <strong>{feature.proof}</strong>
+              <strong>{feature.note}</strong>
               <ul>
                 {feature.bullets.map((bullet) => (
                   <li key={bullet}>{bullet}</li>

@@ -4,7 +4,7 @@
 
 This project is local-first and ephemeral-cloud by default.
 
-Most development should happen in Docker Compose or kind at $0 AWS cost. EKS should be created only for integration testing, final screenshots, and interview demo preparation.
+Most development should happen in Docker Compose or kind at $0 AWS cost. EKS should be created only for integration testing, final screenshots, and approved runtime demo preparation.
 
 ## Approximate costs
 

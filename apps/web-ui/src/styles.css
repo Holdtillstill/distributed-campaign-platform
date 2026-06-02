@@ -217,6 +217,47 @@ button.ghost {
   padding: 0;
 }
 
+.marketing-tertiary-links .docs-link-static {
+  cursor: default;
+}
+
+.marketing-tertiary-links .docs-link-static:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.api-mode-banner {
+  display: inline-grid;
+  gap: 2px;
+  margin-top: 16px;
+  border: 1px solid rgba(15, 35, 63, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 10px 12px;
+}
+
+.api-mode-banner span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.api-mode-banner strong {
+  color: #172033;
+  font-size: 0.95rem;
+}
+
+.api-mode-live {
+  border-color: rgba(15, 118, 110, 0.24);
+  background: rgba(240, 253, 250, 0.76);
+}
+
+.api-mode-live span {
+  color: #0f766e;
+}
+
 .campaign-flow-visual {
   position: relative;
   grid-column: 3;
@@ -285,7 +326,7 @@ button.ghost {
 
 .visual-card span,
 .visual-card dt,
-.marketing-proof-strip span,
+.marketing-check-strip span,
 .workflow-lane span,
 .depth-link-grid span,
 .pricing-grid span {
@@ -499,7 +540,7 @@ button.ghost {
   animation: marketing-route 2.7s ease-in-out infinite;
 }
 
-.marketing-proof-strip,
+.marketing-check-strip,
 .marketing-workflow,
 .marketing-depth,
 .pricing-section {
@@ -507,26 +548,26 @@ button.ghost {
   margin: 0 auto;
 }
 
-.marketing-proof-strip {
+.marketing-check-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 4px 0 60px;
 }
 
-.marketing-proof-strip div {
+.marketing-check-strip div {
   border-top: 1px solid rgba(15, 35, 63, 0.14);
   padding: 16px 4px 0;
 }
 
-.marketing-proof-strip strong {
+.marketing-check-strip strong {
   display: block;
   margin-top: 9px;
   color: #111827;
   font-size: 1.15rem;
 }
 
-.marketing-proof-strip p,
+.marketing-check-strip p,
 .marketing-section-copy p,
 .workflow-lane p,
 .pricing-grid p {
@@ -3025,7 +3066,7 @@ textarea {
 
 .public-product-nav,
 .feature-hero,
-.feature-proof-band,
+.feature-check-band,
 .feature-index,
 .feature-depth,
 .feature-final-cta,
@@ -3188,7 +3229,7 @@ textarea {
   font-weight: 900;
 }
 
-.feature-proof-band,
+.feature-check-band,
 .feature-index-grid,
 .kb-quick-ctas,
 .kb-article-grid {
@@ -3197,11 +3238,11 @@ textarea {
   gap: 16px;
 }
 
-.feature-proof-band {
+.feature-check-band {
   padding: 18px 0 54px;
 }
 
-.feature-proof-band div,
+.feature-check-band div,
 .feature-card,
 .feature-depth,
 .feature-final-cta,
@@ -3216,7 +3257,7 @@ textarea {
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.055);
 }
 
-.feature-proof-band span,
+.feature-check-band span,
 .feature-card span,
 .kb-card span,
 .kb-guide-row span,
@@ -3229,14 +3270,14 @@ textarea {
   text-transform: uppercase;
 }
 
-.feature-proof-band strong {
+.feature-check-band strong {
   display: block;
   margin-top: 10px;
   color: #111827;
   font-size: 1.6rem;
 }
 
-.feature-proof-band p,
+.feature-check-band p,
 .feature-card p,
 .feature-depth p,
 .feature-final-cta p,
@@ -6430,7 +6471,7 @@ textarea {
   .auth-grid,
   .workspace-access-hero,
   .marketing-hero,
-  .marketing-proof-strip,
+  .marketing-check-strip,
   .marketing-workflow,
   .marketing-depth,
   .depth-link-grid,
@@ -6438,7 +6479,7 @@ textarea {
   .pricing-grid,
   .feature-hero,
   .feature-compliance-readiness,
-  .feature-proof-band,
+  .feature-check-band,
   .feature-depth,
   .feature-command-center dl,
   .design-review-recommendations,

@@ -725,7 +725,7 @@ describe('App', () => {
     vi.unstubAllGlobals()
   })
 
-  it('shows a customer-facing marketing site on the main URL', () => {
+  it('shows a customer-facing marketing site on the main URL', async () => {
     mockFetch()
 
     render(<App />)
@@ -736,10 +736,23 @@ describe('App', () => {
     expect(screen.getAllByRole('link', { name: /^Knowledge base$/i })[0]).toHaveAttribute('href', '/kb')
     expect(screen.getAllByRole('button', { name: /^Customer login$/i }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: /Feature tour/i })[0]).toHaveAttribute('href', '/features')
+    expect(await screen.findByText(/API connected/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /API docs/i })).toHaveAttribute('href', '/api/docs')
     expect(screen.getByLabelText(/CampaignOS live campaign flow preview/i)).toHaveTextContent(/Credits reserved/i)
     expect(screen.getByLabelText(/CampaignOS live campaign flow preview/i)).toHaveTextContent(/Live monitor/i)
     expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
+  })
+
+  it('labels the static portfolio host when the API route returns the app shell', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => htmlAppShell()))
+
+    render(<App />)
+
+    expect(await screen.findByText(/Static portfolio host/i)).toBeInTheDocument()
+    expect(screen.getByText(/API demo by request/i)).toBeInTheDocument()
+    expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /API docs/i })).not.toBeInTheDocument()
   })
 
   it('renders the feature marketing route with real product capabilities and CTAs', () => {
@@ -1045,7 +1058,7 @@ describe('App', () => {
 
     expect(screen.getByLabelText(/login email.*email lookup input/i)).toHaveAttribute(
       'placeholder',
-      'you@company.com',
+      'you@example.test',
     )
     expect(screen.getByLabelText(/access code.*signup input/i)).toHaveAttribute(
       'placeholder',

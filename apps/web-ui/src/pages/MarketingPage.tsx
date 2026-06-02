@@ -1,4 +1,6 @@
-import { API_BASE_URL } from '../api/client'
+import { useEffect, useState } from 'react'
+
+import { API_BASE_URL, API_DOCS_URL, responseLooksApiBacked } from '../api/client'
 
 export function MarketingPage({
   onCustomerAccess,
@@ -7,6 +9,24 @@ export function MarketingPage({
   onCustomerAccess: () => void
   onInternalAccess?: () => void
 }) {
+  const [apiConnected, setApiConnected] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetch(`${API_BASE_URL}/readyz`, { cache: 'no-store' })
+      .then((response) => {
+        if (!cancelled) setApiConnected(responseLooksApiBacked(response))
+      })
+      .catch(() => {
+        if (!cancelled) setApiConnected(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <main className="marketing-site">
       <header className="marketing-nav">
@@ -46,9 +66,19 @@ export function MarketingPage({
           </div>
           <div className="marketing-tertiary-links" aria-label="Secondary resources">
             <a href="/kb">Knowledge base</a>
-            <a className="docs-link secondary-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
-              API docs
-            </a>
+            {apiConnected ? (
+              <a className="docs-link secondary-link" href={API_DOCS_URL} target="_blank" rel="noreferrer">
+                API docs
+              </a>
+            ) : (
+              <span className="docs-link docs-link-static" aria-label="API docs available during runtime demos">
+                API docs by request
+              </span>
+            )}
+          </div>
+          <div className={apiConnected ? 'api-mode-banner api-mode-live' : 'api-mode-banner'} aria-live="polite">
+            <span>{apiConnected ? 'API connected' : 'Static portfolio host'}</span>
+            <strong>{apiConnected ? 'Runtime workflows are available.' : 'API demo by request.'}</strong>
           </div>
         </div>
 
@@ -115,7 +145,7 @@ export function MarketingPage({
         </div>
       </section>
 
-      <section className="marketing-proof-strip" aria-label="Platform proof points">
+      <section className="marketing-check-strip" aria-label="Platform operating checks">
         <div>
           <span>Modeled reach</span>
           <strong>2.65M subscribers</strong>

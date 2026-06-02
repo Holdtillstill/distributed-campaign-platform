@@ -38,6 +38,9 @@ jobs:
       - name: Python tests
         run: uv run pytest
 
+      - name: Public readiness checks
+        run: node scripts/check-public-readiness.mjs
+
       - name: Web UI tests
         working-directory: apps/web-ui
         run: |

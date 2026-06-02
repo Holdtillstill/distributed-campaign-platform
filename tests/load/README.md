@@ -14,4 +14,4 @@ k6 run tests/load/campaign-fanout-threshold.js
 RECIPIENTS=1000 ITERATIONS=3 VUS=1 k6 run tests/load/campaign-fanout-threshold.js
 ```
 
-Use this to support the interview story: the current API request path is fine for a portfolio demo, but very large broadcasts should move to a scheduler/fan-out worker that batches database writes and queue publishes outside the HTTP request.
+Use this to support the architecture review: the current API request path is fine for a small portfolio demo, but very large broadcasts should move to a scheduler/fan-out worker that batches database writes and queue publishes outside the HTTP request.

@@ -10,7 +10,9 @@ export class ApiClientError extends Error {
   }
 }
 
-export const API_BASE_URL = window.__APP_CONFIG__?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL ?? '/api'
+const configuredApiBaseUrl = window.__APP_CONFIG__?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL ?? ''
+export const API_BASE_URL = configuredApiBaseUrl.trim() || '/api'
+export const API_DOCS_URL = `${API_BASE_URL.replace(/\/$/, '')}/docs`
 
 export const API_UNAVAILABLE_MESSAGE =
   'Campaign API is not connected for this static portfolio host. Start an approved demo environment or use the local demo stack for API-backed workflows.'
@@ -19,6 +21,11 @@ export const PUBLIC_DESIGN_ROUTES_ENABLED =
   import.meta.env.DEV ||
   window.__APP_CONFIG__?.enableDesignRoutes === true ||
   import.meta.env.VITE_ENABLE_PUBLIC_DESIGN_ROUTES === 'true'
+
+export function responseLooksApiBacked(response: Response): boolean {
+  const contentType = response.headers?.get?.('content-type')?.toLowerCase() ?? ''
+  return response.ok && !contentType.includes('text/html')
+}
 
 const isLocalHost = LOCAL_HOSTS.has(window.location.hostname)
 

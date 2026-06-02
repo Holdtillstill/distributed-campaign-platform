@@ -204,7 +204,7 @@ export default function App() {
 
   function loginInternalAdmin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    persistSession({ role: 'internal_admin', email: adminEmail || 'ops@company.com' })
+    persistSession({ role: 'internal_admin', email: adminEmail || 'ops@example.test' })
     syncRouteStateFromLocation()
   }
 

@@ -71,7 +71,7 @@ export function CustomerAccessPage({
               type="email"
               value={loginEmail}
               onChange={(event) => onLoginEmail(event.target.value)}
-              placeholder="you@company.com"
+              placeholder="you@example.test"
             />
           </label>
           <button>Find my companies</button>
@@ -122,7 +122,7 @@ export function CustomerAccessPage({
               type="email"
               value={signupEmail}
               onChange={(event) => onSignupEmail(event.target.value)}
-              placeholder="you@company.com"
+              placeholder="you@example.test"
             />
           </label>
           <label>

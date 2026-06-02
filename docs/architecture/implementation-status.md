@@ -19,9 +19,9 @@ This project is a portfolio platform demo. It is intentionally local-first, with
 
 | Claim | Status |
 |---|---|
-| Ready to show in interviews | Yes. The local app, tests, docs, and architecture story are strong enough for portfolio review. |
+| Ready for portfolio review | Yes. The local app, tests, docs, and architecture story are strong enough for a technical walkthrough. |
 | Ready for local demo | Yes. `uv run pytest` and `scripts/local/e2e-smoke-test.sh` validate the core app path. |
-| Ready for EKS demo | Almost. Terraform and Helm are credible, but the final proof is `terraform apply`, Helm install, ALB smoke test, and teardown in the new AWS account. |
+| Ready for EKS demo | Almost. Terraform and Helm are credible, but the final validation is `terraform apply`, Helm install, ALB smoke test, and teardown in the new AWS account. |
 | Production ready | No. Large fan-out, managed data services, hot dedupe, provider auth, DR, and operational runbooks need more work. |
 
 ## Queue Provider Modes

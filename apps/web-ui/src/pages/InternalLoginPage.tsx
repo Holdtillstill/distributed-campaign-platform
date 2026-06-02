@@ -28,7 +28,7 @@ export function InternalLoginPage({
             type="email"
             value={adminEmail}
             onChange={(event) => onAdminEmail(event.target.value)}
-            placeholder="ops@company.com"
+            placeholder="ops@example.test"
           />
         </label>
         <button>Login as internal admin</button>

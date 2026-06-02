@@ -26,7 +26,7 @@ const recommendations = [
     route: '/kb',
     secondaryRoute: '/features',
     direction: 'Current Intercom-like public support surfaces',
-    reason: 'Approachable customer education and product proof stay available outside the authenticated shell.',
+    reason: 'Approachable customer education and product details stay available outside the authenticated shell.',
   },
 ]
 

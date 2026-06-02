@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from 'react'
 
-import { API_BASE_URL } from '../api/client'
+import { API_DOCS_URL } from '../api/client'
 
 export function PageHeader({
   title,
@@ -26,7 +26,7 @@ export function PageHeader({
       </div>
       <div className="page-actions">
         {action}
-        <a className="docs-link" href={`${API_BASE_URL}/docs`} target="_blank" rel="noreferrer">
+        <a className="docs-link" href={API_DOCS_URL} target="_blank" rel="noreferrer">
           API docs
         </a>
       </div>
