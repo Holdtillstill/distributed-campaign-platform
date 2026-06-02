@@ -74,6 +74,7 @@ assertAll(
     "CLOUDFRONT_DISTRIBUTION_ID",
     "CLOUDFRONT_FUNCTION_NAME",
     "SITE_URL",
+    "VITE_STATIC_PORTFOLIO_HOST: \"true\"",
     "node scripts/validate-static-spa-router.mjs",
     "npm test -- --run",
     "npm run build",

@@ -26,6 +26,7 @@ env:
   SITE_URL: ${{ secrets.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev' }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VITE_ENABLE_PUBLIC_DESIGN_ROUTES: "false"
+  VITE_STATIC_PORTFOLIO_HOST: "true"
 
 jobs:
   deploy-static-web-ui:

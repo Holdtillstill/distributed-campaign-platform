@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { API_BASE_URL, API_DOCS_URL, responseLooksApiBacked } from '../api/client'
+import { API_BASE_URL, API_DOCS_URL, isStaticPortfolioHost, responseLooksApiBacked } from '../api/client'
 
 export function MarketingPage({
   onCustomerAccess,
@@ -13,6 +13,11 @@ export function MarketingPage({
 
   useEffect(() => {
     let cancelled = false
+
+    if (isStaticPortfolioHost()) {
+      setApiConnected(false)
+      return
+    }
 
     fetch(`${API_BASE_URL}/readyz`, { cache: 'no-store' })
       .then((response) => {

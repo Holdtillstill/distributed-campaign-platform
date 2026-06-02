@@ -722,6 +722,7 @@ describe('App', () => {
   afterEach(() => {
     window.localStorage.clear()
     window.history.pushState(null, '', '/')
+    delete window.__APP_CONFIG__
     vi.unstubAllGlobals()
   })
 
@@ -753,6 +754,19 @@ describe('App', () => {
     expect(screen.getByText(/API demo by request/i)).toBeInTheDocument()
     expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /API docs/i })).not.toBeInTheDocument()
+  })
+
+  it('does not probe the API on the static portfolio build', async () => {
+    window.__APP_CONFIG__ = { staticPortfolioHost: true }
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    expect(screen.getByText(/Static portfolio host/i)).toBeInTheDocument()
+    expect(screen.getByText(/API demo by request/i)).toBeInTheDocument()
+    expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('renders the feature marketing route with real product capabilities and CTAs', () => {

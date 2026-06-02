@@ -22,6 +22,10 @@ export const PUBLIC_DESIGN_ROUTES_ENABLED =
   window.__APP_CONFIG__?.enableDesignRoutes === true ||
   import.meta.env.VITE_ENABLE_PUBLIC_DESIGN_ROUTES === 'true'
 
+export function isStaticPortfolioHost(): boolean {
+  return window.__APP_CONFIG__?.staticPortfolioHost === true || import.meta.env.VITE_STATIC_PORTFOLIO_HOST === 'true'
+}
+
 export function responseLooksApiBacked(response: Response): boolean {
   const contentType = response.headers?.get?.('content-type')?.toLowerCase() ?? ''
   return response.ok && !contentType.includes('text/html')

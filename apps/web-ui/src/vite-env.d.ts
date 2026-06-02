@@ -5,6 +5,7 @@ declare global {
     __APP_CONFIG__?: {
       apiBaseUrl?: string
       enableDesignRoutes?: boolean
+      staticPortfolioHost?: boolean
       grafanaUrl?: string
       tempoUrl?: string
       prometheusUrl?: string
