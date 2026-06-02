@@ -67,11 +67,11 @@ Core distributed-systems behaviors:
 |---|---|
 | Cloud | S3/CloudFront static host, ECR image path, and request-only AWS EKS preview scaffolding |
 | IaC | Terraform |
-| Kubernetes | Helm, HPA, PDBs, NetworkPolicies, Argo CD scaffolding, Karpenter later |
+| Kubernetes | Helm, HPA, PDBs, NetworkPolicies, Argo CD scaffolding, optional Karpenter expansion |
 | App | Python 3.12, FastAPI, async workers |
 | Data and queueing | PostgreSQL, Redis, NATS JetStream locally, optional SQS for AWS-native EKS dispatch |
 | Observability | OpenTelemetry Collector, Prometheus, Grafana, Loki, Tempo, Alertmanager |
-| Security | IRSA, RBAC, NetworkPolicies, Trivy, Gitleaks, External Secrets later, Kyverno later |
+| Security | IRSA, RBAC, NetworkPolicies, Trivy, Gitleaks, optional External Secrets and Kyverno expansion |
 | Testing | pytest, k6, Helm lint, Terraform validation |
 
 ## Repository layout
@@ -238,6 +238,8 @@ The scaffold covers Prometheus/Alertmanager/Grafana, Loki, Tempo, and OpenTeleme
 
 See [`platform/observability/README.md`](platform/observability/README.md) for install commands.
 
-## Current next step
+## Runtime Preview Boundary
 
-The EKS dev path has Terraform, ECR image repositories, Helm EKS values, ALB ingress, External Secrets wiring, persistent demo data services, readiness checks, and CI gates prepared for validation. Use [`docs/runbooks/eks-dev.md`](docs/runbooks/eks-dev.md) for the ephemeral cloud deployment flow, then record the ALB smoke result and destroy the stack in the approved window.
+The public static host is the always-available review surface. The fuller runtime path is request-only and intended for short approved windows, where Terraform, ECR image repositories, Helm EKS values, ingress, External Secrets wiring, persistent demo data services, readiness checks, and observability can be validated together.
+
+Use [`docs/runbooks/eks-dev.md`](docs/runbooks/eks-dev.md) for the ephemeral cloud deployment flow. Any approved cloud run should record the application smoke result, observability check, and cleanup result before the stack is destroyed.
