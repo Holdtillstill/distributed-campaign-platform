@@ -41,7 +41,6 @@ const bannedText = [
   { label: "assistant/tooling name", pattern: /\b(Codex|Gemini|Claude|ChatGPT|LLM)\b/i },
   { label: "internal workspace artifact", pattern: /\b(antigravity|portfolio_review|ybz\.dev)\b/i },
   { label: "interview/meta phrasing", pattern: /\b(interviews?|hiring manager|case study|proof points?)\b/i },
-  { label: "development process disclosure", pattern: /\b(AI-Assisted Development Disclosure|AI coding assistance)\b/i },
 ]
 
 const sensitiveText = [

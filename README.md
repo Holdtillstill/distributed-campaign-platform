@@ -4,6 +4,12 @@ CampaignOS is a production-style Kubernetes platform running an event-driven cam
 
 > Status: SaaS product-depth demo slice in progress: local-first multi-tenant SMS workflows, admin health, content templates, and analytics are covered by targeted UI/API tests.
 
+## Development note
+
+This project was built with AI-assisted coding support. Product direction,
+architecture, validation, deployment choices, operations, and maintenance remain
+my responsibility.
+
 ## Goals
 
 This project demonstrates senior DevOps / platform engineering skills with a domain-relevant distributed system:
