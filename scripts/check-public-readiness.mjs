@@ -58,6 +58,7 @@ const findings = []
 const visitorScriptPath = path.join(root, "apps/web-ui/index.html")
 const publicDir = path.join(root, "apps/web-ui/public")
 const publicEnvPath = path.join(publicDir, "env.js")
+const issueTemplateConfigPath = path.join(root, ".github/ISSUE_TEMPLATE/config.yml")
 
 function relative(filePath) {
   return path.relative(root, filePath)
@@ -159,6 +160,18 @@ if (fs.existsSync(sitemapPath)) {
 }
 if (!fs.existsSync(socialPreviewPath)) {
   findings.push("apps/web-ui/public/social-preview.jpg: missing social preview image")
+}
+
+if (fs.existsSync(issueTemplateConfigPath)) {
+  const issueConfig = fs.readFileSync(issueTemplateConfigPath, "utf8")
+  if (!issueConfig.includes("blank_issues_enabled: false")) {
+    findings.push(".github/ISSUE_TEMPLATE/config.yml: blank public issues should stay disabled")
+  }
+  if (!issueConfig.includes("SECURITY.md")) {
+    findings.push(".github/ISSUE_TEMPLATE/config.yml: missing security policy contact link")
+  }
+} else {
+  findings.push(".github/ISSUE_TEMPLATE/config.yml: missing")
 }
 
 if (findings.length) {
