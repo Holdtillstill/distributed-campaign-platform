@@ -39,7 +39,7 @@ data "aws_partition" "current" {}
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+  version = "~> 6.6"
 
   name = var.name
   cidr = var.vpc_cidr
@@ -216,7 +216,7 @@ resource "aws_sqs_queue" "app" {
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  version = "~> 21.23"
 
   cluster_name    = var.name
   cluster_version = var.cluster_version
@@ -264,7 +264,7 @@ module "eks" {
 
 module "ebs_csi_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
+  version = "~> 6.6"
 
   role_name             = "${var.name}-ebs-csi"
   attach_ebs_csi_policy = true
@@ -285,7 +285,7 @@ resource "aws_eks_addon" "ebs_csi" {
 
 module "load_balancer_controller_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
+  version = "~> 6.6"
 
   role_name                              = "${var.name}-aws-lbc"
   attach_load_balancer_controller_policy = true
