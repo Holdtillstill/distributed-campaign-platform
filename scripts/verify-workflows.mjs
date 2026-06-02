@@ -4,6 +4,7 @@ const workflowsDir = new URL("../.github/workflows/", import.meta.url)
 
 const expectedWorkflows = [
   "ci.yaml",
+  "codeql.yml",
   "dependency-audit.yml",
   "image-publish.yaml",
   "secret-scan.yml",
@@ -139,5 +140,20 @@ assertAll(
 
 const secretScan = await readWorkflow("secret-scan.yml")
 assertAll(secretScan, ["gitleaks detect", "--redact", "Block committed cloud identifiers"], "secret-scan.yml")
+
+const codeql = await readWorkflow("codeql.yml")
+assertAll(
+  codeql,
+  [
+    "permissions:\n  contents: read\n  security-events: write",
+    "schedule:",
+    "javascript-typescript",
+    "python",
+    "github/codeql-action/init@v3",
+    "build-mode: none",
+    "github/codeql-action/analyze@v3",
+  ],
+  "codeql.yml",
+)
 
 console.log("workflow contracts passed")

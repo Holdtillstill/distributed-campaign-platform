@@ -111,9 +111,10 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
 - Dedicated dependency audits run `pip-audit` from the uv lock export and
   `npm audit` for the web UI.
 - Security workflows run Gitleaks, blocking Trivy filesystem vulnerability/secret
-  scans, blocking image scans, and Dependency Review for public pull requests.
-  Trivy IaC/Kubernetes misconfiguration scanning stays advisory until production
-  promotion because this repo includes local demo infrastructure and EKS scaffolding.
+  scans, blocking image scans, CodeQL source analysis, and Dependency Review for
+  public pull requests. Trivy IaC/Kubernetes misconfiguration scanning stays
+  advisory until production promotion because this repo includes local demo
+  infrastructure and EKS scaffolding.
 - Scheduled static-host smoke covers HTTP guardrails and Chromium browser
   rendering on selected deep links, including console, overflow,
   visitor-telemetry, privacy-signal, and serious/critical accessibility checks.

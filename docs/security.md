@@ -29,6 +29,7 @@ GitHub Actions runs dependency, secret, filesystem, image vulnerability, and sta
 - Gitleaks scans repository history and blocks committed cloud identifiers.
 - Trivy scans the filesystem for vulnerabilities and secrets.
 - Trivy scans Docker images in CI and image-publish paths before any push.
+- CodeQL runs source-level analysis for the JavaScript/TypeScript and Python code.
 - Trivy misconfiguration scanning is kept advisory because this repo includes local-only demo infrastructure and EKS scaffolding; production promotion would turn unresolved IaC and Kubernetes misconfiguration findings into release blockers.
 - GitHub Actions OIDC is used for AWS deploy/publish workflows; no static AWS access keys are required in the repo.
 - Scheduled static-host smoke validates CloudFront/API guardrails, browser rendering, visitor/privacy telemetry behavior, and serious/critical accessibility checks for selected public routes.
