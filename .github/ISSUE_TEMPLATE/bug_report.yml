@@ -40,11 +40,10 @@ body:
     id: checks
     attributes:
       label: Checks run
-      description: List any tests, smoke checks, browser-console checks, or logs reviewed.
+      description: List any tests, smoke checks, sanitized browser-console checks, or sanitized logs reviewed.
       render: shell
   - type: textarea
     id: public_boundary
     attributes:
       label: Public boundary
       description: Do not include secrets, account-specific cloud identifiers, personal data, request records, or private preview URLs.
-
