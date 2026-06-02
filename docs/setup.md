@@ -4,7 +4,7 @@ This project is designed to be local-first, then deployed to ephemeral EKS envir
 
 ## Local tools
 
-Required for the first implementation phase:
+Required for local development and validation:
 
 - git
 - Docker Desktop or compatible Docker engine
@@ -57,7 +57,7 @@ Create AWS Budgets alerts for actual cost thresholds:
 - $50
 - $100
 
-## GitHub setup needed later
+## GitHub setup
 
 - Create GitHub repo: `distributed-campaign-platform`
 - Start private; make public after docs/screenshots are curated
@@ -66,16 +66,7 @@ Create AWS Budgets alerts for actual cost thresholds:
 
 ## Cost-control operating rule
 
-Cloud environment should be ephemeral by default:
-
-```bash
-make deploy-dev
-make demo-load-test
-make screenshots
-make destroy-dev
-```
-
-Until those targets exist, manually run Terraform destroy after every EKS test.
+Cloud environments should be ephemeral by default. Use the EKS runbook for the exact Terraform and Helm flow, and run Terraform destroy after every EKS test unless a longer-lived environment is explicitly approved.
 
 ## EKS deployment path
 
