@@ -60,6 +60,7 @@ const publicDir = path.join(root, "apps/web-ui/public")
 const publicEnvPath = path.join(publicDir, "env.js")
 const issueTemplateConfigPath = path.join(root, ".github/ISSUE_TEMPLATE/config.yml")
 const contributingPath = path.join(root, "CONTRIBUTING.md")
+const dependabotPath = path.join(root, ".github/dependabot.yml")
 
 function relative(filePath) {
   return path.relative(root, filePath)
@@ -185,6 +186,26 @@ if (fs.existsSync(contributingPath)) {
   }
 } else {
   findings.push("CONTRIBUTING.md: missing")
+}
+
+if (fs.existsSync(dependabotPath)) {
+  const dependabot = fs.readFileSync(dependabotPath, "utf8")
+  for (const group of [
+    "actions-dependencies",
+    "python-dependencies",
+    "web-npm-dependencies",
+    "api-docker-dependencies",
+    "dispatcher-docker-dependencies",
+    "provider-docker-dependencies",
+    "web-docker-dependencies",
+    "terraform-dependencies",
+  ]) {
+    if (!dependabot.includes(group)) {
+      findings.push(`.github/dependabot.yml: missing grouped update rule ${group}`)
+    }
+  }
+} else {
+  findings.push(".github/dependabot.yml: missing")
 }
 
 if (findings.length) {
