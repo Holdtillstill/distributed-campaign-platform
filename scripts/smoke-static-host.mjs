@@ -63,6 +63,8 @@ function assertSecurityHeaders(result) {
   requireHeader(result.headers, 'x-content-type-options', 'nosniff')
   requireHeader(result.headers, 'x-frame-options', 'DENY')
   requireHeader(result.headers, 'referrer-policy', 'strict-origin-when-cross-origin')
+  requireHeader(result.headers, 'cross-origin-opener-policy', 'same-origin')
+  requireHeader(result.headers, 'permissions-policy', /camera=\(\), microphone=\(\), geolocation=\(\), payment=\(\)/)
 }
 
 const htmlRoutes = [
