@@ -56,6 +56,8 @@ const sensitiveText = [
 const allowedAccounts = new Set(["000000000000", "111122223333", "123456789012"])
 const findings = []
 const visitorScriptPath = path.join(root, "apps/web-ui/index.html")
+const readmePath = path.join(root, "README.md")
+const readmeScreenshotPath = path.join(root, "docs/screenshots/campaignos-overview.png")
 const publicDir = path.join(root, "apps/web-ui/public")
 const publicEnvPath = path.join(publicDir, "env.js")
 const issueTemplateConfigPath = path.join(root, ".github/ISSUE_TEMPLATE/config.yml")
@@ -116,6 +118,22 @@ function dependabotBlock(dependabot, ecosystem, directory) {
 }
 
 walk(root)
+
+if (fs.existsSync(readmePath)) {
+  const readme = fs.readFileSync(readmePath, "utf8")
+  const requiredReadmeMarkers = [
+    ["public static URL", "Public UI preview: <https://distributed-campaign-platform.bozhi.dev>"],
+    ["runtime request boundary", "Runtime preview: request-only through <https://bozhi.dev/#request>"],
+    ["AI-assisted disclosure", "This project was built with AI-assisted coding support"],
+    ["public status table", "| EKS runtime preview | Request-only |"],
+    ["README screenshot", "![CampaignOS public product surface](docs/screenshots/campaignos-overview.png)"],
+  ]
+  for (const [label, marker] of requiredReadmeMarkers) {
+    if (!readme.includes(marker)) findings.push(`README.md: missing ${label}`)
+  }
+} else {
+  findings.push("README.md: missing")
+}
 
 if (fs.existsSync(visitorScriptPath)) {
   const shell = fs.readFileSync(visitorScriptPath, "utf8")
@@ -182,6 +200,9 @@ if (fs.existsSync(sitemapPath)) {
 }
 if (!fs.existsSync(socialPreviewPath)) {
   findings.push("apps/web-ui/public/social-preview.jpg: missing social preview image")
+}
+if (!fs.existsSync(readmeScreenshotPath)) {
+  findings.push("docs/screenshots/campaignos-overview.png: missing README screenshot")
 }
 
 if (fs.existsSync(issueTemplateConfigPath)) {
