@@ -1,11 +1,5 @@
 # CampaignOS Distributed Campaign Platform
 
-[![CI](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/ci.yaml)
-[![Static host smoke](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/static-smoke.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/static-smoke.yml)
-[![Dependency audit](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/dependency-audit.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/dependency-audit.yml)
-[![Security](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/security.yml)
-[![Secret scan](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/secret-scan.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/secret-scan.yml)
-
 CampaignOS is a local-first, EKS-ready campaign delivery simulator for showing
 distributed workflows, GitOps, autoscaling, distributed tracing, open-source
 observability, SLOs, and incident runbooks.
