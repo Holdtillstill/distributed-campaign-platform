@@ -63,7 +63,6 @@ assertAll(
   staticDeploy,
   [
     "permissions:\n  contents: read\n  id-token: write",
-    "environment: static-production",
     "AWS_ROLE_TO_ASSUME",
     "STATIC_SITE_BUCKET",
     "CLOUDFRONT_DISTRIBUTION_ID",
@@ -90,7 +89,6 @@ assertAll(
   imagePublish,
   [
     "concurrency:",
-    "environment: image-publish",
     "permissions:\n  contents: read\n  id-token: write",
     "aws-actions/configure-aws-credentials@v6",
     "mask-aws-account-id: true",
