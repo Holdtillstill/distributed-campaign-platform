@@ -2,7 +2,7 @@
 
 The public portfolio host loads lightweight first-party pageview telemetry so the owner can understand which project routes are being reviewed.
 
-Collected signals are limited to operational visitor context such as project name, page path, referrer/source parameters, user agent-derived device type, locale, timezone, viewport, network/ISP summary when available, approximate location, and a masked IP address. The app should not expose raw visitor events, IP addresses, approval records, or private deployment details in the public UI.
+Collected signals are limited to operational visitor context such as project name, page path, referrer/source parameters, user agent-derived device type, derived traffic source/channel, locale, timezone, viewport, network/ISP summary when available, approximate location, and a masked IP address. Raw IP address and user agent are retained briefly for digest, abuse, and reliability analysis, then purged. The app should not expose raw visitor events, IP addresses, approval records, or private deployment details in the public UI.
 
 Do Not Track and Global Privacy Control signals are respected by the shared first-party tracker.
 
