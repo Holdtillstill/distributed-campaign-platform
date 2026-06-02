@@ -1,0 +1,47 @@
+name: Deployment Task
+description: Track local, static-host, image, or approved preview validation work.
+title: "[Deploy]: "
+labels: ["deployment"]
+body:
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Local Docker Compose
+        - Local kind cluster
+        - Public static host
+        - Approved short-lived preview
+        - CI/CD
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What should be deployed, validated, or rolled back?
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Required validation
+      value: |
+        - Python tests:
+        - Web UI typecheck/tests/build:
+        - Static edge-router validation:
+        - Helm lint/render:
+        - Browser smoke:
+        - Image scan:
+        - Observability check:
+    validations:
+      required: true
+  - type: textarea
+    id: cost_safety
+    attributes:
+      label: Cost and safety boundary
+      description: Note whether the task creates runtime resources. Preview resources must be approved, short-lived, and cleaned up.
+    validations:
+      required: true
+

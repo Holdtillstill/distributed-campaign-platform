@@ -1,0 +1,39 @@
+name: Content Or Docs
+description: Improve public copy, docs, runbooks, architecture notes, or screenshots.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - README
+        - Architecture docs
+        - Runbooks
+        - Knowledge base
+        - Screenshots
+        - Public website copy
+        - Security or privacy notes
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: File path, route, or heading.
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What should change?
+      description: Explain what is stale, unclear, inaccurate, or missing.
+    validations:
+      required: true
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested update
+      description: Optional replacement wording, source links, or acceptance criteria.
+

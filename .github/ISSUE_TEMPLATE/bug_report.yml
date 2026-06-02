@@ -1,0 +1,50 @@
+name: Bug Report
+description: Report broken behavior in the CampaignOS UI, API, workers, static host, or deployment scaffold.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Public static UI
+        - Campaign API
+        - Dispatcher
+        - Provider simulator
+        - Helm or Kubernetes scaffold
+        - Observability
+        - CI/CD
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Describe the visible behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include routes, commands, API calls, or local setup details.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Checks run
+      description: List any tests, smoke checks, browser-console checks, or logs reviewed.
+      render: shell
+  - type: textarea
+    id: public_boundary
+    attributes:
+      label: Public boundary
+      description: Do not include secrets, account-specific cloud identifiers, personal data, request records, or private preview URLs.
+
