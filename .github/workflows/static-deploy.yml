@@ -60,6 +60,7 @@ jobs:
         working-directory: apps/web-ui
         run: |
           npm test -- --run
+          npm run typecheck
           VITE_STATIC_PORTFOLIO_HOST=true npm run build
 
       - uses: aws-actions/configure-aws-credentials@v6

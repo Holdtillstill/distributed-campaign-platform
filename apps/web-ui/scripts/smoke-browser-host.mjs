@@ -10,7 +10,12 @@ const routes = [
   { path: '/', markers: ['CampaignOS', 'Orchestrate every customer message'] },
   { path: '/app/dashboard', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
   { path: '/app/campaigns/scheduled', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
+  { path: '/app/subscribers', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
+  { path: '/app/analytics', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
+  { path: '/internal/dashboard', markers: ['Operator console', 'Admin access'] },
+  { path: '/kb/articles', markers: ['Customer knowledge base', 'Internal admin and tenant operations overview'] },
   { path: '/features/broadcast-monitor', markers: ['CampaignOS', 'Broadcast monitor'] },
+  { path: '/features/analytics', markers: ['CampaignOS', 'Analytics and campaign reporting'] },
 ];
 
 const profiles = [
