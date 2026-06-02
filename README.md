@@ -108,6 +108,11 @@ The smoke test waits for the local dependencies and service health endpoints, cr
 
 The browser demo UI is served by Nginx and proxies API calls under `/api/*` to the Campaign API, so `http://127.0.0.1:8080` can create campaigns and poll status without CORS configuration. The frontend keeps the API base local-first through `window.__APP_CONFIG__?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL ?? "/api"`.
 
+The static portfolio host uses the same React build without an always-on API.
+Its CloudFront edge router must reject `/api/*` and `/r/*` unless those paths
+are explicitly proxied to a provisioned demo stack; otherwise static hosting can
+serve the app shell where JSON is expected.
+
 Dispatcher reliability defaults:
 
 - transient provider statuses `429`, `500`, `502`, `503`, and `504` are retried

@@ -45,6 +45,9 @@ jobs:
           npm test -- --run
           npm run build
 
+      - name: Static edge router validation
+        run: node scripts/validate-static-spa-router.mjs
+
       - name: Helm lint and render
         run: |
           helm lint deploy/helm/campaign-platform

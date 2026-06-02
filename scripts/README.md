@@ -8,3 +8,6 @@ Bootstrap, validation, local development, and teardown helpers.
 - `local/seed-demo-data.py`: seeds the Demo Retail Co tenant, access code, subscribers, content, and campaign data.
 - `local/install-observability-dashboards.sh`: imports local Grafana dashboard assets.
 - `local/wait-for-local-stack.sh`: waits for local service readiness.
+- `deploy-static-edge-router.sh`: creates or updates the CloudFront Function used by the static portfolio host and associates it with the configured distribution.
+- `validate-static-spa-router.mjs`: validates the CloudFront Function source used by the static portfolio host.
+- `smoke-static-host.mjs`: checks a deployed static host and fails if `/api/*` or `/r/*` returns the HTML app shell.
