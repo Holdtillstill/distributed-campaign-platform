@@ -10,7 +10,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  SITE_URL: ${{ vars.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev' }}
+  SITE_URL: ${{ secrets.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev' }}
 
 jobs:
   smoke-static-host:

@@ -14,8 +14,8 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: us-west-2
-  AWS_ROLE_TO_ASSUME: ${{ vars.AWS_ROLE_TO_ASSUME }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-west-2' }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:

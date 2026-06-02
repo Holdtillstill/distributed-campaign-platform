@@ -17,12 +17,12 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
-  AWS_ROLE_TO_ASSUME: ${{ vars.AWS_ROLE_TO_ASSUME }}
-  STATIC_SITE_BUCKET: ${{ vars.STATIC_SITE_BUCKET }}
-  CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
-  CLOUDFRONT_FUNCTION_NAME: ${{ vars.CLOUDFRONT_FUNCTION_NAME }}
-  SITE_URL: ${{ vars.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev' }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-west-2' }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  STATIC_SITE_BUCKET: ${{ secrets.STATIC_SITE_BUCKET }}
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+  CLOUDFRONT_FUNCTION_NAME: ${{ secrets.CLOUDFRONT_FUNCTION_NAME }}
+  SITE_URL: ${{ secrets.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev' }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VITE_ENABLE_PUBLIC_DESIGN_ROUTES: "false"
 
@@ -40,11 +40,11 @@ jobs:
 
       - name: Check required deployment variables
         run: |
-          : "${AWS_ROLE_TO_ASSUME:?Set repository variable AWS_ROLE_TO_ASSUME}"
-          : "${STATIC_SITE_BUCKET:?Set repository variable STATIC_SITE_BUCKET}"
-          : "${CLOUDFRONT_DISTRIBUTION_ID:?Set repository variable CLOUDFRONT_DISTRIBUTION_ID}"
-          : "${CLOUDFRONT_FUNCTION_NAME:?Set repository variable CLOUDFRONT_FUNCTION_NAME}"
-          : "${SITE_URL:?Set repository variable SITE_URL}"
+          : "${AWS_ROLE_TO_ASSUME:?Set Actions secret AWS_ROLE_TO_ASSUME}"
+          : "${STATIC_SITE_BUCKET:?Set Actions secret STATIC_SITE_BUCKET}"
+          : "${CLOUDFRONT_DISTRIBUTION_ID:?Set Actions secret CLOUDFRONT_DISTRIBUTION_ID}"
+          : "${CLOUDFRONT_FUNCTION_NAME:?Set Actions secret CLOUDFRONT_FUNCTION_NAME}"
+          : "${SITE_URL:?Set Actions secret SITE_URL}"
 
       - name: Install web dependencies
         working-directory: apps/web-ui
