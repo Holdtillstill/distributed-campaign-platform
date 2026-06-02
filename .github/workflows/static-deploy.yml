@@ -8,6 +8,7 @@ on:
     paths:
       - apps/web-ui/**
       - deploy/cloudfront/**
+      - scripts/deploy-static-edge-router.sh
       - scripts/smoke-static-host.mjs
       - scripts/validate-static-spa-router.mjs
       - .github/workflows/static-deploy.yml
