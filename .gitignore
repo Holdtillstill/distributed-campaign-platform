@@ -23,10 +23,13 @@ npm-debug.log*
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
 crash.log
 crash.*.log
 *.tfvars
 *.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
 !*.auto.tfvars.example
 .terraform.lock.hcl
 
@@ -44,6 +47,10 @@ dist/
 build/
 .tmp/
 coverage/
+playwright-report/
+test-results/
+smoke-artifacts/
+*.har
 
 # Screenshots may contain account-specific details; curate before committing
 _docs_screenshots_raw/

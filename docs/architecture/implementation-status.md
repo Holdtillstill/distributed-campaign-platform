@@ -12,7 +12,7 @@ This project is a portfolio platform demo. It is intentionally local-first, with
 | Deduplication | PostgreSQL unique keys and status updates provide durable idempotency. | Redis is deployed locally/in Helm but not yet on the hot dedupe path. | Add Redis/ElastiCache for fast short-lived provider webhook dedupe, message locks, and rate-limit counters before hitting PostgreSQL. |
 | Database | PostgreSQL schema covers tenants, subscribers, consent, campaigns, messages, links, reminders, and SMS conversations. | Local/kind/EKS demo chart runs a single in-cluster PostgreSQL StatefulSet. | Use RDS PostgreSQL for automated backup, Multi-AZ failover, patching, and durable production operations. |
 | Inbound SMS | `POST /public/sms/inbound` handles keyword, ZIP, Y/N, STOP, HELP, and unknown replies. | Provider simulator is not a real carrier integration. | Add provider signature validation, provider-specific payload adapters, webhook replay protection, and async inbound queueing. |
-| AWS network | Terraform creates VPC, public/private/control-plane subnets, EKS, ECR, SQS, VPC endpoints, NAT, and IRSA roles. | Dev defaults optimize cost with one NAT gateway while retaining multi-AZ subnets. | For higher availability, set `single_nat_gateway=false` and `one_nat_gateway_per_az=true`; add RDS and ElastiCache subnets/security groups. |
+| AWS network | Terraform defines VPC, public/private/control-plane subnets, EKS, ECR, SQS, VPC endpoints, NAT, and IRSA roles for the approved validation path. | Dev defaults optimize cost with one NAT gateway while retaining multi-AZ subnets. The current AWS run still needs apply, smoke test, and destroy evidence. | For higher availability, set `single_nat_gateway=false` and `one_nat_gateway_per_az=true`; add RDS and ElastiCache subnets/security groups. |
 | Observability | OpenTelemetry, trace/log correlation, Prometheus ServiceMonitors, RED metrics, workflow counters, NATS JetStream exporter metrics, Grafana/Loki/Tempo values, app dashboards, PrometheusRule alerts, and runbooks are present. | The default demo observes the in-cluster NATS path directly and the optional SQS path through app-level counters. | Add AWS SQS queue age/depth alerts, Redis hit-rate metrics, RDS metrics, and DLQ redrive runbooks before calling it production coverage. |
 
 ## Deployment Claims
@@ -21,7 +21,7 @@ This project is a portfolio platform demo. It is intentionally local-first, with
 |---|---|
 | Ready for portfolio review | Yes. The local app, tests, docs, and architecture story are strong enough for a technical walkthrough. |
 | Ready for local demo | Yes. `uv run pytest` and `scripts/local/e2e-smoke-test.sh` validate the core app path. |
-| Ready for EKS demo | Almost. Terraform and Helm are credible, but the final validation is `terraform apply`, Helm install, ALB smoke test, and teardown in the new AWS account. |
+| Ready for EKS demo | Ready to validate. Terraform and Helm are credible, but the final evidence is `terraform apply`, Helm install, ALB smoke test, observability smoke, and teardown in the approved AWS window. |
 | Production ready | No. Large fan-out, managed data services, hot dedupe, provider auth, DR, and operational runbooks need more work. |
 
 ## Queue Provider Modes

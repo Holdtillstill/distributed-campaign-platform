@@ -17,6 +17,11 @@ run `.github/workflows/static-deploy.yml`. The workflow publishes the
 CloudFront Function and associates it with the distribution's viewer-request
 event before syncing assets and running the static-host smoke test.
 
+Edge security for the static host belongs to that existing CloudFront
+distribution. If the shared portfolio WAF is enabled, attach its web ACL there;
+otherwise keep the static preview on the cheaper CloudFront-only path and rely
+on the router rejecting fake `/api/*` and `/r/*` responses.
+
 For EKS, render with account-specific ECR repositories:
 
 ```bash

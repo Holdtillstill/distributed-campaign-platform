@@ -16,6 +16,14 @@
 - Avoid `latest` image tags
 - Require requests/limits for workloads
 
+## Demo authentication boundary
+
+Local review uses simulator identity controls: company access codes, `X-Company-Id` or browser session company ids for tenant selection, and `X-Internal-Admin: true` for internal admin endpoints. These are useful for demonstrating authorization boundaries without adding an external IdP, but they are not production auth. A production path needs signed sessions, tenant-aware RBAC, audited admin roles, webhook signature verification, replay protection, and rate limits on public endpoints.
+
+## CI security posture
+
+GitHub Actions runs dependency, secret, filesystem, and image vulnerability scans. Trivy misconfiguration scanning is kept advisory because this repo includes local-only demo infrastructure and EKS scaffolding; production promotion would turn unresolved IaC and Kubernetes misconfiguration findings into release blockers.
+
 ## Later controls
 
 - Kyverno policies for baseline workload controls

@@ -96,6 +96,6 @@ The app Helm chart sets `OTEL_EXPORTER_OTLP_ENDPOINT` for Campaign API, Dispatch
 ## Security Boundaries
 
 - Tenant operations are scoped by `X-Company-Id` or stored session company id in the frontend.
-- Internal admin API operations require `X-Internal-Admin: true` in this demo implementation.
+- Internal admin API operations require `X-Internal-Admin: true` in this demo implementation. This is a simulator boundary for local review, not production authentication.
 - Helm NetworkPolicies restrict app ingress/egress to declared dependencies and observability paths.
 - No real SMS provider credentials, paid cloud APIs, or external secrets are required for local review.

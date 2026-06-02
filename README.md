@@ -89,7 +89,7 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
 
 1. **Local app mode**: Docker Compose for PostgreSQL, Redis, NATS, and services.
 2. **Local Kubernetes mode**: kind + Helm to validate Kubernetes manifests without AWS cost.
-3. **Ephemeral EKS mode**: Terraform creates EKS only for integration tests and screenshots, then destroys it.
+3. **Ephemeral EKS mode**: Terraform and Helm are prepared for approved EKS integration tests and screenshots, then immediate destroy.
 
 ## Local Docker Compose end-to-end smoke test
 
@@ -118,6 +118,10 @@ The smoke test waits for the local dependencies and service health endpoints, cr
 The browser demo UI is served by Nginx and proxies API calls under `/api/*` to the Campaign API, so `http://127.0.0.1:8080` can create campaigns and poll status without CORS configuration. The frontend keeps the API base local-first through `window.__APP_CONFIG__?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL ?? "/api"`.
 
 The static portfolio host uses the same React build without an always-on API.
+
+### Demo Auth Boundary
+
+This repo uses local/demo identity signals such as access codes, `X-Company-Id`, stored browser session company ids, and `X-Internal-Admin: true`. Those are deliberate simulator controls for local review, not production authentication. A production version would replace them with an IdP-backed session, tenant-aware RBAC, signed provider webhooks, audited admin roles, and rate-limited public endpoints.
 Its CloudFront edge router must reject `/api/*` and `/r/*` unless those paths
 are explicitly proxied to a provisioned demo stack; otherwise static hosting can
 serve the app shell where JSON is expected.
@@ -203,4 +207,4 @@ See [`platform/observability/README.md`](platform/observability/README.md) for i
 
 ## Current next step
 
-The EKS dev path now has Terraform, ECR image repositories, Helm EKS values, ALB ingress, External Secrets wiring, persistent demo data services, readiness checks, and CI gates. Use [`docs/runbooks/eks-dev.md`](docs/runbooks/eks-dev.md) for the ephemeral cloud deployment flow.
+The EKS dev path has Terraform, ECR image repositories, Helm EKS values, ALB ingress, External Secrets wiring, persistent demo data services, readiness checks, and CI gates prepared for validation. Use [`docs/runbooks/eks-dev.md`](docs/runbooks/eks-dev.md) for the ephemeral cloud deployment flow, then record the ALB smoke result and destroy the stack in the approved window.
