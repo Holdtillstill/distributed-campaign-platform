@@ -85,6 +85,12 @@ for (const [route, expectedText] of htmlRoutes) {
   if (result.status !== 200 || !result.contentType.toLowerCase().includes('text/html')) {
     throw new Error(`${route} should serve the public web app, got ${result.status} ${result.contentType}`)
   }
+  if (route !== '/') {
+    const cacheHeader = result.headers['x-cache'] || ''
+    if (/error from cloudfront/i.test(cacheHeader)) {
+      throw new Error(`${route} should use clean CloudFront routing, got x-cache="${cacheHeader}"`)
+    }
+  }
   if (!result.body.includes(expectedText)) {
     throw new Error(`${route} should include expected public copy: ${expectedText}`)
   }

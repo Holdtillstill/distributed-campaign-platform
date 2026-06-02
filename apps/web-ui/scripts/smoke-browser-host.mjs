@@ -3,6 +3,7 @@ import { chromium } from '@playwright/test';
 const WEB_BASE = normalizeBase(process.env.WEB_BASE || process.env.SITE_URL || 'https://distributed-campaign-platform.bozhi.dev');
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 20000);
 const VISITOR_ENDPOINT = 'https://on-demand-demos.bozhi.dev/api/events';
+const VISITOR_ENDPOINTS = Array.from(new Set([VISITOR_ENDPOINT, `${WEB_BASE}/api/events`]));
 
 const routes = [
   { path: '/', markers: ['CampaignOS', 'Orchestrate every customer message'] },
@@ -31,7 +32,7 @@ function isBlockedStaticRoute(url) {
 }
 
 async function installVisitorStub(page, visitorEvents) {
-  await page.route(VISITOR_ENDPOINT, async (interceptedRoute) => {
+  const handler = async (interceptedRoute) => {
     const request = interceptedRoute.request();
     try {
       visitorEvents.push(JSON.parse(request.postData() || '{}'));
@@ -39,7 +40,10 @@ async function installVisitorStub(page, visitorEvents) {
       visitorEvents.push({ parseError: true, raw: request.postData() || '' });
     }
     await interceptedRoute.fulfill({ status: 202, contentType: 'application/json', body: '{}' });
-  });
+  };
+  for (const endpoint of VISITOR_ENDPOINTS) {
+    await page.route(endpoint, handler);
+  }
 }
 
 async function visitRoute(page, route, profileName) {
