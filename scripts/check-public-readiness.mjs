@@ -104,6 +104,15 @@ function scanFile(filePath) {
   }
 }
 
+function dependabotBlock(dependabot, ecosystem, directory) {
+  const escaped = directory.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const pattern = new RegExp(
+    `- package-ecosystem: ${ecosystem}\\n\\s+directory: ${escaped}\\n(?<block>.*?)(?=\\n\\s+- package-ecosystem:|$)`,
+    "s",
+  )
+  return dependabot.match(pattern)?.groups?.block || ""
+}
+
 walk(root)
 
 if (fs.existsSync(visitorScriptPath)) {
@@ -202,6 +211,24 @@ if (fs.existsSync(dependabotPath)) {
   ]) {
     if (!dependabot.includes(group)) {
       findings.push(`.github/dependabot.yml: missing grouped update rule ${group}`)
+    }
+  }
+  const dockerGuardrails = new Map([
+    ["/apps/campaign-api", ['dependency-name: "python"', '">= 3.13"']],
+    ["/apps/dispatcher", ['dependency-name: "python"', '">= 3.13"']],
+    ["/apps/provider-simulator", ['dependency-name: "python"', '">= 3.13"']],
+    ["/apps/web-ui", ['dependency-name: "nginx"', '">= 1.30"']],
+  ])
+  for (const [directory, markers] of dockerGuardrails.entries()) {
+    const block = dependabotBlock(dependabot, "docker", directory)
+    if (!block) {
+      findings.push(`.github/dependabot.yml: missing Docker update block for ${directory}`)
+      continue
+    }
+    for (const marker of markers) {
+      if (!block.includes(marker)) {
+        findings.push(`.github/dependabot.yml: Docker block ${directory} missing base-image guardrail ${marker}`)
+      }
     }
   }
 } else {
