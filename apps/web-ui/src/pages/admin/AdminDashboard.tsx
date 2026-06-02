@@ -2,6 +2,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { MetricCard } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
 import { DataTable } from '../../components/DataTable'
+import { OBSERVABILITY_LINKS } from '../../api/client'
 
 import type { AdminDashboardSummary, CompanyHealthRow, CompanyResult, SystemCheck, UsageRow } from '../../types'
 import { formatCount, formatNumber } from '../../utils'
@@ -192,17 +193,27 @@ export function AdminDashboard({
           <button className="secondary" onClick={onRefreshSystemStatus}>
             Refresh checks
           </button>
-          <div className="observability-links" aria-label="Observability links">
-            <a className="docs-link secondary-link" href="http://127.0.0.1:3000" target="_blank" rel="noreferrer">
-              Grafana
-            </a>
-            <a className="docs-link secondary-link" href="http://127.0.0.1:3000/explore" target="_blank" rel="noreferrer">
-              Tempo Explore
-            </a>
-            <a className="docs-link secondary-link" href="http://127.0.0.1:9090" target="_blank" rel="noreferrer">
-              Prometheus
-            </a>
-          </div>
+          {OBSERVABILITY_LINKS.grafana || OBSERVABILITY_LINKS.tempo || OBSERVABILITY_LINKS.prometheus ? (
+            <div className="observability-links" aria-label="Observability links">
+              {OBSERVABILITY_LINKS.grafana ? (
+                <a className="docs-link secondary-link" href={OBSERVABILITY_LINKS.grafana} target="_blank" rel="noreferrer">
+                  Grafana
+                </a>
+              ) : null}
+              {OBSERVABILITY_LINKS.tempo ? (
+                <a className="docs-link secondary-link" href={OBSERVABILITY_LINKS.tempo} target="_blank" rel="noreferrer">
+                  Tempo Explore
+                </a>
+              ) : null}
+              {OBSERVABILITY_LINKS.prometheus ? (
+                <a className="docs-link secondary-link" href={OBSERVABILITY_LINKS.prometheus} target="_blank" rel="noreferrer">
+                  Prometheus
+                </a>
+              ) : null}
+            </div>
+          ) : (
+            <p className="muted">Observability links appear when this demo is connected to a local or provisioned stack.</p>
+          )}
         </div>
         <ul className="compact-list">
           {systemChecks.map((check) => (

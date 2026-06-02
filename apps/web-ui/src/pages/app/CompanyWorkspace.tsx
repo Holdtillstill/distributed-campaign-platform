@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
-import { API_BASE_URL } from '../../api/client'
+import { API_BASE_URL, apiErrorMessage, readApiJson } from '../../api/client'
 import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { MetricCard as Metric } from '../../components/MetricCard'
@@ -96,7 +96,7 @@ async function formatCampaignScheduleError(response: Response) {
   const fallback = `Schedule campaign failed: ${response.status}`
   let payload: { detail?: string | CampaignScheduleErrorDetail } | null = null
   try {
-    payload = await response.json()
+    payload = await readApiJson<{ detail?: string | CampaignScheduleErrorDetail }>(response)
   } catch {
     return fallback
   }
@@ -317,10 +317,23 @@ export function CompanyWorkspace({
     'Quiet hours, sender identity, and audit trail',
   ]
 
+  async function readWorkspaceJson<T>(response: Response, fallback: string): Promise<T | null> {
+    try {
+      return await readApiJson<T>(response)
+    } catch (error) {
+      setError(apiErrorMessage(error, fallback))
+      return null
+    }
+  }
+
   useEffect(() => {
     async function loadDashboardSummary() {
-      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/dashboard-summary`)
-      if (response.ok) setDashboardSummary(await response.json())
+      try {
+        const response = await fetch(`${API_BASE_URL}/companies/${companyId}/dashboard-summary`)
+        if (response.ok) setDashboardSummary(await readApiJson<DashboardSummary>(response))
+      } catch (error) {
+        setError(apiErrorMessage(error, 'Company dashboard failed to load. Check that the Campaign API is available.'))
+      }
     }
     void loadDashboardSummary()
   }, [companyId])
@@ -344,14 +357,16 @@ export function CompanyWorkspace({
           fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`),
           fetch(`${API_BASE_URL}/companies/${companyId}/reminder-campaigns`),
         ])
-        if (listsResponse.ok) setSubscriberLists(await listsResponse.json())
+        if (listsResponse.ok) setSubscriberLists(await readApiJson<SubscriberListResult[]>(listsResponse))
         if (campaignsResponse.ok) {
-          const loadedCampaigns = (await campaignsResponse.json()) as CampaignListItem[]
+          const loadedCampaigns = await readApiJson<CampaignListItem[]>(campaignsResponse)
           setCampaigns(loadedCampaigns)
           setSelectedMonitorCampaignId((current) => current || loadedCampaigns[0]?.id || '')
         }
-        if (mediaResponse.ok) setMediaAssets(await mediaResponse.json())
-        if (remindersResponse.ok) setReminderCampaigns(await remindersResponse.json())
+        if (mediaResponse.ok) setMediaAssets(await readApiJson<MediaAsset[]>(mediaResponse))
+        if (remindersResponse.ok) setReminderCampaigns(await readApiJson<ReminderCampaign[]>(remindersResponse))
+      } catch (error) {
+        setError(apiErrorMessage(error, 'Campaign planning data failed to load. Check that the Campaign API is available.'))
       } finally {
         setSubscriberListsLoaded(true)
         setMediaAssetsLoaded(true)
@@ -362,22 +377,26 @@ export function CompanyWorkspace({
 
   useEffect(() => {
     async function loadSubscriberDirectory() {
-      const response = await fetch(
-        subscriberSearchUrl({
-          companyId,
-          q: subscriberSearch,
-          listId: selectedSubscriberListId,
-          consentStatus: subscriberConsentFilter,
-          limit: subscriberLimit,
-          offset: subscriberOffset,
-        }),
-      )
-      if (response.ok) {
-        const result = (await response.json()) as SubscriberSearchResult
-        setSubscribers(result.rows)
-        setSubscriberTotal(result.total)
-        setSubscriberLimit(result.limit)
-        setSubscriberOffset(result.offset)
+      try {
+        const response = await fetch(
+          subscriberSearchUrl({
+            companyId,
+            q: subscriberSearch,
+            listId: selectedSubscriberListId,
+            consentStatus: subscriberConsentFilter,
+            limit: subscriberLimit,
+            offset: subscriberOffset,
+          }),
+        )
+        if (response.ok) {
+          const result = await readApiJson<SubscriberSearchResult>(response)
+          setSubscribers(result.rows)
+          setSubscriberTotal(result.total)
+          setSubscriberLimit(result.limit)
+          setSubscriberOffset(result.offset)
+        }
+      } catch (error) {
+        setError(apiErrorMessage(error, 'Subscriber directory failed to load. Check that the Campaign API is available.'))
       }
     }
     void loadSubscriberDirectory()
@@ -385,20 +404,24 @@ export function CompanyWorkspace({
 
   useEffect(() => {
     async function loadDirectSubscriberRows() {
-      const response = await fetch(
-        subscriberSearchUrl({
-          companyId,
-          q: directSubscriberSearch,
-          listId: 'all',
-          consentStatus: 'all',
-          limit: 10,
-          offset: 0,
-        }),
-      )
-      if (response.ok) {
-        const result = (await response.json()) as SubscriberSearchResult
-        setDirectSubscriberRows(result.rows)
-        setDirectSubscriberTotal(result.total)
+      try {
+        const response = await fetch(
+          subscriberSearchUrl({
+            companyId,
+            q: directSubscriberSearch,
+            listId: 'all',
+            consentStatus: 'all',
+            limit: 10,
+            offset: 0,
+          }),
+        )
+        if (response.ok) {
+          const result = await readApiJson<SubscriberSearchResult>(response)
+          setDirectSubscriberRows(result.rows)
+          setDirectSubscriberTotal(result.total)
+        }
+      } catch (error) {
+        setError(apiErrorMessage(error, 'Subscriber search failed to load. Check that the Campaign API is available.'))
       }
     }
     void loadDirectSubscriberRows()
@@ -411,12 +434,16 @@ export function CompanyWorkspace({
     async function loadMonitor() {
       setMonitorLoading(true)
       setMonitorError(null)
-      const response = await fetch(`${API_BASE_URL}/campaigns/${selectedMonitorCampaignId}/broadcast-monitor`)
-      if (cancelled) return
-      if (response.ok) {
-        setBroadcastMonitor(await response.json())
-      } else {
-        setMonitorError(`Monitor unavailable: ${response.status}`)
+      try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${selectedMonitorCampaignId}/broadcast-monitor`)
+        if (cancelled) return
+        if (response.ok) {
+          setBroadcastMonitor(await readApiJson<BroadcastMonitor>(response))
+        } else {
+          setMonitorError(`Monitor unavailable: ${response.status}`)
+        }
+      } catch (error) {
+        if (!cancelled) setMonitorError(apiErrorMessage(error, 'Monitor unavailable. Check that the Campaign API is available.'))
       }
       setMonitorLoading(false)
     }
@@ -527,7 +554,8 @@ export function CompanyWorkspace({
       setError(await formatCampaignScheduleError(response))
       return
     }
-    const result = (await response.json()) as Campaign
+    const result = await readWorkspaceJson<Campaign>(response, 'Schedule campaign failed. Check that the Campaign API is available.')
+    if (!result) return
     setCampaign(result)
     setCampaigns((current) => [
       {
@@ -571,7 +599,10 @@ export function CompanyWorkspace({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: listName }),
     })
-    if (response.ok) setSubscriberList(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<SubscriberListResult>(response, 'Create subscriber list failed. Check that the Campaign API is available.')
+      if (result) setSubscriberList(result)
+    }
   }
 
   async function importSubscriber(event: FormEvent<HTMLFormElement>) {
@@ -583,7 +614,8 @@ export function CompanyWorkspace({
       body: JSON.stringify({ phone_number: subscriberPhone, source: subscriberSource, list_id: subscriberList?.id ?? '' }),
     })
     if (response.ok) {
-      const result = (await response.json()) as SubscriberResult
+      const result = await readWorkspaceJson<SubscriberResult>(response, 'Import subscriber failed. Check that the Campaign API is available.')
+      if (!result) return
       setSubscriber(result)
       if (result.id) setTrackedSubscriberId(result.id)
     }
@@ -627,7 +659,8 @@ export function CompanyWorkspace({
             body: JSON.stringify({ name: listName }),
           })
           if (listResponse.ok) {
-            list = (await listResponse.json()) as SubscriberListResult
+            list = await readWorkspaceJson<SubscriberListResult>(listResponse, 'Create subscriber list failed. Check that the Campaign API is available.') ?? undefined
+            if (!list) continue
             createdLists.set(key, list)
             setSubscriberLists((current) => [list as SubscriberListResult, ...current.filter((item) => item.id !== list?.id)])
           }
@@ -645,7 +678,8 @@ export function CompanyWorkspace({
         }),
       })
       if (response.ok) {
-        const result = (await response.json()) as SubscriberResult
+        const result = await readWorkspaceJson<SubscriberResult>(response, 'Import subscriber failed. Check that the Campaign API is available.')
+        if (!result) continue
         importedSubscribers.push({ ...result, region: row.region, source: row.source || result.source })
       }
     }
@@ -675,7 +709,8 @@ export function CompanyWorkspace({
       body: JSON.stringify({ company_id: companyId, phone_number: optInPhone, source: optInSource }),
     })
     if (response.ok) {
-      const result = (await response.json()) as OptInResult
+      const result = await readWorkspaceJson<OptInResult>(response, 'Opt-in start failed. Check that the Campaign API is available.')
+      if (!result) return
       setOptIn(result)
       if (result.confirmation_token) setConfirmToken(result.confirmation_token)
     }
@@ -685,7 +720,10 @@ export function CompanyWorkspace({
     event.preventDefault()
     if (isReadOnly) return
     const response = await fetch(`${API_BASE_URL}/public/opt-ins/${confirmToken}/confirm`, { method: 'POST' })
-    if (response.ok) setConfirmResult(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<OptInResult>(response, 'Opt-in confirmation failed. Check that the Campaign API is available.')
+      if (result) setConfirmResult(result)
+    }
   }
 
   async function addMediaAsset(event: FormEvent<HTMLFormElement>) {
@@ -697,7 +735,8 @@ export function CompanyWorkspace({
       body: JSON.stringify({ filename: mediaFilename, content_type: mediaContentType, url: mediaUrl }),
     })
     if (response.ok) {
-      const result = (await response.json()) as MediaAsset
+      const result = await readWorkspaceJson<MediaAsset>(response, 'Add media failed. Check that the Campaign API is available.')
+      if (!result) return
       setMediaAssets((current) => [result, ...current.filter((asset) => asset.id !== result.id)])
       if (result.id) setTrackedMediaAssetId(result.id)
       setContentFeedback(`${result.filename ?? 'Media asset'} added to the library`)
@@ -708,7 +747,10 @@ export function CompanyWorkspace({
 
   async function refreshMediaAssets() {
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`)
-    if (response.ok) setMediaAssets(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<MediaAsset[]>(response, 'Refresh media failed. Check that the Campaign API is available.')
+      if (result) setMediaAssets(result)
+    }
   }
 
   function stageUploadedMedia(file: File | undefined) {
@@ -732,7 +774,8 @@ export function CompanyWorkspace({
       }),
     })
     if (response.ok) {
-      const result = (await response.json()) as CampaignLink
+      const result = await readWorkspaceJson<CampaignLink>(response, 'Create tracked link failed. Check that the Campaign API is available.')
+      if (!result) return
       setCampaignLink(result)
       setCampaignLinks((current) => [result, ...current.filter((link) => link.id !== result.id)])
       setContentFeedback(`Tracking link created: ${result.public_url}`)
@@ -743,12 +786,18 @@ export function CompanyWorkspace({
 
   async function refreshCampaignLinks() {
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-links`)
-    if (response.ok) setCampaignLinks(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<CampaignLink[]>(response, 'Refresh tracked links failed. Check that the Campaign API is available.')
+      if (result) setCampaignLinks(result)
+    }
   }
 
   async function refreshPerformance() {
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-performance`)
-    if (response.ok) setPerformance(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<PerformanceTotals>(response, 'Refresh performance failed. Check that the Campaign API is available.')
+      if (result) setPerformance(result)
+    }
   }
 
   async function createReminder(event: FormEvent<HTMLFormElement>) {
@@ -764,7 +813,8 @@ export function CompanyWorkspace({
       }),
     })
     if (response.ok) {
-      const result = (await response.json()) as ReminderCampaign
+      const result = await readWorkspaceJson<ReminderCampaign>(response, 'Create reminder failed. Check that the Campaign API is available.')
+      if (!result) return
       setReminderCampaign(result)
       setReminderCampaigns((current) => [result, ...current.filter((item) => item.id !== result.id)])
     }
@@ -781,12 +831,18 @@ export function CompanyWorkspace({
         credit_limit: inviteCreditLimit.trim() ? Number(inviteCreditLimit) : null,
       }),
     })
-    if (response.ok) setAccessCodeResult(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<AccessCodeResult>(response, 'Create access code failed. Check that the Campaign API is available.')
+      if (result) setAccessCodeResult(result)
+    }
   }
 
   async function refreshTeamUsers() {
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/users`)
-    if (response.ok) setTeamUsers(await response.json())
+    if (response.ok) {
+      const result = await readWorkspaceJson<CompanyUser[]>(response, 'Refresh team users failed. Check that the Campaign API is available.')
+      if (result) setTeamUsers(result)
+    }
   }
 
   async function updateTeamUser(event: FormEvent<HTMLFormElement>) {
@@ -801,7 +857,8 @@ export function CompanyWorkspace({
       }),
     })
     if (response.ok) {
-      const updatedUser = (await response.json()) as CompanyUser
+      const updatedUser = await readWorkspaceJson<CompanyUser>(response, 'Update team user failed. Check that the Campaign API is available.')
+      if (!updatedUser) return
       setTeamUsers((current) => [
         updatedUser,
         ...current.filter((user) => user.email.toLowerCase() !== updatedUser.email.toLowerCase()),

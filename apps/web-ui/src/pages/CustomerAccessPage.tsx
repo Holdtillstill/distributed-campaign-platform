@@ -44,11 +44,12 @@ export function CustomerAccessPage({
             access code issued by a company owner or admin.
           </p>
         </div>
-        <aside className="demo-helper" aria-label="Demo credentials">
-          <span>Demo workspace</span>
+        <aside className="demo-helper" aria-label="Seeded demo access">
+          <span>Seeded demo access</span>
           <strong>Demo Retail Co</strong>
           <p>
-            Evaluators can look up <b>owner@demo-retail.test</b> or join with access code <b>DEMORETA-E568C9</b>.
+            When the demo API is running, evaluators can look up <b>owner@demo-retail.test</b> or join with
+            access code <b>DEMORETA-E568C9</b>.
           </p>
         </aside>
       </section>

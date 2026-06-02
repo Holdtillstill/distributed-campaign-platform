@@ -32,6 +32,16 @@ function failedJson(body: unknown, status = 503) {
   } as Response)
 }
 
+const htmlAppShell = () =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Headers({ 'content-type': 'text/html' }),
+    json: () => Promise.reject(new SyntaxError("Unexpected token '<'")),
+    text: () => Promise.resolve('<!doctype html><html><body>Distributed Campaign Platform</body></html>'),
+  } as Response)
+
 function mockFetch({
   companyCampaigns,
   mediaAssets,
@@ -1043,6 +1053,18 @@ describe('App', () => {
     )
   })
 
+  it('shows a clear API-unavailable message when the static host returns the HTML app shell', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => htmlAppShell()))
+    const user = userEvent.setup()
+
+    render(<App />)
+    await user.click(screen.getAllByRole('button', { name: /customer login/i })[0])
+    await user.type(screen.getByLabelText(/login email.*email lookup input/i), 'owner@demo-retail.test')
+    await user.click(screen.getByRole('button', { name: /find my companies/i }))
+
+    expect(await screen.findByText(/Campaign API is not connected for this static portfolio host/i)).toBeInTheDocument()
+  })
+
   it('explains invite workspace access and renders membership role plus budget cards', async () => {
     mockFetch()
     const user = userEvent.setup()
@@ -1158,6 +1180,18 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /trace 000000000000/i })).toBeInTheDocument()
     expect(screen.getByText(/span 000000000000/i)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/observability/trace-smoke')
+  })
+
+  it('marks system checks unavailable when API routes return the HTML app shell', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => htmlAppShell()))
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/internal')
+    render(<App />)
+    await loginAsInternalAdmin(user)
+    await user.click(screen.getByRole('button', { name: /refresh checks/i }))
+
+    expect(await screen.findAllByText(/Campaign API is not connected for this static portfolio host/i)).not.toHaveLength(0)
   })
 
   it('shows internal admin layout and company health table scaffold', async () => {

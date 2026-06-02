@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
-import { API_BASE_URL } from './api/client'
+import { API_BASE_URL, PUBLIC_DESIGN_ROUTES_ENABLED, apiErrorMessage, readApiJson } from './api/client'
 import { AppShell } from './components/AppShell'
 import { EmptyState } from './components/EmptyState'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
@@ -99,7 +99,7 @@ function unavailableAuthenticatedRouteFromLocation(): AuthenticatedRouteUnavaila
 
 function publicRouteFromLocation(): PublicRoute | null {
   const path = window.location.pathname
-  if (path === '/design-review' || path === '/designs') return { page: 'design-review' }
+  if (PUBLIC_DESIGN_ROUTES_ENABLED && (path === '/design-review' || path === '/designs')) return { page: 'design-review' }
   if (path === '/kb' || path.startsWith('/kb/')) return { page: 'kb' }
   if (path === '/features' || path.startsWith('/features/')) {
     const activeSlug = path.split('/')[2]
@@ -112,8 +112,12 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(() => loadStoredSession())
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
   const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() => publicRouteFromLocation())
-  const [designExploration, setDesignExploration] = useState(() => routeToExploration(window.location.pathname))
-  const [appDesignExploration, setAppDesignExploration] = useState(() => routeToAppDesign(window.location.pathname))
+  const [designExploration, setDesignExploration] = useState(() =>
+    PUBLIC_DESIGN_ROUTES_ENABLED ? routeToExploration(window.location.pathname) : null,
+  )
+  const [appDesignExploration, setAppDesignExploration] = useState(() =>
+    PUBLIC_DESIGN_ROUTES_ENABLED ? routeToAppDesign(window.location.pathname) : null,
+  )
   const [adminPage, setAdminPage] = useState<AdminPage>(() => adminPageFromLocation())
   const [companyPage, setCompanyPage] = useState<CompanyPage>(() => companyPageFromLocation())
   const [companyCampaignSubpage, setCompanyCampaignSubpage] = useState<CampaignSubpage | undefined>(() =>
@@ -133,8 +137,8 @@ export default function App() {
   function syncRouteStateFromLocation() {
     setSurface(surfaceFromLocation())
     setPublicRoute(publicRouteFromLocation())
-    setDesignExploration(routeToExploration(window.location.pathname))
-    setAppDesignExploration(routeToAppDesign(window.location.pathname))
+    setDesignExploration(PUBLIC_DESIGN_ROUTES_ENABLED ? routeToExploration(window.location.pathname) : null)
+    setAppDesignExploration(PUBLIC_DESIGN_ROUTES_ENABLED ? routeToAppDesign(window.location.pathname) : null)
     setAdminPage(adminPageFromLocation())
     setCompanyPage(companyPageFromLocation())
     setCompanyCampaignSubpage(campaignSubpageFromLocation())
@@ -207,50 +211,58 @@ export default function App() {
   async function lookupMemberships(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAuthMessage(null)
-    const response = await fetch(`${API_BASE_URL}/me/memberships`, {
-      headers: { 'X-User-Email': loginEmail },
-    })
-    if (!response.ok) {
-      setAuthMessage(`Membership lookup failed: ${response.status}`)
-      return
-    }
-    const result = asMemberships(await response.json())
-    setMemberships(result)
-    if (result.length === 0) {
-      setAuthMessage('No companies found. Please sign up with an access code from your company admin.')
+    try {
+      const response = await fetch(`${API_BASE_URL}/me/memberships`, {
+        headers: { 'X-User-Email': loginEmail },
+      })
+      if (!response.ok) {
+        setAuthMessage(`Membership lookup failed: ${response.status}`)
+        return
+      }
+      const result = asMemberships(await readApiJson<unknown>(response))
+      setMemberships(result)
+      if (result.length === 0) {
+        setAuthMessage('No companies found. Please sign up with an access code from your company admin.')
+      }
+    } catch (error) {
+      setAuthMessage(apiErrorMessage(error, 'Membership lookup failed. Check that the Campaign API is available.'))
     }
   }
 
   async function signupWithAccessCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAuthMessage(null)
-    const response = await fetch(`${API_BASE_URL}/signup/access-code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: signupEmail, name: signupName, access_code: accessCode }),
-    })
-    if (!response.ok) {
-      setAuthMessage('Access code signup failed. Check the code and try again.')
-      return
+    try {
+      const response = await fetch(`${API_BASE_URL}/signup/access-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: signupEmail, name: signupName, access_code: accessCode }),
+      })
+      if (!response.ok) {
+        setAuthMessage('Access code signup failed. Check the code and try again.')
+        return
+      }
+      const result = await readApiJson<{
+        email: string
+        company_id: string
+        company_name: string
+        membership_role: string
+        credit_limit?: number | null
+        credits_used?: number
+      }>(response)
+      persistSession({
+        role: 'company_user',
+        email: result.email,
+        companyId: result.company_id,
+        companyName: result.company_name,
+        membershipRole: result.membership_role,
+        creditLimit: result.credit_limit,
+        creditsUsed: result.credits_used ?? 0,
+      })
+      syncRouteStateFromLocation()
+    } catch (error) {
+      setAuthMessage(apiErrorMessage(error, 'Access code signup failed. Check that the Campaign API is available.'))
     }
-    const result = (await response.json()) as {
-      email: string
-      company_id: string
-      company_name: string
-      membership_role: string
-      credit_limit?: number | null
-      credits_used?: number
-    }
-    persistSession({
-      role: 'company_user',
-      email: result.email,
-      companyId: result.company_id,
-      companyName: result.company_name,
-      membershipRole: result.membership_role,
-      creditLimit: result.credit_limit,
-      creditsUsed: result.credits_used ?? 0,
-    })
-    syncRouteStateFromLocation()
   }
 
   function openMembership(membership: Membership) {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
-import { API_BASE_URL } from '../../api/client'
+import { API_BASE_URL, apiErrorMessage, apiStatusDetail, readApiJson } from '../../api/client'
 import type {
   AdminDashboardSummary,
   AdminPage,
@@ -38,25 +38,33 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
 
   useEffect(() => {
     async function loadAdminSummary() {
-      const [summaryResponse, healthResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/dashboard-summary`, {
-          headers: { 'X-Internal-Admin': 'true' },
-        }),
-        fetch(`${API_BASE_URL}/admin/company-health?from=2026-05-22&to=2026-06-21`, {
-          headers: { 'X-Internal-Admin': 'true' },
-        }),
-      ])
-      if (summaryResponse.ok) setAdminSummary(await summaryResponse.json())
-      if (healthResponse.ok) setCompanyHealthRows(await healthResponse.json())
+      try {
+        const [summaryResponse, healthResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/admin/dashboard-summary`, {
+            headers: { 'X-Internal-Admin': 'true' },
+          }),
+          fetch(`${API_BASE_URL}/admin/company-health?from=2026-05-22&to=2026-06-21`, {
+            headers: { 'X-Internal-Admin': 'true' },
+          }),
+        ])
+        if (summaryResponse.ok) setAdminSummary(await readApiJson<AdminDashboardSummary>(summaryResponse))
+        if (healthResponse.ok) setCompanyHealthRows(await readApiJson<CompanyHealthRow[]>(healthResponse))
+      } catch (error) {
+        setError(apiErrorMessage(error, 'Admin dashboard failed to load. Check that the Campaign API is available.'))
+      }
     }
     void loadAdminSummary()
   }, [companyResult])
 
   async function refreshCompanyHealth() {
-    const response = await fetch(`${API_BASE_URL}/admin/company-health?from=2026-05-22&to=2026-06-21`, {
-      headers: { 'X-Internal-Admin': 'true' },
-    })
-    if (response.ok) setCompanyHealthRows(await response.json())
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/company-health?from=2026-05-22&to=2026-06-21`, {
+        headers: { 'X-Internal-Admin': 'true' },
+      })
+      if (response.ok) setCompanyHealthRows(await readApiJson<CompanyHealthRow[]>(response))
+    } catch (error) {
+      setError(apiErrorMessage(error, 'Company health failed to load. Check that the Campaign API is available.'))
+    }
   }
 
   async function reviewCompany(row: CompanyHealthRow) {
@@ -68,20 +76,23 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
       setError(`Company campaign history failed: ${response.status}`)
       return
     }
-    setSelectedCompanyCampaigns(await response.json())
+    try {
+      setSelectedCompanyCampaigns(await readApiJson<CampaignListItem[]>(response))
+    } catch (error) {
+      setError(apiErrorMessage(error, 'Company campaign history failed. Check that the Campaign API is available.'))
+    }
   }
 
   function toSystemCheck(response: Response, path: string, label: string): SystemCheck {
-    if (!response.ok) {
-      return { path, label, state: 'error', detail: `${response.status} ${response.statusText}` }
-    }
-    return { path, label, state: 'ok', detail: `${path} responded ${response.status}` }
+    const detail = apiStatusDetail(response, path)
+    if (!response.ok || detail !== `${path} responded ${response.status}`) return { path, label, state: 'error', detail }
+    return { path, label, state: 'ok', detail }
   }
 
   async function toTraceSystemCheck(response: Response): Promise<SystemCheck> {
     const base = toSystemCheck(response, '/observability/trace-smoke', 'Trace smoke')
     if (!response.ok) return base
-    const body = await response.json().catch(() => null)
+    const body = await readApiJson<{ trace_id?: string; span_id?: string; sampled?: boolean }>(response).catch(() => null)
     const traceId = typeof body?.trace_id === 'string' ? body.trace_id : null
     const spanId = typeof body?.span_id === 'string' ? body.span_id : null
     const sampled = typeof body?.sampled === 'boolean' ? body.sampled : undefined
@@ -96,10 +107,18 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
 
   async function refreshSystemStatus() {
     const checks = await Promise.all([
-      fetch(`${API_BASE_URL}/healthz`).then((response) => toSystemCheck(response, '/healthz', 'Campaign API liveness')),
-      fetch(`${API_BASE_URL}/readyz`).then((response) => toSystemCheck(response, '/readyz', 'Campaign API readiness')),
-      fetch(`${API_BASE_URL}/metrics`).then((response) => toSystemCheck(response, '/metrics', 'Prometheus metrics')),
-      fetch(`${API_BASE_URL}/observability/trace-smoke`).then(toTraceSystemCheck),
+      fetch(`${API_BASE_URL}/healthz`)
+        .then((response) => toSystemCheck(response, '/healthz', 'Campaign API liveness'))
+        .catch(() => ({ path: '/healthz', label: 'Campaign API liveness', state: 'error', detail: 'Request failed' }) as SystemCheck),
+      fetch(`${API_BASE_URL}/readyz`)
+        .then((response) => toSystemCheck(response, '/readyz', 'Campaign API readiness'))
+        .catch(() => ({ path: '/readyz', label: 'Campaign API readiness', state: 'error', detail: 'Request failed' }) as SystemCheck),
+      fetch(`${API_BASE_URL}/metrics`)
+        .then((response) => toSystemCheck(response, '/metrics', 'Prometheus metrics'))
+        .catch(() => ({ path: '/metrics', label: 'Prometheus metrics', state: 'error', detail: 'Request failed' }) as SystemCheck),
+      fetch(`${API_BASE_URL}/observability/trace-smoke`)
+        .then(toTraceSystemCheck)
+        .catch(() => ({ path: '/observability/trace-smoke', label: 'Trace smoke', state: 'error', detail: 'Request failed' }) as SystemCheck),
     ])
     setSystemChecks(checks)
   }
@@ -124,7 +143,11 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
       setError(`Create company failed: ${response.status}`)
       return
     }
-    setCompanyResult(await response.json())
+    try {
+      setCompanyResult(await readApiJson<CompanyResult>(response))
+    } catch (error) {
+      setError(apiErrorMessage(error, 'Create company failed. Check that the Campaign API is available.'))
+    }
   }
 
   async function loadUsage(event: FormEvent<HTMLFormElement>) {
@@ -138,7 +161,11 @@ export function AdminWorkspace({ page }: { page: AdminPage }) {
       setError(`Usage dashboard failed: ${response.status}`)
       return
     }
-    setUsageRows(await response.json())
+    try {
+      setUsageRows(await readApiJson<UsageRow[]>(response))
+    } catch (error) {
+      setError(apiErrorMessage(error, 'Usage dashboard failed. Check that the Campaign API is available.'))
+    }
   }
 
   if (page === 'companies') {

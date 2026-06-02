@@ -70,8 +70,8 @@ const kbArticles: KbArticle[] = [
       'Each membership carries the company, role, and optional credit allocation that the workspace uses to enable or disable actions. If a teammate cannot schedule or invite, check their role first, then check their user credit limit.',
     ],
     steps: [
-      'Existing Demo Retail users can look up owner@demo-retail.test.',
-      'New invited users can join with access code DEMORETA-E568C9.',
+      'When the demo API is running, existing Demo Retail users can look up owner@demo-retail.test.',
+      'Seeded demo users can join with access code DEMORETA-E568C9.',
       'The returned membership includes company, role, and any user credit allocation.',
     ],
     callout: {
@@ -514,8 +514,8 @@ export function KnowledgeBasePage() {
             />
           </label>
         </div>
-        <aside className="demo-helper kb-demo-helper" aria-label="Demo credential helper">
-          <span>Demo credentials</span>
+        <aside className="demo-helper kb-demo-helper" aria-label="Seeded demo access helper">
+          <span>Seeded demo access</span>
           <strong>Demo Retail Co</strong>
           <p>
             Customer owner: <b>owner@demo-retail.test</b>
