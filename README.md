@@ -20,6 +20,7 @@ my responsibility.
 | Local runtime | Build validated | Docker Compose, API tests, UI tests, Helm render checks, and image scans cover the service slice. |
 | Observability | Local and preview-ready | OpenTelemetry, Prometheus, Grafana, Loki, Tempo, alerts, and runbooks are prepared for local or approved preview validation. |
 | EKS runtime preview | Request-only | Shared EKS demos are short-lived validation windows, not always-on campaign infrastructure. |
+| ECR image publish | Manual-only | CI builds and scans images automatically; pushing AWS image artifacts requires a manual workflow dispatch. |
 
 ## Goals
 

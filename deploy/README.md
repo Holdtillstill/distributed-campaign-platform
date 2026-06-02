@@ -31,6 +31,10 @@ distribution. If the shared portfolio WAF is enabled, attach its web ACL there;
 otherwise keep the static preview on the cheaper CloudFront-only path and rely
 on the router rejecting fake `/api/*` and `/r/*` responses.
 
+The image publish workflow is manual-only because it pushes long-lived ECR
+images. Regular CI still builds and scans the service images without pushing new
+AWS artifacts.
+
 For EKS, render with account-specific ECR repositories:
 
 ```bash

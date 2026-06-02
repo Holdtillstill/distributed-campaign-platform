@@ -22,6 +22,12 @@ function assertAll(text, needles, context) {
   for (const needle of needles) assertIncludes(text, needle, context)
 }
 
+function assertNotMatches(text, pattern, context) {
+  if (pattern.test(text)) {
+    throw new Error(`${context} unexpectedly matches ${pattern}`)
+  }
+}
+
 async function readWorkflow(name) {
   return readFile(new URL(name, workflowsDir), "utf8")
 }
@@ -85,9 +91,11 @@ const staticSmoke = await readWorkflow("static-smoke.yml")
 assertAll(staticSmoke, ["schedule:", "SITE_URL", "WEB_BASE=\"${SITE_URL}\" node scripts/smoke-static-host.mjs"], "static-smoke.yml")
 
 const imagePublish = await readWorkflow("image-publish.yaml")
+assertNotMatches(imagePublish, /^  push:/m, "image-publish.yaml")
 assertAll(
   imagePublish,
   [
+    "workflow_dispatch:",
     "concurrency:",
     "permissions:\n  contents: read\n  id-token: write",
     "aws-actions/configure-aws-credentials@v6",
