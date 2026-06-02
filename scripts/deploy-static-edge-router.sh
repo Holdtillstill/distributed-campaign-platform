@@ -78,6 +78,25 @@ fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`);
 NODE
 }
 
+viewer_request_association_status() {
+  FUNCTION_ARN="${function_arn}" node - "${distribution_config}" <<'NODE'
+const fs = require("node:fs");
+
+const [sourcePath] = process.argv.slice(2);
+const functionArn = process.env.FUNCTION_ARN;
+const config = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+const associations = config.DefaultCacheBehavior?.FunctionAssociations || { Quantity: 0 };
+const items = associations.Items || [];
+const viewerRequestItems = items.filter((item) => item.EventType === "viewer-request");
+
+if (viewerRequestItems.length === 1 && viewerRequestItems[0].FunctionARN === functionArn) {
+  process.stdout.write("current");
+} else {
+  process.stdout.write("update");
+}
+NODE
+}
+
 max_update_attempts="${CLOUDFRONT_UPDATE_MAX_ATTEMPTS:-5}"
 update_succeeded="false"
 
@@ -91,6 +110,11 @@ for attempt in $(seq 1 "${max_update_attempts}"); do
     --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
     --query DistributionConfig \
     --output json >"${distribution_config}"
+
+  if [ "$(viewer_request_association_status)" = "current" ]; then
+    echo "Static edge router is published and already associated."
+    exit 0
+  fi
 
   write_updated_distribution_config
 
