@@ -10,10 +10,12 @@ Deployment packaging lives here.
 The chart defaults to `global.queue.provider=nats` for local and cost-controlled demos. EKS can switch to AWS SQS with `global.queue.provider=sqs` plus the Terraform SQS queue URL outputs and the app service account IRSA role.
 
 The static web UI deploy workflow expects an existing private S3 bucket,
-CloudFront distribution, and OIDC role. Set repository variables
+CloudFront distribution, and OIDC role. Set Actions secrets
 `AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `STATIC_SITE_BUCKET`,
 `CLOUDFRONT_DISTRIBUTION_ID`, `CLOUDFRONT_FUNCTION_NAME`, and `SITE_URL`, then
-run `.github/workflows/static-deploy.yml`. The workflow publishes the
+run `.github/workflows/static-deploy.yml`. The deployment job uses the
+`static-production` GitHub environment so reviewer protection can be enabled
+before public AWS surfaces are changed. The workflow publishes the
 CloudFront Function and associates it with the distribution's viewer-request
 event before syncing assets and running the static-host smoke test.
 

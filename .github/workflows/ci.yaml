@@ -41,6 +41,9 @@ jobs:
       - name: Public readiness checks
         run: node scripts/check-public-readiness.mjs
 
+      - name: Verify workflow contracts
+        run: node scripts/verify-workflows.mjs
+
       - name: Web UI tests
         working-directory: apps/web-ui
         run: |

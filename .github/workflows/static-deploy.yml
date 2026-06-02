@@ -30,6 +30,7 @@ env:
 jobs:
   deploy-static-web-ui:
     runs-on: ubuntu-latest
+    environment: static-production
     steps:
       - uses: actions/checkout@v6
 

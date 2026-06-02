@@ -12,6 +12,15 @@ This project was built with AI-assisted coding support. Product direction,
 architecture, validation, deployment choices, operations, and maintenance remain
 my responsibility.
 
+## Public status
+
+| Surface | Status | Notes |
+| --- | --- | --- |
+| Static CampaignOS UI | Public static host | `distributed-campaign-platform.bozhi.dev` serves the product UI shell, deep links, and static route guardrails. |
+| Local runtime | Build validated | Docker Compose, API tests, UI tests, Helm render checks, and image scans cover the service slice. |
+| Observability | Local and preview-ready | OpenTelemetry, Prometheus, Grafana, Loki, Tempo, alerts, and runbooks are prepared for local or approved preview validation. |
+| EKS runtime preview | Request-only | Shared EKS demos are short-lived validation windows, not always-on campaign infrastructure. |
+
 ## Goals
 
 This project demonstrates senior DevOps / platform engineering skills with a domain-relevant distributed system:
