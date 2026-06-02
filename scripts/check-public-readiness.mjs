@@ -53,6 +53,7 @@ const sensitiveText = [
 
 const allowedAccounts = new Set(["000000000000", "111122223333", "123456789012"])
 const findings = []
+const visitorScriptPath = path.join(root, "apps/web-ui/index.html")
 
 function relative(filePath) {
   return path.relative(root, filePath)
@@ -97,6 +98,18 @@ function scanFile(filePath) {
 }
 
 walk(root)
+
+if (fs.existsSync(visitorScriptPath)) {
+  const shell = fs.readFileSync(visitorScriptPath, "utf8")
+  if (!shell.includes('https://on-demand-demos.bozhi.dev/visitor.js')) {
+    findings.push("apps/web-ui/index.html: missing first-party visitor telemetry script")
+  }
+  if (!shell.includes('data-project="distributed-campaign-platform"')) {
+    findings.push("apps/web-ui/index.html: missing distributed-campaign-platform visitor project id")
+  }
+} else {
+  findings.push("apps/web-ui/index.html: missing public web shell")
+}
 
 if (findings.length) {
   console.error("Public-readiness check failed:")
