@@ -1,7 +1,7 @@
 [project]
 name = "distributed-campaign-platform"
 version = "0.1.0"
-description = "Distributed campaign delivery simulator for AWS EKS platform engineering portfolio"
+description = "CampaignOS distributed campaign delivery simulator for AWS EKS platform engineering portfolio"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

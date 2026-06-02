@@ -1,6 +1,6 @@
-# Distributed Campaign Delivery Platform on AWS EKS
+# CampaignOS Distributed Campaign Platform on AWS EKS
 
-A production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
+CampaignOS is a production-style Kubernetes platform running an event-driven campaign delivery simulator with GitOps, autoscaling, distributed tracing, open-source observability, SLOs, and incident runbooks.
 
 > Status: SaaS product-depth demo slice in progress: local-first multi-tenant SMS workflows, admin health, content templates, and analytics are covered by targeted UI/API tests.
 
@@ -22,7 +22,7 @@ This project demonstrates senior DevOps / platform engineering skills with a dom
 
 ## Application concept
 
-The application simulates a distributed campaign delivery platform:
+CampaignOS simulates a distributed campaign delivery platform:
 
 ```text
 Campaign API → Segment Worker → Scheduler → Dispatch Queue → Dispatchers → Provider Simulator
