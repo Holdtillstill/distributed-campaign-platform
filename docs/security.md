@@ -22,14 +22,23 @@ Local review uses simulator identity controls: company access codes, `X-Company-
 
 ## CI security posture
 
-GitHub Actions runs dependency, secret, filesystem, and image vulnerability scans. Trivy misconfiguration scanning is kept advisory because this repo includes local-only demo infrastructure and EKS scaffolding; production promotion would turn unresolved IaC and Kubernetes misconfiguration findings into release blockers.
+GitHub Actions runs dependency, secret, filesystem, image vulnerability, and static-host smoke checks:
+
+- `pip-audit` audits Python dependencies from the uv lock export.
+- `npm audit` audits the web UI dependency tree.
+- Gitleaks scans repository history and blocks committed cloud identifiers.
+- Trivy scans the filesystem for vulnerabilities and secrets.
+- Trivy scans Docker images in CI and image-publish paths before any push.
+- Trivy misconfiguration scanning is kept advisory because this repo includes local-only demo infrastructure and EKS scaffolding; production promotion would turn unresolved IaC and Kubernetes misconfiguration findings into release blockers.
+- GitHub Actions OIDC is used for AWS deploy/publish workflows; no static AWS access keys are required in the repo.
+- Scheduled static-host smoke validates CloudFront/API guardrails and browser rendering for selected public routes.
 
 ## Later controls
 
 - Kyverno policies for baseline workload controls
-- Trivy image scanning
 - Checkov/tflint for IaC validation
-- GitHub Actions OIDC to AWS deployment role
+- image signing and provenance verification
+- production IdP-backed user sessions, tenant-aware RBAC, and signed webhooks
 - Private EKS endpoint and private nodes as a documented production variant
 
 ## Public portfolio caution

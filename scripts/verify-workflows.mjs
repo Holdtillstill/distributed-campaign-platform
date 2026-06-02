@@ -88,7 +88,17 @@ assertAll(
 )
 
 const staticSmoke = await readWorkflow("static-smoke.yml")
-assertAll(staticSmoke, ["schedule:", "SITE_URL", "WEB_BASE=\"${SITE_URL}\" node scripts/smoke-static-host.mjs"], "static-smoke.yml")
+assertAll(
+  staticSmoke,
+  [
+    "schedule:",
+    "SITE_URL",
+    "npx playwright install --with-deps chromium",
+    "WEB_BASE=\"${SITE_URL}\" node scripts/smoke-static-host.mjs",
+    "WEB_BASE=\"${SITE_URL}\" npm run smoke:browser-host",
+  ],
+  "static-smoke.yml",
+)
 
 const imagePublish = await readWorkflow("image-publish.yaml")
 assertNotMatches(imagePublish, /^  push:/m, "image-publish.yaml")

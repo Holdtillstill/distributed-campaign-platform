@@ -1,10 +1,18 @@
 # CampaignOS Distributed Campaign Platform
 
+[![CI](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/ci.yaml)
+[![Static host smoke](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/static-smoke.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/static-smoke.yml)
+[![Dependency audit](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/dependency-audit.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/dependency-audit.yml)
+[![Security](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/security.yml)
+[![Secret scan](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/secret-scan.yml/badge.svg?branch=main)](https://github.com/Holdtillstill/distributed-campaign-platform/actions/workflows/secret-scan.yml)
+
 CampaignOS is a local-first, EKS-ready campaign delivery simulator for showing
 distributed workflows, GitOps, autoscaling, distributed tracing, open-source
 observability, SLOs, and incident runbooks.
 
-> Status: SaaS product-depth demo slice in progress: local-first multi-tenant SMS workflows, admin health, content templates, and analytics are covered by targeted UI/API tests.
+![CampaignOS public product surface](docs/screenshots/campaignos-overview.png)
+
+> Status: Portfolio demo slice: local-first multi-tenant SMS workflows, admin health, content templates, analytics, CI scans, and static-host guardrails are covered by targeted UI/API tests.
 
 ## Development note
 
@@ -56,17 +64,17 @@ Core distributed-systems behaviors:
 - backpressure from queue depth and provider quotas
 - structured logs, metrics, traces, and correlation IDs
 
-## Planned stack
+## Implemented and Preview Stack
 
 | Layer | Tools |
 |---|---|
-| Cloud | AWS EKS, ECR, VPC, IAM, ALB, S3, optional Route 53/ACM |
+| Cloud | S3/CloudFront static host, ECR image path, and request-only AWS EKS preview scaffolding |
 | IaC | Terraform |
-| Kubernetes | Helm, Argo CD, HPA, PDBs, NetworkPolicies, Karpenter later |
+| Kubernetes | Helm, HPA, PDBs, NetworkPolicies, Argo CD scaffolding, Karpenter later |
 | App | Python 3.12, FastAPI, async workers |
 | Data and queueing | PostgreSQL, Redis, NATS JetStream locally, optional SQS for AWS-native EKS dispatch |
 | Observability | OpenTelemetry Collector, Prometheus, Grafana, Loki, Tempo, Alertmanager |
-| Security | IRSA, RBAC, External Secrets later, Kyverno later, Trivy/Checkov/tflint |
+| Security | IRSA, RBAC, NetworkPolicies, Trivy, Gitleaks, External Secrets later, Kyverno later |
 | Testing | pytest, k6, Helm lint, Terraform validation |
 
 ## Repository layout
@@ -94,6 +102,20 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
 - [Customer user guide](docs/kb/customer-user-guide.md)
 - [Internal admin guide](docs/kb/internal-admin-guide.md)
 - [Privacy note](docs/privacy.md)
+
+## CI and Security
+
+- CI runs Python tests, public-readiness checks, workflow-contract checks,
+  React tests/build, static edge-router validation, Helm render checks, Docker
+  image builds, and Trivy image scans.
+- Dedicated dependency audits run `pip-audit` from the uv lock export and
+  `npm audit` for the web UI.
+- Security workflows run Gitleaks, Trivy filesystem/secret scans, Trivy
+  misconfiguration scans, and Dependency Review for public pull requests.
+- Scheduled static-host smoke covers HTTP guardrails and Chromium browser
+  rendering on selected deep links.
+- Dependabot tracks GitHub Actions, uv, npm, Dockerfiles, and Terraform so
+  security fixes turn into reviewable pull requests instead of manual drift.
 
 ## Development modes
 
