@@ -9,7 +9,10 @@ export function MarketingPage({
   onCustomerAccess: () => void
   onInternalAccess?: () => void
 }) {
-  const [apiConnected, setApiConnected] = useState(false)
+  const [apiConnected, setApiConnected] = useState(() => !isStaticPortfolioHost())
+  const staticPortfolioHost = isStaticPortfolioHost()
+  const requestOnly = staticPortfolioHost || !apiConnected
+  const requestDemoUrl = 'https://bozhi.dev/#request'
 
   useEffect(() => {
     let cancelled = false
@@ -44,9 +47,8 @@ export function MarketingPage({
           <a href="/features">Features</a>
           <a href="/kb">Knowledge base</a>
           <a href="#pricing">Pricing</a>
-          <button onClick={onCustomerAccess}>
-            Customer login
-          </button>
+          <a href="https://bozhi.dev/privacy.html">Privacy</a>
+          {requestOnly ? <a href={requestDemoUrl}>Request API demo</a> : <button onClick={onCustomerAccess}>Customer login</button>}
           {onInternalAccess ? (
             <button className="ghost" onClick={onInternalAccess}>
               Internal
@@ -64,7 +66,7 @@ export function MarketingPage({
             follow-ups, and broadcast reporting without spreadsheet reconciliation.
           </p>
           <div className="hero-actions">
-            <button onClick={onCustomerAccess}>Customer login</button>
+            {requestOnly ? <a href={requestDemoUrl}>Request API demo</a> : <button onClick={onCustomerAccess}>Customer login</button>}
             <a className="docs-link secondary-link" href="/features">
               Feature tour
             </a>

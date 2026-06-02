@@ -82,11 +82,13 @@ export function AppShell({
           {nav.map((item) => (
             <button
               className={activePage === item.id ? 'nav-item active' : 'nav-item'}
+              aria-pressed={activePage === item.id}
               key={item.id}
               onClick={() => {
                 if (isAdmin) onAdminPage(item.id as AdminPage)
                 else onCompanyPage(item.id as CompanyPage)
               }}
+              type="button"
             >
               {item.label}
             </button>
@@ -97,8 +99,9 @@ export function AppShell({
           <div className="sidebar-resource-links" aria-label="Product help links">
             <a href="/features">Features</a>
             <a href="/kb">Knowledge base</a>
+            <a href="https://bozhi.dev/privacy.html">Privacy</a>
           </div>
-          <button className="secondary" onClick={onLogout}>
+          <button className="secondary" onClick={onLogout} type="button">
             Logout
           </button>
         </div>

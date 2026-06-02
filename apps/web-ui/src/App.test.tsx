@@ -1084,12 +1084,25 @@ describe('App', () => {
     vi.stubGlobal('fetch', vi.fn(() => htmlAppShell()))
     const user = userEvent.setup()
 
+    window.history.pushState(null, '', '/app')
     render(<App />)
-    await user.click(screen.getAllByRole('button', { name: /customer login/i })[0])
     await user.type(screen.getByLabelText(/login email.*email lookup input/i), 'owner@demo-retail.test')
     await user.click(screen.getByRole('button', { name: /find my companies/i }))
 
     expect(await screen.findByText(/Campaign API is not connected for this static portfolio host/i)).toBeInTheDocument()
+  })
+
+  it('disables access forms on the configured static portfolio host', () => {
+    window.__APP_CONFIG__ = { staticPortfolioHost: true }
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    expect(screen.getByText(/Workspace forms need a running Campaign API/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /request api demo/i })).toHaveAttribute('href', 'https://bozhi.dev/#request')
+    expect(screen.getByRole('button', { name: /find my companies/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeDisabled()
+    expect(screen.getByLabelText(/login email.*email lookup input/i)).toBeDisabled()
   })
 
   it('explains invite workspace access and renders membership role plus budget cards', async () => {

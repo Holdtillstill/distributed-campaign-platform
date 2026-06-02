@@ -110,10 +110,13 @@ scripts/               Bootstrap, local dev, validation, teardown helpers
   image builds, and Trivy image scans.
 - Dedicated dependency audits run `pip-audit` from the uv lock export and
   `npm audit` for the web UI.
-- Security workflows run Gitleaks, Trivy filesystem/secret scans, Trivy
-  misconfiguration scans, and Dependency Review for public pull requests.
+- Security workflows run Gitleaks, blocking Trivy filesystem vulnerability/secret
+  scans, blocking image scans, and Dependency Review for public pull requests.
+  Trivy IaC/Kubernetes misconfiguration scanning stays advisory until production
+  promotion because this repo includes local demo infrastructure and EKS scaffolding.
 - Scheduled static-host smoke covers HTTP guardrails and Chromium browser
-  rendering on selected deep links.
+  rendering on selected deep links, including console, overflow,
+  visitor-telemetry, privacy-signal, and serious/critical accessibility checks.
 - Dependabot tracks GitHub Actions, uv, npm, Dockerfiles, and Terraform so
   security fixes turn into reviewable pull requests instead of manual drift.
 

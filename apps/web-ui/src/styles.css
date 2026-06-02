@@ -826,6 +826,46 @@ button.ghost {
   font-weight: 850;
 }
 
+.static-access-banner {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(14, 165, 233, 0.08)),
+    #ffffff;
+  padding: 18px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.07);
+}
+
+.static-access-banner span {
+  color: #0f766e;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.static-access-banner strong {
+  color: #111827;
+  font-size: 1.08rem;
+}
+
+.static-access-banner p {
+  max-width: 740px;
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.static-access-banner a {
+  justify-self: start;
+  color: #0f766e;
+  font-weight: 850;
+  text-underline-offset: 3px;
+}
+
 .access-panel {
   min-height: 360px;
 }

@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 
+import { isStaticPortfolioHost } from '../api/client'
 import { getRoleMeta } from '../roles'
 import type { Membership } from '../types'
 import { formatNumber } from '../utils'
@@ -33,6 +34,8 @@ export function CustomerAccessPage({
   onLookup: (event: FormEvent<HTMLFormElement>) => void
   onOpenMembership: (membership: Membership) => void
 }) {
+  const staticPortfolioHost = isStaticPortfolioHost()
+
   return (
     <main className="auth-screen">
       <section className="auth-hero workspace-access-hero">
@@ -53,6 +56,17 @@ export function CustomerAccessPage({
           </p>
         </aside>
       </section>
+      {staticPortfolioHost ? (
+        <section className="static-access-banner" aria-label="Static host API boundary">
+          <span>Static portfolio host</span>
+          <strong>Workspace forms need a running Campaign API.</strong>
+          <p>
+            This page is available for product review, but login, signup, and membership lookup run only in a local stack
+            or an approved runtime demo.
+          </p>
+          <a href="https://bozhi.dev/#request">Request API demo</a>
+        </section>
+      ) : null}
 
       <section className="auth-grid" aria-label="Authentication choices">
         <form className="panel access-panel" onSubmit={onLookup}>
@@ -68,13 +82,16 @@ export function CustomerAccessPage({
             Login email
             <span className="sr-only">email lookup input</span>
             <input
+              disabled={staticPortfolioHost}
               type="email"
               value={loginEmail}
               onChange={(event) => onLoginEmail(event.target.value)}
               placeholder="you@example.test"
             />
           </label>
-          <button>Find my companies</button>
+          <button disabled={staticPortfolioHost} type="submit">
+            Find my companies
+          </button>
           {memberships.length ? (
             <ul className="compact-list membership-list">
               {memberships.map((membership) => {
@@ -119,6 +136,7 @@ export function CustomerAccessPage({
           <label>
             Work email
             <input
+              disabled={staticPortfolioHost}
               type="email"
               value={signupEmail}
               onChange={(event) => onSignupEmail(event.target.value)}
@@ -127,18 +145,26 @@ export function CustomerAccessPage({
           </label>
           <label>
             Full name
-            <input value={signupName} onChange={(event) => onSignupName(event.target.value)} placeholder="Your name" />
+            <input
+              disabled={staticPortfolioHost}
+              value={signupName}
+              onChange={(event) => onSignupName(event.target.value)}
+              placeholder="Your name"
+            />
           </label>
           <label>
             Access code
             <span className="sr-only">signup input</span>
             <input
+              disabled={staticPortfolioHost}
               value={accessCode}
               onChange={(event) => onAccessCode(event.target.value.toUpperCase())}
               placeholder="ACME-7KQ9"
             />
           </label>
-          <button>Sign up with access code</button>
+          <button disabled={staticPortfolioHost} type="submit">
+            Sign up with access code
+          </button>
         </form>
       </section>
       {authMessage ? <p className="notice">{authMessage}</p> : null}
