@@ -68,7 +68,7 @@ function OperatorConsole() {
       <section className="operator-workspace">
         <header className="operator-topbar">
           <div>
-            <span>Live operations</span>
+            <span>Runtime operations</span>
             <h1>Operator Console</h1>
           </div>
           <AppDesignLinks tone="dark" />
@@ -134,7 +134,7 @@ function ExecutiveSaas() {
         <div className="executive-heading">
           <span>Company owner workspace</span>
           <h1>Executive SaaS Dashboard</h1>
-          <p>Revenue, reach, credit allocation, and live broadcast status in one operating view.</p>
+          <p>Revenue, reach, credit allocation, and broadcast status in one operating view.</p>
         </div>
         <aside className="executive-budget" aria-label="Role and budget">
           <span>Role and budget</span>
@@ -379,7 +379,7 @@ function RetailOpsWorkspace() {
           <div className="retail-day">
             <span>Today</span>
             <strong>3 sends need review before 4:00 PM.</strong>
-            <p>Segments, budget, live monitor, and store-team handoff stay in one workspace.</p>
+            <p>Segments, budget, broadcast monitor, and store-team handoff stay in one workspace.</p>
           </div>
 
           <div className="retail-operations">
@@ -477,7 +477,7 @@ function MinimalEnterpriseWorkspace() {
         </section>
 
         <div className="minimal-layout">
-          <section className="minimal-list" aria-label="Campaigns and live broadcast monitor">
+          <section className="minimal-list" aria-label="Campaigns and broadcast monitor">
             {workItems.map(([label, title, detail]) => (
               <article key={label}>
                 <span>{label}</span>
@@ -524,20 +524,20 @@ function RealtimeBroadcastWarRoom() {
         <section aria-label="Role and budget">
           <span>Role and budget</span>
           <strong>Operations lead</strong>
-          <p>Live-send authority / 4.8M credits / retry threshold 0.8%</p>
+          <p>Runtime send authority / 4.8M credits / retry threshold 0.8%</p>
         </section>
       </aside>
 
       <section className="warroom-main">
         <header className="warroom-header">
           <div>
-            <span>Live command surface</span>
+            <span>Runtime command surface</span>
             <h1>Realtime Broadcast War Room</h1>
           </div>
           <AppDesignResourceLinks tone="dark" />
         </header>
 
-        <section className="warroom-monitor" aria-label="Campaigns live broadcast monitor">
+        <section className="warroom-monitor" aria-label="Campaigns broadcast monitor">
           <div>
             <span>Campaigns / broadcast monitor</span>
             <strong>Summer Preview is moving at 41.8k/min.</strong>
@@ -608,7 +608,7 @@ function MobileRegionalManager() {
           ))}
         </nav>
 
-        <section className="mobile-live-card" aria-label="Campaigns live broadcast monitor">
+        <section className="mobile-live-card" aria-label="Campaigns broadcast monitor">
           <span>Campaigns / broadcast monitor</span>
           <strong>Memorial Day Promo</strong>
           <p>947k sent / 41.8k per minute / ETA 18m</p>
@@ -715,7 +715,7 @@ function ComplianceConsentCenter() {
 
 function AgencyMultiTenantConsole() {
   const tenants = [
-    ['Demo Retail Co', 'Live', '1.36M reach'],
+    ['Demo Retail Co', 'Runtime', '1.36M reach'],
     ['Acme Retail', 'Draft', '50k limit'],
     ['North Market', 'Review', '83k reach'],
   ]
@@ -757,9 +757,9 @@ function AgencyMultiTenantConsole() {
           </div>
 
           <div className="agency-grid">
-            <section aria-label="Campaigns live broadcast monitor">
+            <section aria-label="Campaigns broadcast monitor">
               <span>Campaigns / broadcast monitor</span>
-              <strong>Summer Preview live</strong>
+              <strong>Summer Preview running</strong>
               <p>947k sent / 412 retries / ETA 18m / escalation owner assigned.</p>
             </section>
             <section aria-label="Subscribers segments">

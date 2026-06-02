@@ -56,7 +56,7 @@ export function MarketingPage({
           <h1>Orchestrate every customer message before it moves.</h1>
           <p>
             A premium SMS campaign control plane for tenant workspaces, credit-aware scheduling, tracked Smart SMS,
-            follow-ups, and live broadcast reporting without spreadsheet reconciliation.
+            follow-ups, and broadcast reporting without spreadsheet reconciliation.
           </p>
           <div className="hero-actions">
             <button onClick={onCustomerAccess}>Customer login</button>
@@ -82,7 +82,7 @@ export function MarketingPage({
           </div>
         </div>
 
-        <div className="campaign-flow-visual" aria-label="CampaignOS live campaign flow preview">
+        <div className="campaign-flow-visual" aria-label="CampaignOS campaign flow preview">
           <div className="flow-orbit flow-orbit-one" aria-hidden="true" />
           <div className="flow-orbit flow-orbit-two" aria-hidden="true" />
 
@@ -119,8 +119,8 @@ export function MarketingPage({
             </dl>
           </section>
 
-          <section className="visual-card visual-card-live" aria-label="Live broadcast state">
-            <span className="live-dot">Live monitor</span>
+          <section className="visual-card visual-card-live" aria-label="Broadcast monitor state">
+            <span className="live-dot">Broadcast monitor</span>
             <strong>41.8k/min</strong>
             <p>ETA recalculating as queued messages move through provider outcomes.</p>
             <div className="live-bars" aria-hidden="true">
@@ -152,7 +152,7 @@ export function MarketingPage({
           <p>Production-scale audiences stay readable with representative sample rows.</p>
         </div>
         <div>
-          <span>Live ops</span>
+          <span>Runtime ops</span>
           <strong>Broadcast monitor</strong>
           <p>Queue, sent, failed, retry, dead-letter, throughput, and ETA stay visible.</p>
         </div>
@@ -171,7 +171,7 @@ export function MarketingPage({
       <section className="marketing-workflow" id="platform" aria-label="CampaignOS workflow">
         <div className="marketing-section-copy">
           <p className="eyebrow">Platform flow</p>
-          <h2>From tenant setup to live reporting, every handoff has context.</h2>
+          <h2>From tenant setup to broadcast reporting, every handoff has context.</h2>
           <p>
             Internal operators issue access, customer teams plan audiences, and CampaignOS keeps budget, readiness, and
             delivery state attached to the work.
@@ -204,9 +204,9 @@ export function MarketingPage({
       <section className="marketing-depth" aria-label="Feature and help links">
         <div className="marketing-section-copy">
           <p className="eyebrow">Product depth</p>
-          <h2>Built for the daily campaign room, not a static demo.</h2>
+          <h2>Built for the daily campaign room, not a flat brochure.</h2>
           <p>
-            CampaignOS connects the public feature tour, customer knowledge base, live monitor, internal admin, and API
+            CampaignOS connects the public feature tour, customer knowledge base, broadcast monitor, internal admin, and API
             documentation to the same workflow story.
           </p>
         </div>
@@ -220,7 +220,7 @@ export function MarketingPage({
             <strong>Access codes, scheduling, monitor, budgets</strong>
           </a>
           <a href="/monitor">
-            <span>Live monitor</span>
+            <span>Broadcast monitor</span>
             <strong>Throughput and provider outcomes by campaign</strong>
           </a>
           <a href="/internal">

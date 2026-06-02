@@ -1461,9 +1461,9 @@ export function CompanyWorkspace({
         ) : null}
 
         {campaignSubpage === 'monitor' ? (
-          <section className="panel broadcast-monitor monitor-war-room" aria-label="Live broadcast monitor">
+          <section className="panel broadcast-monitor monitor-war-room" aria-label="Broadcast monitor">
             <div className="section-heading">
-              <span>Live operations</span>
+              <span>Runtime operations</span>
               <strong>Broadcast monitor</strong>
             </div>
             <div className="monitor-help-strip">

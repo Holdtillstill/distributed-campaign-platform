@@ -10,7 +10,7 @@ export function routeToExploration(pathname: string): ExplorationId | null {
 const facts = {
   tenant: 'Demo Retail Co',
   modeledSubscribers: '2.65M modeled subscribers',
-  monitor: 'live broadcast monitor',
+  monitor: 'broadcast monitor',
   throughput: '41.8k/min',
 }
 
@@ -102,9 +102,9 @@ function PremiumFintech() {
         </div>
       </section>
 
-      <section className="premium-monitor" id="monitor" aria-label="Premium live broadcast monitor">
+      <section className="premium-monitor" id="monitor" aria-label="Premium broadcast monitor">
         <div>
-          <p className="exploration-kicker">Live broadcast monitor</p>
+          <p className="exploration-kicker">Broadcast monitor</p>
           <h2>Every send gets a financial control plane.</h2>
         </div>
         <div className="premium-monitor-card">
@@ -160,14 +160,14 @@ function DarkCommandCenter() {
               <span>12:04:24</span> queue shards=64 throughput={facts.throughput}
             </p>
             <p>
-              <span>12:04:25</span> monitor=live status=green tempo_trace=sampled
+              <span>12:04:25</span> monitor=runtime status=green tempo_trace=sampled
             </p>
           </div>
         </div>
 
         <div className="ops-copy">
           <p className="exploration-kicker">Dark operator command center</p>
-          <h1>The live send floor for SMS operators.</h1>
+          <h1>The broadcast floor for SMS operators.</h1>
           <p>
             A serious operations surface for watching throughput, queue pressure, failed sends, and tenant risk while
             customer campaigns keep moving.
@@ -175,10 +175,10 @@ function DarkCommandCenter() {
           <CtaLinks tone="dark" />
         </div>
 
-        <aside className="ops-live-panel" aria-label="Live throughput panel">
+        <aside className="ops-live-panel" aria-label="Broadcast throughput panel">
           <div className="ops-pulse">
             <span />
-            <strong>Live</strong>
+            <strong>Runtime</strong>
           </div>
           <div className="ops-throughput">
             <span>Throughput</span>
@@ -257,7 +257,7 @@ function CinematicStory() {
         label="Act II"
         title="The campaign leaves with restraint."
         stat="64"
-        copy="Queue partitions pace the broadcast while the live broadcast monitor reports sent, retry, and dead-letter state."
+        copy="Queue partitions pace the broadcast while the broadcast monitor reports sent, retry, and dead-letter state."
       />
       <StoryScene
         label="Act III"
@@ -376,7 +376,7 @@ function EnterpriseControlRoom() {
           </div>
           <div>
             <span>Broadcast status</span>
-            <strong>Live</strong>
+            <strong>Runtime</strong>
             <small>{facts.monitor}</small>
           </div>
           <div>
@@ -406,7 +406,7 @@ function EnterpriseControlRoom() {
 
           <section className="data-broadcast-table" aria-label="Broadcast monitor table">
             <div className="data-panel-title">
-              <span>Live broadcast monitor</span>
+              <span>Broadcast monitor</span>
               <strong>Active campaigns</strong>
             </div>
             <table>

@@ -738,8 +738,8 @@ describe('App', () => {
     expect(screen.getAllByRole('link', { name: /Feature tour/i })[0]).toHaveAttribute('href', '/features')
     expect(await screen.findByText(/API connected/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /API docs/i })).toHaveAttribute('href', '/api/docs')
-    expect(screen.getByLabelText(/CampaignOS live campaign flow preview/i)).toHaveTextContent(/Credits reserved/i)
-    expect(screen.getByLabelText(/CampaignOS live campaign flow preview/i)).toHaveTextContent(/Live monitor/i)
+    expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Credits reserved/i)
+    expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Broadcast monitor/i)
     expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
   })
@@ -763,7 +763,7 @@ describe('App', () => {
 
     expect(screen.getByRole('heading', { name: /CampaignOS features/i })).toBeInTheDocument()
     expect(screen.getAllByText(/2.65M modeled subscribers/i)).not.toHaveLength(0)
-    expect(screen.getByText(/Live broadcast monitor/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Broadcast monitor/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Subscriber segments and modeled audiences/i)).toBeInTheDocument()
     expect(screen.getByText(/Role-based access, invites, and budgets/i)).toBeInTheDocument()
     expect(screen.getByText(/Analytics and campaign reporting/i)).toBeInTheDocument()
@@ -782,7 +782,7 @@ describe('App', () => {
     window.history.pushState(null, '', '/features/broadcast-monitor')
     render(<App />)
 
-    expect(screen.getByRole('heading', { level: 1, name: /Live broadcast monitor/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /Broadcast monitor/i })).toBeInTheDocument()
     expect(screen.getByText(/Feature deep dive/i)).toBeInTheDocument()
     expect(screen.getByText(/Track queued, sent, failed, retried, and dead-lettered messages/i)).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /^Open customer login$/i }).some((link) => link.getAttribute('href') === '/monitor')).toBe(true)
@@ -823,7 +823,7 @@ describe('App', () => {
     expect(screen.getAllByText(/Getting started with Demo Retail Co/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Sign in with an invite or access code/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Create and schedule a campaign/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Monitor broadcast throughput live/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Monitor broadcast throughput/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Internal admin and tenant operations overview/i).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: /^Open customer login$/i })[0]).toHaveAttribute('href', '/app')
     expect(screen.getAllByRole('link', { name: /^Open broadcast monitor$/i })[0]).toHaveAttribute('href', '/monitor')
@@ -833,7 +833,7 @@ describe('App', () => {
     const articles = screen.getByLabelText(/Knowledge base articles/i)
     await user.type(screen.getByLabelText(/Search knowledge base/i), 'broadcast')
 
-    expect(within(articles).getAllByText(/Monitor broadcast throughput live/i).length).toBeGreaterThan(0)
+    expect(within(articles).getAllByText(/Monitor broadcast throughput/i).length).toBeGreaterThan(0)
     expect(within(articles).queryByText(/Invite teammates from Settings/i)).not.toBeInTheDocument()
 
     await user.clear(screen.getByLabelText(/Search knowledge base/i))
@@ -873,8 +873,8 @@ describe('App', () => {
       },
       {
         route: '/2',
-        heading: 'The live send floor for SMS operators.',
-        keyContent: [/Demo Retail Co/i, /41.8k\/min/i, /live broadcast monitor/i],
+        heading: 'The broadcast floor for SMS operators.',
+        keyContent: [/Demo Retail Co/i, /41.8k\/min/i, /broadcast monitor/i],
       },
       {
         route: '/3',
@@ -1316,7 +1316,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^monitor$/i })).toHaveClass('active')
-    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /broadcast monitor/i })).toBeInTheDocument()
     expect(await screen.findByText('30/min')).toBeInTheDocument()
     expect(await screen.findAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
     expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
@@ -1372,7 +1372,7 @@ describe('App', () => {
     render(<App />)
     await signupAsCompanyUser(user)
 
-    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /broadcast monitor/i })).toBeInTheDocument()
     expect(await screen.findByText(/Status: sent/i)).toBeInTheDocument()
     expect(screen.getAllByText(/^Complete$/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Completed:/i)).toBeInTheDocument()
@@ -1401,7 +1401,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^monitor$/i })).toHaveClass('active')
-    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /broadcast monitor/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Monitor guide/i })).toHaveAttribute('href', '/kb')
     expect(await screen.findByText('30/min')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/campaigns/campaign-upcoming/broadcast-monitor')
@@ -1498,7 +1498,7 @@ describe('App', () => {
     expect(window.location.pathname).toBe('/app/monitor')
     expect(await screen.findByRole('heading', { name: /campaigns/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^monitor$/i })).toHaveClass('active')
-    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /broadcast monitor/i })).toBeInTheDocument()
     expect(await screen.findByText('30/min')).toBeInTheDocument()
   })
 
@@ -1765,7 +1765,7 @@ describe('App', () => {
     expect(screen.getByText(/Cart Rescue/i)).toBeInTheDocument()
   })
 
-  it('renders live broadcast monitor with modeled audience, sample throughput, and manual refresh', async () => {
+  it('renders broadcast monitor with modeled audience, sample throughput, and manual refresh', async () => {
     const fetchMock = mockFetch()
     const user = userEvent.setup()
 
@@ -1775,7 +1775,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /campaigns/i }))
     await user.click(await screen.findByRole('button', { name: /^monitor$/i }))
 
-    expect(await screen.findByRole('region', { name: /live broadcast monitor/i })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: /broadcast monitor/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Memorial Day Promo/i)).not.toHaveLength(0)
     expect(screen.getByText('250,000')).toBeInTheDocument()
     expect(screen.getByText(/2 local sample messages/i)).toBeInTheDocument()

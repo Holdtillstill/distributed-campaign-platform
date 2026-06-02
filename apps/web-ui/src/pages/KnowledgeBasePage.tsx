@@ -217,11 +217,11 @@ const kbArticles: KbArticle[] = [
     ],
   },
   {
-    id: 'live-broadcast-monitor-throughput',
+    id: 'broadcast-monitor-throughput',
     category: 'Campaigns',
-    title: 'Monitor broadcast throughput live',
+    title: 'Monitor broadcast throughput',
     summary:
-      'Use the live monitor to validate throughput, percent complete, ETA, provider outcomes, retries, and dead letters.',
+      'Use the broadcast monitor to validate throughput, percent complete, ETA, provider outcomes, retries, and dead letters.',
     appliesTo: 'Operators and campaign managers',
     productArea: 'Broadcast monitor',
     workflowStage: 'Post-schedule monitoring',
@@ -439,9 +439,9 @@ const kbStartPaths = [
     articleId: 'budgets-credits',
   },
   {
-    label: 'Live monitor',
+    label: 'Broadcast monitor',
     description: 'Throughput, retries, dead letters',
-    articleId: 'live-broadcast-monitor-throughput',
+    articleId: 'broadcast-monitor-throughput',
   },
 ]
 

@@ -63,7 +63,7 @@ export function DesignReviewPage() {
         <h1>Recommended production composition</h1>
         <p>
           CampaignOS should use a composite direction: enterprise command surface for everyday customer work,
-          war-room clarity for live broadcasts, and agency-style scanability for internal tenant operations.
+          war-room clarity for runtime broadcasts, and agency-style scanability for internal tenant operations.
         </p>
       </header>
 

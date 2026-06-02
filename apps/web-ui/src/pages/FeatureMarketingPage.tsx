@@ -19,8 +19,8 @@ type FeatureSpotlight = {
 const featureSpotlights: FeatureSpotlight[] = [
   {
     slug: 'broadcast-monitor',
-    kicker: 'Live operations',
-    title: 'Live broadcast monitor',
+    kicker: 'Runtime operations',
+    title: 'Broadcast monitor',
     summary:
       'Track queued, sent, failed, retried, and dead-lettered messages with throughput, progress, and projected ETA.',
     note: 'Monitor projected/sample broadcasts before the full modeled audience is moved.',
@@ -130,7 +130,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
           <p className="eyebrow">{activeFeature ? 'Feature deep dive' : 'Campaign platform'}</p>
           <h1>{activeFeature ? activeFeature.title : 'CampaignOS features'}</h1>
           <p>
-            Multi-tenant SMS campaign software for customer teams that need modeled audience planning, live
+            Multi-tenant SMS campaign software for customer teams that need modeled audience planning, broadcast
             throughput visibility, controlled budgets, and tenant operations in one demo-ready product.
           </p>
           <div className="hero-actions">
@@ -182,7 +182,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
         </div>
         <div>
           <span>Operations</span>
-          <strong>Live ETA</strong>
+          <strong>Projected ETA</strong>
           <p>Broadcast monitor exposes progress, throughput, retry pressure, and failed rows.</p>
         </div>
         <div>
