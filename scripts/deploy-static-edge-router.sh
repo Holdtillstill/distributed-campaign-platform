@@ -51,18 +51,10 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 
 distribution_config="${tmp_dir}/distribution-config.json"
 updated_config="${tmp_dir}/distribution-config-updated.json"
+update_error="${tmp_dir}/distribution-update-error.txt"
 
-distribution_etag="$(aws cloudfront get-distribution-config \
-  --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
-  --query ETag \
-  --output text)"
-
-aws cloudfront get-distribution-config \
-  --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
-  --query DistributionConfig \
-  --output json >"${distribution_config}"
-
-FUNCTION_ARN="${function_arn}" node - "${distribution_config}" "${updated_config}" <<'NODE'
+write_updated_distribution_config() {
+  FUNCTION_ARN="${function_arn}" node - "${distribution_config}" "${updated_config}" <<'NODE'
 const fs = require("node:fs");
 
 const [sourcePath, targetPath] = process.argv.slice(2);
@@ -84,13 +76,48 @@ defaultBehavior.FunctionAssociations = {
 
 fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`);
 NODE
+}
 
-aws cloudfront update-distribution \
-  --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
-  --if-match "${distribution_etag}" \
-  --distribution-config "file://${updated_config}" \
-  --query Distribution.Status \
-  --output text >/dev/null
+max_update_attempts="${CLOUDFRONT_UPDATE_MAX_ATTEMPTS:-5}"
+update_succeeded="false"
+
+for attempt in $(seq 1 "${max_update_attempts}"); do
+  distribution_etag="$(aws cloudfront get-distribution-config \
+    --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+    --query ETag \
+    --output text)"
+
+  aws cloudfront get-distribution-config \
+    --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+    --query DistributionConfig \
+    --output json >"${distribution_config}"
+
+  write_updated_distribution_config
+
+  if aws cloudfront update-distribution \
+    --id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+    --if-match "${distribution_etag}" \
+    --distribution-config "file://${updated_config}" \
+    --query Distribution.Status \
+    --output text >/dev/null 2>"${update_error}"; then
+    update_succeeded="true"
+    break
+  fi
+
+  if grep -q "PreconditionFailed" "${update_error}" && [ "${attempt}" -lt "${max_update_attempts}" ]; then
+    echo "CloudFront distribution changed while updating; retrying with a fresh ETag (${attempt}/${max_update_attempts})." >&2
+    sleep $((attempt * 2))
+    continue
+  fi
+
+  cat "${update_error}" >&2
+  exit 1
+done
+
+if [ "${update_succeeded}" != "true" ]; then
+  echo "CloudFront distribution update did not complete after ${max_update_attempts} attempts." >&2
+  exit 1
+fi
 
 aws cloudfront wait distribution-deployed --id "${CLOUDFRONT_DISTRIBUTION_ID}"
 echo "Static edge router is published and associated."
