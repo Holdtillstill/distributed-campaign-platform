@@ -75,6 +75,7 @@ assertAll(
     "CLOUDFRONT_FUNCTION_NAME",
     "SITE_URL",
     "node scripts/validate-static-spa-router.mjs",
+    "npx playwright install --with-deps chromium",
     "npm test -- --run",
     "VITE_STATIC_PORTFOLIO_HOST=true npm run build",
     "aws-actions/configure-aws-credentials@v6",
@@ -83,6 +84,7 @@ assertAll(
     "aws s3 sync apps/web-ui/dist/",
     "aws cloudfront create-invalidation",
     "WEB_BASE=\"${SITE_URL}\" node scripts/smoke-static-host.mjs",
+    "WEB_BASE=\"${SITE_URL}\" npm run smoke:browser-host",
   ],
   "static-deploy.yml",
 )

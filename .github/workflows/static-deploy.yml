@@ -49,7 +49,9 @@ jobs:
 
       - name: Install web dependencies
         working-directory: apps/web-ui
-        run: npm ci
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
 
       - name: Validate static edge router
         run: node scripts/validate-static-spa-router.mjs
@@ -84,3 +86,7 @@ jobs:
 
       - name: Smoke deployed static host
         run: WEB_BASE="${SITE_URL}" node scripts/smoke-static-host.mjs
+
+      - name: Smoke deployed browser rendering
+        working-directory: apps/web-ui
+        run: WEB_BASE="${SITE_URL}" npm run smoke:browser-host
