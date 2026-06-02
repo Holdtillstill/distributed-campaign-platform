@@ -28,7 +28,6 @@
 
 Before making the repository public or posting screenshots:
 
-- remove raw AWS account IDs where possible
-- avoid exposing email addresses or phone numbers
-- verify no secrets are present in git history
-- curate screenshots under `docs/screenshots/`
+- do not expose account-specific AWS identifiers, ARNs, hosted zone IDs, deployment emails, phone numbers, webhook URLs, or private endpoints
+- keep screenshots generic and curated under `docs/screenshots/`
+- verify the working tree and git history with secret scanning before publishing
