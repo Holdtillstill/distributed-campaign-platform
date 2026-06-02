@@ -5,45 +5,77 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: uv
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: npm
     directory: /apps/web-ui
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: docker
     directory: /apps/campaign-api
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: docker
     directory: /apps/dispatcher
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: docker
     directory: /apps/provider-simulator
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: docker
     directory: /apps/web-ui
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: terraform
     directory: /infra/terraform/environments/dev
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
