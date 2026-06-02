@@ -30,9 +30,17 @@ function isAppShell({ body, contentType, status }) {
 const htmlRoutes = [
   ['/', 'CampaignOS'],
   ['/app', 'CampaignOS'],
+  ['/app/dashboard', 'CampaignOS'],
   ['/app/campaigns/scheduled', 'CampaignOS'],
+  ['/app/campaigns/follow-ups', 'CampaignOS'],
+  ['/app/subscribers', 'CampaignOS'],
+  ['/app/analytics', 'CampaignOS'],
+  ['/monitor', 'CampaignOS'],
+  ['/internal/dashboard', 'CampaignOS'],
   ['/features', 'CampaignOS'],
+  ['/features/broadcast-monitor', 'CampaignOS'],
   ['/kb', 'CampaignOS'],
+  ['/kb/articles', 'CampaignOS'],
 ]
 for (const [route, expectedText] of htmlRoutes) {
   const result = await fetchText(route)

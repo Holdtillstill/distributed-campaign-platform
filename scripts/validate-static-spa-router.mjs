@@ -24,7 +24,18 @@ for (const uri of ['/api', '/api/health', '/api/healthz', '/api/me/memberships',
   assert.match(response.body, /Campaign API/)
 }
 
-for (const uri of ['/app', '/app/campaigns/scheduled', '/features/broadcast-monitor', '/kb/articles', '/internal/dashboard']) {
+for (const uri of [
+  '/app',
+  '/app/dashboard',
+  '/app/campaigns/scheduled',
+  '/app/campaigns/follow-ups',
+  '/app/subscribers',
+  '/app/analytics',
+  '/monitor',
+  '/features/broadcast-monitor',
+  '/kb/articles',
+  '/internal/dashboard',
+]) {
   const request = route(uri)
   assert.equal(request.uri, '/index.html', `${uri} should rewrite to the SPA shell`)
 }
