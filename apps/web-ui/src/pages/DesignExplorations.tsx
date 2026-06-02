@@ -160,7 +160,7 @@ function DarkCommandCenter() {
               <span>12:04:24</span> queue shards=64 throughput={facts.throughput}
             </p>
             <p>
-              <span>12:04:25</span> monitor=runtime status=green tempo_trace=sampled
+              <span>12:04:25</span> sample_runtime status=green mock_trace=sampled
             </p>
           </div>
         </div>
