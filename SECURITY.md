@@ -15,4 +15,4 @@ Use GitHub private vulnerability reporting or a direct owner channel. Do not ope
 
 ## Baseline Checks
 
-CI runs Python and npm dependency audits, Gitleaks secret scanning, GitHub dependency review, Trivy filesystem scanning, and Trivy image scanning for service images.
+CI runs Python and npm dependency audits, Gitleaks secret scanning, Trivy filesystem scanning, and Trivy image scanning for service images. GitHub dependency review runs on public pull requests where the repository security features support it.
