@@ -17,14 +17,14 @@ function route(uri, method = 'GET') {
   return vm.runInNewContext(`${source}\nhandler(event);`, context)
 }
 
-for (const uri of ['/api', '/api/healthz', '/api/me/memberships', '/r/campaign-link']) {
+for (const uri of ['/api', '/api/health', '/api/healthz', '/api/me/memberships', '/r/campaign-link']) {
   const response = route(uri)
   assert.equal(response.statusCode, 404, `${uri} should return an edge 404`)
   assert.equal(response.headers['content-type'].value, 'application/json')
   assert.match(response.body, /Campaign API/)
 }
 
-for (const uri of ['/app', '/features/broadcast-monitor', '/kb/articles', '/internal/dashboard']) {
+for (const uri of ['/app', '/app/campaigns/scheduled', '/features/broadcast-monitor', '/kb/articles', '/internal/dashboard']) {
   const request = route(uri)
   assert.equal(request.uri, '/index.html', `${uri} should rewrite to the SPA shell`)
 }

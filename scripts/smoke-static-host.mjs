@@ -27,15 +27,30 @@ function isAppShell({ body, contentType, status }) {
   return status === 200 && contentType.toLowerCase().includes('text/html') && body.includes('<div id="root"></div>')
 }
 
-const htmlRoutes = ['/', '/app', '/features', '/kb']
-for (const route of htmlRoutes) {
+const htmlRoutes = [
+  ['/', 'CampaignOS'],
+  ['/app', 'CampaignOS'],
+  ['/app/campaigns/scheduled', 'CampaignOS'],
+  ['/features', 'CampaignOS'],
+  ['/kb', 'CampaignOS'],
+]
+for (const [route, expectedText] of htmlRoutes) {
   const result = await fetchText(route)
   if (result.status !== 200 || !result.contentType.toLowerCase().includes('text/html')) {
     throw new Error(`${route} should serve the public web app, got ${result.status} ${result.contentType}`)
   }
+  if (!result.body.includes(expectedText)) {
+    throw new Error(`${route} should include expected public copy: ${expectedText}`)
+  }
+  if (!result.body.includes('https://on-demand-demos.bozhi.dev/visitor.js')) {
+    throw new Error(`${route} should include the first-party visitor script`)
+  }
+  if (!result.body.includes('data-project="distributed-campaign-platform"')) {
+    throw new Error(`${route} should tag visitor events with the distributed-campaign-platform project id`)
+  }
 }
 
-for (const route of ['/api/healthz', '/api/me/memberships', '/r/static-host-smoke']) {
+for (const route of ['/api/health', '/api/healthz', '/api/me/memberships', '/r/static-host-smoke']) {
   const result = await fetchText(route, {
     headers: {
       accept: 'application/json',
