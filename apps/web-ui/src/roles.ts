@@ -13,8 +13,8 @@ export type RoleMeta = {
 const roleMetadata: Record<string, RoleMeta> = {
   customer_admin: {
     label: 'Company admin',
-    description: 'Can manage campaigns, media, analytics, team access, and credit limits.',
-    permissionSummary: 'Campaigns, audiences, media, analytics, invites, and budgets.',
+    description: 'Campaigns, media, reporting, team access, and limits.',
+    permissionSummary: 'Campaigns / media / reporting / team access / limits',
     marketScope: 'All company markets and segments',
     canInvite: true,
     canManageBudget: true,
@@ -24,8 +24,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   campaign_manager: {
     label: 'Campaign manager',
-    description: 'Can build, schedule, and monitor campaigns within an assigned budget.',
-    permissionSummary: 'Campaigns, media, and performance. No team or budget changes.',
+    description: 'Builds, schedules, and monitors campaigns inside budget.',
+    permissionSummary: 'Campaigns / media / performance',
     marketScope: 'Assigned campaign segments',
     canInvite: false,
     canManageBudget: false,
@@ -35,7 +35,7 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   regional_manager: {
     label: 'Regional manager',
-    description: 'Can run campaigns for assigned regional lists.',
+    description: 'Runs campaigns for assigned regional lists.',
     permissionSummary: 'Regional campaigns and performance.',
     marketScope: 'Assigned regional market and customer lists',
     canInvite: false,
@@ -46,8 +46,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   analyst: {
     label: 'Analyst',
-    description: 'Can review campaign, audience, quota, and analytics data.',
-    permissionSummary: 'Reporting-only dashboards, campaign history, and analytics.',
+    description: 'Reads campaign, audience, quota, and analytics data.',
+    permissionSummary: 'Reporting / history / analytics',
     marketScope: 'Reporting across assigned company data',
     canInvite: false,
     canManageBudget: false,
@@ -57,8 +57,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   viewer: {
     label: 'Viewer',
-    description: 'Can view workspace status without editing data.',
-    permissionSummary: 'Read-only workspace visibility.',
+    description: 'Read-only workspace status.',
+    permissionSummary: 'Read-only status',
     marketScope: 'Read-only company overview',
     canInvite: false,
     canManageBudget: false,
@@ -70,8 +70,8 @@ const roleMetadata: Record<string, RoleMeta> = {
 
 const fallbackRole: RoleMeta = {
   label: 'Company user',
-  description: 'Workspace member with permissions managed by a company admin.',
-  permissionSummary: 'Workspace access is active. Specific permissions are configured by role.',
+  description: 'Role managed by a company admin.',
+  permissionSummary: 'Workspace access',
   marketScope: 'Company workspace',
   canInvite: false,
   canManageBudget: false,

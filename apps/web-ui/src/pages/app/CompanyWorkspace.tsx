@@ -1088,8 +1088,8 @@ export function CompanyWorkspace({
     return (
       <>
         <PageHeader
-          eyebrow="Campaign workspace"
-          title="Campaign control"
+          eyebrow="Demo Retail Co"
+          title="Campaigns"
           description={`${session.companyName} / ${roleMeta.label}`}
         />
         <section className="role-aware-banner" aria-label="Workspace access summary">
@@ -1099,31 +1099,31 @@ export function CompanyWorkspace({
             <p>{roleMeta.description}</p>
           </div>
           <div>
-            <span>Market</span>
+            <span>Scope</span>
             <strong>{roleMeta.marketScope}</strong>
-            <p>Lists available to this role.</p>
+            <p>Visible lists and regions.</p>
           </div>
           <div>
-            <span>Budget</span>
+            <span>Allocation</span>
             <strong>
-              {hasUserBudget ? `${formatNumber(userBudgetRemaining)} remaining` : 'Company pooled budget'}
+              {hasUserBudget ? `${formatNumber(userBudgetRemaining)} remaining` : 'Company pooled'}
             </strong>
             <p>
               {hasUserBudget
                 ? `${formatNumber(userCreditsUsed)} used of ${formatNumber(userBudgetLimit)} assigned credits.`
-                : 'No separate user credit limit.'}
+                : 'No user cap.'}
             </p>
           </div>
         </section>
         <section className="dashboard-command-surface" aria-label="Dashboard command surface">
           <div className="dashboard-command-main">
-            <p className="eyebrow">Ready to send</p>
+            <p className="eyebrow">Scheduled</p>
             <h2>
               {activeCampaign
                 ? activeCampaign.name
                 : 'Create the first campaign'}
             </h2>
-            <p>Check reach, budget, and delivery path before scheduling.</p>
+            <p>Reach, budget, and delivery state for the next send.</p>
             <div className="decision-list" aria-label="Decision queue">
               <article>
                 <span>Status</span>
@@ -1144,17 +1144,17 @@ export function CompanyWorkspace({
               <article>
                 <span>Audience</span>
                 <strong>{dashboardAudienceSummary}</strong>
-                <p>Modeled reach and sample rows.</p>
+                <p>Modeled reach.</p>
               </article>
             </div>
           </div>
           <aside className="dashboard-command-aside" aria-label="Next actions">
             <div className="next-action-summary">
-              <span>Next</span>
-              <strong>{canCreateCampaign ? 'Send, edit, or monitor' : 'Monitor and report'}</strong>
+              <span>Actions</span>
+              <strong>{canCreateCampaign ? 'Open a workflow' : 'Reporting only'}</strong>
               <p>
                 {canCreateCampaign
-                  ? 'Open the builder, monitor, media library, or analytics.'
+                  ? 'Builder, monitor, media, subscribers, or analytics.'
                   : 'Creation is disabled for this role.'}
               </p>
             </div>
