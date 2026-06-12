@@ -1100,9 +1100,9 @@ describe('App', () => {
     window.history.pushState(null, '', '/app')
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /Company dashboard/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Campaign control/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Demo Retail Co/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Review Seattle VIP Double Points/i)).toBeInTheDocument()
+    expect(screen.getByText(/Seattle VIP Double Points/i)).toBeInTheDocument()
     expect(screen.getAllByText(/2,650,000/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /New campaign/i })).toBeEnabled()
     expect(fetchMock).not.toHaveBeenCalled()
@@ -1123,7 +1123,7 @@ describe('App', () => {
 
     const membership = await screen.findByRole('listitem', { name: /acme retail/i })
     expect(within(membership).getByText(/Company admin/i)).toBeInTheDocument()
-    expect(within(membership).getByText(/Full workspace control/i)).toBeInTheDocument()
+    expect(within(membership).getByText(/Campaigns, audiences, media, analytics, invites, and budgets/i)).toBeInTheDocument()
     expect(within(membership).getByText(/50,000 remaining of 50,000/i)).toBeInTheDocument()
   })
 
@@ -1324,7 +1324,7 @@ describe('App', () => {
     render(<App />)
     await signupAsCompanyUser(user)
 
-    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /campaign control/i })).toBeInTheDocument()
     expect(screen.getAllByText(/Acme Retail/)).not.toHaveLength(0)
     expect(screen.getByRole('button', { name: /campaigns/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /companies/i })).not.toBeInTheDocument()
@@ -1463,7 +1463,7 @@ describe('App', () => {
     window.history.pushState(null, '', '/app')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /campaign control/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^campaigns$/i }))
     expect(window.location.pathname).toBe('/app/campaigns')
@@ -1490,12 +1490,12 @@ describe('App', () => {
     render(<App />)
     await signupAsCompanyUser(user)
 
-    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/dashboard command surface/i)).toHaveTextContent(/Today's decisions/i)
-    expect(screen.getByLabelText(/decision queue/i)).toHaveTextContent(/Budget posture/i)
-    expect(screen.getByLabelText(/decision queue/i)).toHaveTextContent(/Audience posture/i)
-    expect(screen.getByLabelText(/analytics and reporting summary/i)).toHaveTextContent(/Performance summary/i)
-    expect(screen.getByLabelText(/invite and access-code framing/i)).toHaveTextContent(/Invite and budget handoff/i)
+    expect(await screen.findByRole('heading', { name: /campaign control/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/dashboard command surface/i)).toHaveTextContent(/Ready to send/i)
+    expect(screen.getByLabelText(/decision queue/i)).toHaveTextContent(/Budget/i)
+    expect(screen.getByLabelText(/decision queue/i)).toHaveTextContent(/Audience/i)
+    expect(screen.getByLabelText(/analytics and reporting summary/i)).toHaveTextContent(/Performance/i)
+    expect(screen.getByLabelText(/invite and access-code framing/i)).toHaveTextContent(/Team access/i)
     expect(screen.queryByText(/not set/i)).not.toBeInTheDocument()
     expect(screen.getByText(/monthly send quota/i)).toBeInTheDocument()
     expect(screen.getByText(/new campaign/i)).toBeInTheDocument()
@@ -1503,7 +1503,7 @@ describe('App', () => {
     expect(screen.getByText(/upload media/i)).toBeInTheDocument()
     expect(screen.getByText(/open broadcast monitor/i)).toBeInTheDocument()
     expect(screen.getByText(/view analytics/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/next actions/i)).toHaveTextContent(/Approve a broadcast or start a new one/i)
+    expect(screen.getByLabelText(/next actions/i)).toHaveTextContent(/Send, edit, or monitor/i)
     expect(screen.getByRole('link', { name: /read knowledge base/i })).toHaveAttribute('href', '/kb')
 
     await user.click(screen.getByRole('button', { name: /new campaign/i }))
@@ -1544,11 +1544,11 @@ describe('App', () => {
     const membership = await screen.findByRole('listitem', { name: /acme retail/i })
     await user.click(within(membership).getByRole('button', { name: /open acme retail/i }))
 
-    expect(await screen.findByRole('heading', { name: /company dashboard/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /campaign control/i })).toBeInTheDocument()
     expect(screen.getByText(/owner@acme.test/)).toBeInTheDocument()
     const shellContext = screen.getByLabelText(/workspace role and budget/i)
     expect(within(shellContext).getByText(/Company admin/i)).toBeInTheDocument()
-    expect(within(shellContext).getByText(/Full workspace control/i)).toBeInTheDocument()
+    expect(within(shellContext).getByText(/Campaigns, audiences, media, analytics, invites, and budgets/i)).toBeInTheDocument()
     expect(within(shellContext).getByText(/50,000 remaining/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/workspace access summary/i)).toHaveTextContent(/All company markets and segments/i)
   })
@@ -1747,7 +1747,7 @@ describe('App', () => {
 
     const shellContext = await screen.findByLabelText(/workspace role and budget/i)
     expect(within(shellContext).getByText(/^Viewer$/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/workspace access summary/i)).toHaveTextContent(/Read-only workspace access/i)
+    expect(screen.getByLabelText(/workspace access summary/i)).toHaveTextContent(/Can view workspace status without editing data/i)
     expect(screen.queryByText(/Full workspace control/i)).not.toBeInTheDocument()
   })
 

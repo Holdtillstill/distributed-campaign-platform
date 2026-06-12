@@ -1088,23 +1088,23 @@ export function CompanyWorkspace({
     return (
       <>
         <PageHeader
-          eyebrow="Company workspace"
-          title="Company dashboard"
+          eyebrow="Campaign workspace"
+          title="Campaign control"
           description={`${session.companyName} / ${roleMeta.label}`}
         />
         <section className="role-aware-banner" aria-label="Workspace access summary">
           <div>
-            <span className="eyebrow">Workspace role</span>
+            <span className="eyebrow">Role</span>
             <strong>{roleMeta.label}</strong>
             <p>{roleMeta.description}</p>
           </div>
           <div>
-            <span>Market scope</span>
+            <span>Market</span>
             <strong>{roleMeta.marketScope}</strong>
-            <p>Allowed markets and lists for this workspace.</p>
+            <p>Lists available to this role.</p>
           </div>
           <div>
-            <span>User allocation</span>
+            <span>Budget</span>
             <strong>
               {hasUserBudget ? `${formatNumber(userBudgetRemaining)} remaining` : 'Company pooled budget'}
             </strong>
@@ -1117,16 +1117,16 @@ export function CompanyWorkspace({
         </section>
         <section className="dashboard-command-surface" aria-label="Dashboard command surface">
           <div className="dashboard-command-main">
-            <p className="eyebrow">Today's decisions</p>
+            <p className="eyebrow">Ready to send</p>
             <h2>
               {activeCampaign
-                ? `Review ${activeCampaign.name}.`
-                : 'Build the first campaign plan for this workspace.'}
+                ? activeCampaign.name
+                : 'Create the first campaign'}
             </h2>
-            <p>Budget, audience, monitor, and reporting status before send.</p>
+            <p>Check reach, budget, and delivery path before scheduling.</p>
             <div className="decision-list" aria-label="Decision queue">
               <article>
-                <span>Broadcast state</span>
+                <span>Status</span>
                 <strong>{activeCampaign ? activeCampaign.status : 'No campaign loaded'}</strong>
                 <p>
                   {activeCampaign
@@ -1137,25 +1137,25 @@ export function CompanyWorkspace({
                 </p>
               </article>
               <article>
-                <span>Budget posture</span>
+                <span>Budget</span>
                 <strong>{formatNumber(companyBudgetRemaining)} credits</strong>
                 <p>{dashboardBudgetTone}</p>
               </article>
               <article>
-                <span>Audience posture</span>
+                <span>Audience</span>
                 <strong>{dashboardAudienceSummary}</strong>
-                <p>Modeled reach with local sample rows.</p>
+                <p>Modeled reach and sample rows.</p>
               </article>
             </div>
           </div>
           <aside className="dashboard-command-aside" aria-label="Next actions">
             <div className="next-action-summary">
-              <span>Next action</span>
-              <strong>{canCreateCampaign ? 'Approve a broadcast or start a new one' : 'Review monitor and reporting status'}</strong>
+              <span>Next</span>
+              <strong>{canCreateCampaign ? 'Send, edit, or monitor' : 'Monitor and report'}</strong>
               <p>
                 {canCreateCampaign
-                  ? 'Move from review to the next workspace task.'
-                  : 'Creation is disabled; monitor and reporting stay available.'}
+                  ? 'Open the builder, monitor, media library, or analytics.'
+                  : 'Creation is disabled for this role.'}
               </p>
             </div>
             <button
@@ -1184,11 +1184,11 @@ export function CompanyWorkspace({
         </section>
 
         <div className="metric-grid dashboard-metrics" aria-label="Workspace posture">
-          <Metric label="Subscribers" value={formatCount(dashboardSummary?.subscriber_count)} trend="Confirmed and imported audience" />
-          <Metric label="Active campaigns" value={formatNumber(scheduledCampaigns.length)} trend="Scheduled or queued decision work" />
-          <Metric label="Messages" value={formatActivity(dashboardSummary?.message_count)} trend="Sent or scheduled sample rows" />
+          <Metric label="Subscribers" value={formatCount(dashboardSummary?.subscriber_count)} trend="Imported audience" />
+          <Metric label="Active campaigns" value={formatNumber(scheduledCampaigns.length)} trend="Scheduled or queued" />
+          <Metric label="Messages" value={formatActivity(dashboardSummary?.message_count)} trend="Sent or scheduled" />
           <Metric label="Credits remaining" value={formatCount(dashboardSummary?.credit_balance)} trend="Contract balance" />
-          <Metric label="Reporting" value={dashboardAnalyticsSummary} trend="Analytics summary" />
+          <Metric label="Reporting" value={dashboardAnalyticsSummary} trend="Clicks and redemptions" />
         </div>
 
         <div className="dashboard-grid">
@@ -1207,7 +1207,7 @@ export function CompanyWorkspace({
           <section className="panel dashboard-reporting-summary" aria-label="Analytics and reporting summary">
             <div className="section-heading">
               <span>Reporting</span>
-              <strong>Performance summary</strong>
+              <strong>Performance</strong>
             </div>
             <dl>
               <div>
@@ -1223,19 +1223,16 @@ export function CompanyWorkspace({
                 <dd>{formatNumber(scheduledReach)}</dd>
               </div>
             </dl>
-            <p className="muted">Use Analytics for campaign-level click, redemption, and credit reporting.</p>
+            <p className="muted">Open Analytics for campaign-level reporting.</p>
           </section>
         </div>
 
         <section className="panel dashboard-access-handoff" aria-label="Invite and access-code framing">
           <div className="section-heading">
             <span>Access</span>
-            <strong>Invite and budget handoff</strong>
+            <strong>Team access</strong>
           </div>
-          <p>
-            Owners issue access codes from Settings, assign roles, and set user credit limits before teammates enter
-            the workspace.
-          </p>
+          <p>Issue access codes, assign roles, and set credit limits from Settings.</p>
           <button className="secondary" disabled={!canInvite} onClick={() => onNavigate('settings')}>
             Manage team access
           </button>

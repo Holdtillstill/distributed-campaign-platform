@@ -891,20 +891,22 @@ button.ghost {
 }
 
 .app-frame {
-  display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  display: block;
   min-height: 100vh;
+  padding-left: 264px;
   background:
     linear-gradient(118deg, rgba(14, 165, 233, 0.1), transparent 36%),
     linear-gradient(180deg, #f7fafc, #eef3f6 56%, #f8fafc);
 }
 
 .sidebar {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  width: 264px;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100svh;
   overflow-y: auto;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background:
@@ -6593,6 +6595,18 @@ textarea {
 
   .kb-guide-list {
     display: none;
+  }
+
+  .app-frame {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding-left: 0;
+  }
+
+  .sidebar {
+    position: static;
+    width: auto;
+    height: auto;
   }
 
   .kb-start-path-grid {

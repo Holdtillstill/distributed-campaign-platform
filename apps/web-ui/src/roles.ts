@@ -13,8 +13,8 @@ export type RoleMeta = {
 const roleMetadata: Record<string, RoleMeta> = {
   customer_admin: {
     label: 'Company admin',
-    description: 'Owns the workspace, team access, role assignment, and user credit allocations.',
-    permissionSummary: 'Full workspace control: campaigns, audiences, content, analytics, invites, and budgets.',
+    description: 'Can manage campaigns, media, analytics, team access, and credit limits.',
+    permissionSummary: 'Campaigns, audiences, media, analytics, invites, and budgets.',
     marketScope: 'All company markets and segments',
     canInvite: true,
     canManageBudget: true,
@@ -24,8 +24,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   campaign_manager: {
     label: 'Campaign manager',
-    description: 'Builds and schedules campaigns using the budget assigned by an admin.',
-    permissionSummary: 'Can create campaigns, manage content, and view performance. Cannot invite users or change budgets.',
+    description: 'Can build, schedule, and monitor campaigns within an assigned budget.',
+    permissionSummary: 'Campaigns, media, and performance. No team or budget changes.',
     marketScope: 'Assigned campaign segments',
     canInvite: false,
     canManageBudget: false,
@@ -35,8 +35,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   regional_manager: {
     label: 'Regional manager',
-    description: 'Owns a market segment and campaigns against that allocated regional budget.',
-    permissionSummary: 'Can create campaigns for assigned market lists and view regional performance.',
+    description: 'Can run campaigns for assigned regional lists.',
+    permissionSummary: 'Regional campaigns and performance.',
     marketScope: 'Assigned regional market and customer lists',
     canInvite: false,
     canManageBudget: false,
@@ -46,8 +46,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   analyst: {
     label: 'Analyst',
-    description: 'Reviews campaign, audience, and quota reporting without changing operational data.',
-    permissionSummary: 'Reporting-only access to dashboards, subscriber samples, campaign history, and analytics.',
+    description: 'Can review campaign, audience, quota, and analytics data.',
+    permissionSummary: 'Reporting-only dashboards, campaign history, and analytics.',
     marketScope: 'Reporting across assigned company data',
     canInvite: false,
     canManageBudget: false,
@@ -57,8 +57,8 @@ const roleMetadata: Record<string, RoleMeta> = {
   },
   viewer: {
     label: 'Viewer',
-    description: 'Read-only workspace access for stakeholders who need status visibility.',
-    permissionSummary: 'Read-only visibility. Campaign, invite, budget, subscriber, and content changes are disabled.',
+    description: 'Can view workspace status without editing data.',
+    permissionSummary: 'Read-only workspace visibility.',
     marketScope: 'Read-only company overview',
     canInvite: false,
     canManageBudget: false,
