@@ -46,7 +46,7 @@ export function MarketingPage({
           <a href="/features">Features</a>
           <a href="/kb">Knowledge base</a>
           <a href="https://bozhi.dev/privacy.html">Privacy</a>
-          {requestOnly ? <a href="/app">Workspace preview</a> : <button onClick={onCustomerAccess}>Customer login</button>}
+          {requestOnly ? <a className="nav-cta" href="/app">Open workspace</a> : <button onClick={onCustomerAccess}>Customer login</button>}
           {onInternalAccess ? (
             <button className="ghost" onClick={onInternalAccess}>
               Internal
@@ -61,7 +61,7 @@ export function MarketingPage({
           <h1>CampaignOS</h1>
           <p>Campaign builder, media library, broadcast monitor, tenant admin, and role-aware budgets in one UI.</p>
           <div className="hero-actions">
-            {requestOnly ? <a href="/app">Workspace preview</a> : <button onClick={onCustomerAccess}>Customer login</button>}
+            {requestOnly ? <a className="docs-link" href="/app">Open workspace</a> : <button onClick={onCustomerAccess}>Customer login</button>}
             <a className="docs-link secondary-link" href="/features">
               Feature map
             </a>
@@ -74,14 +74,14 @@ export function MarketingPage({
                 API docs
               </a>
             ) : (
-              <span className="docs-link docs-link-static" aria-label="API docs available during runtime demos">
-                API docs by request
+              <span className="docs-link docs-link-static" aria-label="API docs unavailable on the public host">
+                API docs offline
               </span>
             )}
           </div>
           <div className={apiConnected ? 'api-mode-banner api-mode-live' : 'api-mode-banner'} aria-live="polite">
-            <span>{apiConnected ? 'API connected' : 'Static preview'}</span>
-            <strong>{apiConnected ? 'Local workflows are available.' : 'Login forms need the local stack.'}</strong>
+            <span>{apiConnected ? 'API connected' : 'Public preview'}</span>
+            <strong>{apiConnected ? 'Workflows are available.' : 'Workspace is open.'}</strong>
           </div>
         </div>
 
@@ -122,7 +122,7 @@ export function MarketingPage({
           <section className="visual-card visual-card-live" aria-label="Broadcast monitor state">
             <span>Broadcast monitor</span>
             <strong>0/min</strong>
-            <p>Scheduled campaign loaded with queued, sent, failed, retry, and dead-letter counters.</p>
+            <p>Scheduled campaign with delivery, retry, and dead-letter counters.</p>
             <div className="live-bars" aria-hidden="true">
               <span />
               <span />
@@ -193,7 +193,7 @@ export function MarketingPage({
           <article>
             <span>04</span>
             <h3>Monitor and report</h3>
-            <p>Operators watch throughput and review honest scheduled, projected, and tracked campaign reporting.</p>
+            <p>Operators watch throughput, failures, retries, and campaign reporting.</p>
           </article>
         </div>
       </section>
@@ -202,7 +202,7 @@ export function MarketingPage({
         <div className="marketing-section-copy">
           <p className="eyebrow">Routes</p>
           <h2>Public pages map to workspace surfaces.</h2>
-          <p>Feature notes, help articles, app routes, and admin routes point at the same seeded workflow.</p>
+          <p>Feature notes, help articles, app routes, and admin routes share the same workflow.</p>
         </div>
         <div className="depth-link-grid">
           <a href="/features">
@@ -227,14 +227,14 @@ export function MarketingPage({
       <section className="pricing-section" id="runtime">
         <div className="marketing-section-copy">
           <p className="eyebrow">Boundary</p>
-          <h2>Static public. Local runtime for API workflows.</h2>
-          <p>Public routes stay open. Login, seeded data, and dispatch behavior run in the local stack.</p>
+          <h2>Preview open. API actions run locally.</h2>
+          <p>Public routes stay open. Dispatch behavior uses the local stack.</p>
         </div>
         <div className="pricing-grid">
           <div>
             <span>Public host</span>
             <strong>Static UI</strong>
-            <p>Marketing, features, help, and route previews remain available.</p>
+            <p>Marketing, features, help, and workspace preview remain available.</p>
           </div>
           <div>
             <span>Local stack</span>

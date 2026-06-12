@@ -750,9 +750,9 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(await screen.findByText(/Static preview/i)).toBeInTheDocument()
-    expect(screen.getByText(/Login forms need the local stack/i)).toBeInTheDocument()
-    expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Public preview/i)).toBeInTheDocument()
+    expect(screen.getByText(/Workspace is open/i)).toBeInTheDocument()
+    expect(screen.getByText(/API docs offline/i)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /API docs/i })).not.toBeInTheDocument()
   })
 
@@ -763,9 +763,9 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByText(/Static preview/i)).toBeInTheDocument()
-    expect(screen.getByText(/Login forms need the local stack/i)).toBeInTheDocument()
-    expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
+    expect(screen.getByText(/Public preview/i)).toBeInTheDocument()
+    expect(screen.getByText(/Workspace is open/i)).toBeInTheDocument()
+    expect(screen.getByText(/API docs offline/i)).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

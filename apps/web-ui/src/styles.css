@@ -158,6 +158,19 @@ button.ghost {
   text-decoration: none;
 }
 
+.marketing-nav .nav-cta {
+  border: 1px solid rgba(15, 118, 110, 0.22);
+  border-radius: 8px;
+  background: #0f766e;
+  color: #ffffff;
+  padding: 9px 13px;
+}
+
+.marketing-nav .nav-cta:hover {
+  background: #0d615b;
+  color: #ffffff;
+}
+
 .marketing-hero {
   display: grid;
   grid-template-columns: minmax(20px, 1fr) minmax(0, 560px) minmax(390px, 620px) minmax(20px, 1fr);
