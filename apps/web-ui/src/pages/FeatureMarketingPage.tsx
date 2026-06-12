@@ -131,7 +131,7 @@ export function FeatureMarketingPage({ activeSlug }: { activeSlug?: string }) {
           <h1>{activeFeature ? activeFeature.title : 'CampaignOS features'}</h1>
           <p>
             Multi-tenant SMS campaign software for customer teams that need modeled audience planning, broadcast
-            throughput visibility, controlled budgets, and tenant operations in one demo-ready product.
+            visibility, controlled budgets, and tenant operations in one product surface.
           </p>
           <div className="hero-actions">
             <a className="docs-link" href="/app">

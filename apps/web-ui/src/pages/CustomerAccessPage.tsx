@@ -62,9 +62,9 @@ export function CustomerAccessPage({
           <strong>Workspace forms need a running Campaign API.</strong>
           <p>
             This page is available for product review, but login, signup, and membership lookup run only in a local stack
-            or an approved runtime demo.
+            or an approved runtime window.
           </p>
-          <a href="https://bozhi.dev/#request">Request API demo</a>
+          <a href="https://bozhi.dev/#contact">Contact for walkthrough</a>
         </section>
       ) : null}
 

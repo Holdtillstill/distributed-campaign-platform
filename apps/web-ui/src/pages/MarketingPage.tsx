@@ -12,7 +12,6 @@ export function MarketingPage({
   const [apiConnected, setApiConnected] = useState(() => !isStaticPortfolioHost())
   const staticPortfolioHost = isStaticPortfolioHost()
   const requestOnly = staticPortfolioHost || !apiConnected
-  const requestDemoUrl = 'https://bozhi.dev/#request'
 
   useEffect(() => {
     let cancelled = false
@@ -46,9 +45,8 @@ export function MarketingPage({
           <a href="#platform">Platform</a>
           <a href="/features">Features</a>
           <a href="/kb">Knowledge base</a>
-          <a href="#pricing">Pricing</a>
           <a href="https://bozhi.dev/privacy.html">Privacy</a>
-          {requestOnly ? <a href={requestDemoUrl}>Request API demo</a> : <button onClick={onCustomerAccess}>Customer login</button>}
+          {requestOnly ? <a href="/app">Workspace preview</a> : <button onClick={onCustomerAccess}>Customer login</button>}
           {onInternalAccess ? (
             <button className="ghost" onClick={onInternalAccess}>
               Internal
@@ -59,20 +57,18 @@ export function MarketingPage({
 
       <section className="marketing-hero" aria-label="CampaignOS campaign control plane">
         <div className="marketing-hero-copy">
-          <p className="eyebrow">CampaignOS</p>
-          <h1>Orchestrate every customer message before it moves.</h1>
-          <p>
-            A premium SMS campaign control plane for tenant workspaces, credit-aware scheduling, tracked Smart SMS,
-            follow-ups, and broadcast reporting without spreadsheet reconciliation.
-          </p>
+          <p className="eyebrow">Messaging operations workspace</p>
+          <h1>CampaignOS</h1>
+          <p>Campaign builder, media library, broadcast monitor, tenant admin, and role-aware budgets in one UI.</p>
           <div className="hero-actions">
-            {requestOnly ? <a href={requestDemoUrl}>Request API demo</a> : <button onClick={onCustomerAccess}>Customer login</button>}
+            {requestOnly ? <a href="/app">Workspace preview</a> : <button onClick={onCustomerAccess}>Customer login</button>}
             <a className="docs-link secondary-link" href="/features">
-              Feature tour
+              Feature map
             </a>
           </div>
           <div className="marketing-tertiary-links" aria-label="Secondary resources">
             <a href="/kb">Knowledge base</a>
+            <a href="/features/broadcast-monitor">Broadcast monitor</a>
             {apiConnected ? (
               <a className="docs-link secondary-link" href={API_DOCS_URL} target="_blank" rel="noreferrer">
                 API docs
@@ -84,52 +80,49 @@ export function MarketingPage({
             )}
           </div>
           <div className={apiConnected ? 'api-mode-banner api-mode-live' : 'api-mode-banner'} aria-live="polite">
-            <span>{apiConnected ? 'API connected' : 'Static portfolio host'}</span>
-            <strong>{apiConnected ? 'Runtime workflows are available.' : 'API demo by request.'}</strong>
+            <span>{apiConnected ? 'API connected' : 'Static preview'}</span>
+            <strong>{apiConnected ? 'Local workflows are available.' : 'Login forms need the local stack.'}</strong>
           </div>
         </div>
 
         <div className="campaign-flow-visual" aria-label="CampaignOS campaign flow preview">
-          <div className="flow-orbit flow-orbit-one" aria-hidden="true" />
-          <div className="flow-orbit flow-orbit-two" aria-hidden="true" />
-
           <section className="visual-card visual-card-main" aria-label="Workspace command preview">
             <div className="visual-card-top">
               <span>Demo Retail Co</span>
-              <strong>Summer Preview</strong>
+              <strong>Seattle VIP Double Points</strong>
             </div>
             <div className="workspace-chips" aria-label="Workspace routing">
-              <span>Phoenix VIP</span>
-              <span>West Region</span>
+              <span>Seattle VIP</span>
+              <span>Customer admin</span>
               <span>Smart SMS</span>
             </div>
             <div className="broadcast-meter" aria-label="Credit meter">
               <div>
-                <span>Credits reserved</span>
-                <strong>2,250 / 4.8M</strong>
+                <span>Modeled reach</span>
+                <strong>275,000</strong>
               </div>
               <i aria-hidden="true" />
             </div>
             <dl className="visual-stats" aria-label="Campaign preview metrics">
               <div>
-                <dt>Modeled audience</dt>
-                <dd>1.36M</dd>
-              </div>
-              <div>
                 <dt>Sample rows</dt>
-                <dd>1,125</dd>
+                <dd>140</dd>
               </div>
               <div>
-                <dt>Follow-ups</dt>
-                <dd>Ready</dd>
+                <dt>Status</dt>
+                <dd>Scheduled</dd>
+              </div>
+              <div>
+                <dt>Credits</dt>
+                <dd>4.8M</dd>
               </div>
             </dl>
           </section>
 
           <section className="visual-card visual-card-live" aria-label="Broadcast monitor state">
-            <span className="live-dot">Broadcast monitor</span>
-            <strong>41.8k/min</strong>
-            <p>ETA recalculating as queued messages move through provider outcomes.</p>
+            <span>Broadcast monitor</span>
+            <strong>0/min</strong>
+            <p>Scheduled campaign loaded with queued, sent, failed, retry, and dead-letter counters.</p>
             <div className="live-bars" aria-hidden="true">
               <span />
               <span />
@@ -140,14 +133,14 @@ export function MarketingPage({
 
           <section className="visual-card visual-card-sms" aria-label="SMS preview">
             <span>SMS preview</span>
-            <p>Summer preview starts now. Your VIP early access is open through Friday.</p>
+            <p>Double points open Friday. Tap for your VIP preview pass.</p>
             <small>Tracked link + reminder rule attached</small>
           </section>
 
           <section className="visual-card visual-card-route" aria-label="Tenant routing">
-            <span>Tenant routing</span>
+            <span>Access</span>
             <strong>Role budget checked</strong>
-            <small>Owner to campaign manager to analyst</small>
+            <small>Owner, manager, analyst, viewer</small>
           </section>
         </div>
       </section>
@@ -156,33 +149,30 @@ export function MarketingPage({
         <div>
           <span>Modeled reach</span>
           <strong>2.65M subscribers</strong>
-          <p>Production-scale audiences stay readable with representative sample rows.</p>
+          <p>Large audiences, small local sample rows.</p>
         </div>
         <div>
-          <span>Runtime ops</span>
+          <span>Builder</span>
           <strong>Broadcast monitor</strong>
-          <p>Queue, sent, failed, retry, dead-letter, throughput, and ETA stay visible.</p>
+          <p>Audience, message, media, schedule, and estimate.</p>
         </div>
         <div>
-          <span>Governance</span>
+          <span>Access</span>
           <strong>Roles + budgets</strong>
-          <p>Access codes, role scopes, and credit allocations travel with each user.</p>
+          <p>Access codes carry role and credit scope.</p>
         </div>
         <div>
-          <span>Readiness</span>
-          <strong>TCPA-aware checks</strong>
-          <p>Consent, STOP suppression, sender identity, send windows, and audit evidence.</p>
+          <span>Operations</span>
+          <strong>Internal admin</strong>
+          <p>Tenant health, usage, handoff, and observability links.</p>
         </div>
       </section>
 
       <section className="marketing-workflow" id="platform" aria-label="CampaignOS workflow">
         <div className="marketing-section-copy">
           <p className="eyebrow">Platform flow</p>
-          <h2>From tenant setup to broadcast reporting, every handoff has context.</h2>
-          <p>
-            Internal operators issue access, customer teams plan audiences, and CampaignOS keeps budget, readiness, and
-            delivery state attached to the work.
-          </p>
+          <h2>Tenant setup to broadcast review.</h2>
+          <p>Internal operators create customers. Customer teams plan, schedule, monitor, and report.</p>
         </div>
         <div className="workflow-lane">
           <article>
@@ -198,7 +188,7 @@ export function MarketingPage({
           <article>
             <span>03</span>
             <h3>Credit-aware send</h3>
-            <p>Regular and Smart SMS estimate sample cost, modeled reach, media requirements, and follow-up readiness.</p>
+            <p>Regular and Smart SMS estimate sample cost, modeled reach, media, and follow-up readiness.</p>
           </article>
           <article>
             <span>04</span>
@@ -210,16 +200,13 @@ export function MarketingPage({
 
       <section className="marketing-depth" aria-label="Feature and help links">
         <div className="marketing-section-copy">
-          <p className="eyebrow">Product depth</p>
-          <h2>Built for the daily campaign room, not a flat brochure.</h2>
-          <p>
-            CampaignOS connects the public feature tour, customer knowledge base, broadcast monitor, internal admin, and API
-            documentation to the same workflow story.
-          </p>
+          <p className="eyebrow">Routes</p>
+          <h2>Public pages map to workspace surfaces.</h2>
+          <p>Feature notes, help articles, app routes, and admin routes point at the same seeded workflow.</p>
         </div>
         <div className="depth-link-grid">
           <a href="/features">
-            <span>Feature tour</span>
+            <span>Feature map</span>
             <strong>Segments, roles, analytics, compliance readiness</strong>
           </a>
           <a href="/kb">
@@ -237,27 +224,27 @@ export function MarketingPage({
         </div>
       </section>
 
-      <section className="pricing-section" id="pricing">
+      <section className="pricing-section" id="runtime">
         <div className="marketing-section-copy">
-          <p className="eyebrow">Usage model</p>
-          <h2>Simple credits for real campaign economics.</h2>
-          <p>Credits make sample sends, Smart SMS enrichment, and budget guardrails visible before scheduling.</p>
+          <p className="eyebrow">Boundary</p>
+          <h2>Static public. Local runtime for API workflows.</h2>
+          <p>Public routes stay open. Login, seeded data, and dispatch behavior run in the local stack.</p>
         </div>
         <div className="pricing-grid">
           <div>
-            <span>Regular SMS</span>
-            <strong>1 credit</strong>
-            <p>Per sample recipient with modeled reach shown separately.</p>
+            <span>Public host</span>
+            <strong>Static UI</strong>
+            <p>Marketing, features, help, and route previews remain available.</p>
           </div>
           <div>
-            <span>Smart SMS</span>
-            <strong>2 credits</strong>
-            <p>Includes media, tracked links, and reminder support.</p>
+            <span>Local stack</span>
+            <strong>API-backed</strong>
+            <p>Workspace login, campaign data, monitor, content, and admin views.</p>
           </div>
           <div>
-            <span>Budget guardrails</span>
-            <strong>Role aware</strong>
-            <p>Company and user-level limits block overspend before campaigns leave the builder.</p>
+            <span>Provider</span>
+            <strong>Simulator</strong>
+            <p>No paid messaging provider is called from the public demo.</p>
           </div>
         </div>
       </section>

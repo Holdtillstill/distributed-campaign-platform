@@ -40,17 +40,14 @@ export function AdminDashboard({
       <PageHeader
         eyebrow="Internal admin"
         title="Internal operator console"
-        description="Scan tenant health, quota pressure, access-code handoff, and platform readiness across active customers."
+        description="Tenant health, quota pressure, access handoff, and system checks."
       />
 
       <section className="admin-operator-command" aria-label="Internal operator command surface">
         <div>
           <p className="eyebrow">Operator scan</p>
-          <h2>Tenant health, quotas, and access handoff in one queue.</h2>
-          <p>
-            Prioritize quota-watch tenants, confirm access codes are ready for customer admins, and use system checks
-            before escalating delivery or platform issues.
-          </p>
+          <h2>Tenant operations queue.</h2>
+          <p>Quota watch, access codes, scheduled reach, and system checks before escalation.</p>
         </div>
         <dl>
           <div>
@@ -87,7 +84,7 @@ export function AdminDashboard({
           <span>Tenant health</span>
           <strong>Tenant health, quotas, and access codes</strong>
         </div>
-        <p className="muted">Scheduled reach next 30 days drives quota watch and access-code handoff priority.</p>
+        <p className="muted">Next 30 days drive quota watch and access handoff priority.</p>
         <DataTable
           ariaLabel="Tenant health"
           rows={companyHealthRows}

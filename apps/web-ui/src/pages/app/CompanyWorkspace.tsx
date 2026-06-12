@@ -872,7 +872,7 @@ export function CompanyWorkspace({
         <PageHeader
           eyebrow="Company workspace"
           title="Company dashboard"
-          description={`${session.companyName} / ${roleMeta.permissionSummary}`}
+          description={`${session.companyName} / ${roleMeta.label}`}
         />
         <section className="role-aware-banner" aria-label="Workspace access summary">
           <div>
@@ -883,7 +883,7 @@ export function CompanyWorkspace({
           <div>
             <span>Market scope</span>
             <strong>{roleMeta.marketScope}</strong>
-            <p>This role can work across every available market and segment in the workspace.</p>
+            <p>Allowed markets and lists for this workspace.</p>
           </div>
           <div>
             <span>User allocation</span>
@@ -893,7 +893,7 @@ export function CompanyWorkspace({
             <p>
               {hasUserBudget
                 ? `${formatNumber(userCreditsUsed)} used of ${formatNumber(userBudgetLimit)} assigned credits.`
-                : 'This membership does not have a separate user credit limit.'}
+                : 'No separate user credit limit.'}
             </p>
           </div>
         </section>
@@ -902,13 +902,10 @@ export function CompanyWorkspace({
             <p className="eyebrow">Today's decisions</p>
             <h2>
               {activeCampaign
-                ? `Review ${activeCampaign.name} before the next send window.`
+                ? `Review ${activeCampaign.name}.`
                 : 'Build the first campaign plan for this workspace.'}
             </h2>
-            <p>
-              Check budget, audience readiness, active broadcast state, and reporting signals before approving the next
-              customer communication.
-            </p>
+            <p>Budget, audience, monitor, and reporting status before send.</p>
             <div className="decision-list" aria-label="Decision queue">
               <article>
                 <span>Broadcast state</span>
@@ -918,7 +915,7 @@ export function CompanyWorkspace({
                     ? `${formatNumber(activeCampaignReach)} modeled recipients / ${formatLocalDateTime(
                         activeCampaign.scheduled_at ?? activeCampaign.created_at,
                       )}`
-                    : 'Create or import a campaign to expose monitor readiness.'}
+                    : 'Create or import a campaign.'}
                 </p>
               </article>
               <article>
@@ -929,7 +926,7 @@ export function CompanyWorkspace({
               <article>
                 <span>Audience posture</span>
                 <strong>{dashboardAudienceSummary}</strong>
-                <p>Consent filters and modeled/sample counts are available in Subscribers.</p>
+                <p>Modeled reach with local sample rows.</p>
               </article>
             </div>
           </div>
@@ -939,8 +936,8 @@ export function CompanyWorkspace({
               <strong>{canCreateCampaign ? 'Approve a broadcast or start a new one' : 'Review monitor and reporting status'}</strong>
               <p>
                 {canCreateCampaign
-                  ? 'Use these shortcuts to move from review into the next workspace task.'
-                  : 'Creation tools stay disabled for this role, but monitoring and reporting remain available.'}
+                  ? 'Move from review to the next workspace task.'
+                  : 'Creation is disabled; monitor and reporting stay available.'}
               </p>
             </div>
             <button
@@ -1247,10 +1244,7 @@ export function CompanyWorkspace({
               <section className="product-help-callout" aria-label="New campaign checklist">
                 <div>
                   <strong>Campaign scheduling checklist</strong>
-                  <p>
-                    Review segments, Smart SMS costs, media requirements, consent evidence, opt-out/STOP suppression,
-                    quiet hours, sender identity, and modeled audience estimates before scheduling.
-                  </p>
+                  <p>Segments, cost, media, consent, STOP suppression, quiet hours, sender, modeled reach.</p>
                 </div>
                 <div>
                   <a href="/kb">Open campaign guide</a>
@@ -1467,10 +1461,7 @@ export function CompanyWorkspace({
               <strong>Broadcast monitor</strong>
             </div>
             <div className="monitor-help-strip">
-              <p>
-                Refreshes every 5 seconds from the current monitor API. Use manual refresh to re-request the selected
-                campaign while checking progress, throughput, ETA, retries, failures, and dead-lettered rows.
-              </p>
+              <p>Auto-refreshes every 5 seconds. Manual refresh reloads the selected campaign.</p>
               <div>
                 <a href="/kb">Monitor guide</a>
                 <a href="/features/broadcast-monitor">Feature details</a>
@@ -1535,7 +1526,7 @@ export function CompanyWorkspace({
                       <div>
                         <dt>Sent</dt>
                         <dd>{formatNumber(broadcastMonitor.sent)}</dd>
-                        <dd className="metric-note">Provider accepted</dd>
+                        <dd className="metric-note">Simulator accepted</dd>
                       </div>
                       <div>
                         <dt>Failed</dt>
@@ -1581,11 +1572,7 @@ export function CompanyWorkspace({
                     </div>
                     <section className="monitor-semantics" aria-label="Monitor status semantics">
                       <strong>Operational labels</strong>
-                      <p>
-                        Queued rows are waiting to send, sent rows have provider outcomes, failed rows need review,
-                        retried rows already had another attempt, and dead-lettered rows are terminal until an operator
-                        investigates.
-                      </p>
+                      <p>Queued waits; sent is simulator-accepted; failed, retried, and dead-lettered need review.</p>
                     </section>
                   </div>
                 ) : (
@@ -1946,7 +1933,7 @@ export function CompanyWorkspace({
                   <MediaAssetPreview asset={asset} />
                   <strong>{asset.filename}</strong>
                   <span>{asset.content_type}</span>
-                  <span>{asset.url}</span>
+                  <span title={asset.url ?? ''}>{formatAssetLocation(asset.url)}</span>
                 </li>
               ))}
             </ul>
@@ -2698,6 +2685,17 @@ function isSeededExternalMedia(url: string) {
     return parsedUrl.hostname === 'cdn.example'
   } catch {
     return url.startsWith('local-upload://')
+  }
+}
+
+function formatAssetLocation(url?: string | null) {
+  if (!url) return 'No source URL'
+  try {
+    const parsedUrl = new URL(url)
+    const path = parsedUrl.pathname.length > 34 ? `${parsedUrl.pathname.slice(0, 31)}...` : parsedUrl.pathname
+    return `${parsedUrl.hostname}${path}`
+  } catch {
+    return url.length > 42 ? `${url.slice(0, 39)}...` : url
   }
 }
 

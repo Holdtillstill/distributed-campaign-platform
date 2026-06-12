@@ -10,4 +10,6 @@ RUN apk upgrade --no-cache libxml2 nghttp2-libs
 ENV CAMPAIGN_API_UPSTREAM=http://campaign-api:8080
 COPY apps/web-ui/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY apps/web-ui/docker-entrypoint.d/10-env-js.sh /docker-entrypoint.d/10-env-js.sh
+RUN chmod +x /docker-entrypoint.d/10-env-js.sh
 EXPOSE 80

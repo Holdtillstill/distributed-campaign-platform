@@ -731,17 +731,17 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /Orchestrate every customer message before it moves/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^CampaignOS$/i })).toBeInTheDocument()
     expect(screen.getAllByText(/CampaignOS/i).length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /^Features$/i })).toHaveAttribute('href', '/features')
     expect(screen.getAllByRole('link', { name: /^Knowledge base$/i })[0]).toHaveAttribute('href', '/kb')
     expect(screen.getAllByRole('button', { name: /^Customer login$/i }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: /Feature tour/i })[0]).toHaveAttribute('href', '/features')
+    expect(screen.getAllByRole('link', { name: /Feature map/i })[0]).toHaveAttribute('href', '/features')
     expect(await screen.findByText(/API connected/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /API docs/i })).toHaveAttribute('href', '/api/docs')
-    expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Credits reserved/i)
+    expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Modeled reach/i)
     expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Broadcast monitor/i)
-    expect(screen.getAllByText(/Regular SMS/i)).not.toHaveLength(0)
+    expect(screen.getAllByText(/Static UI/i)).not.toHaveLength(0)
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
   })
 
@@ -750,8 +750,8 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(await screen.findByText(/Static portfolio host/i)).toBeInTheDocument()
-    expect(screen.getByText(/API demo by request/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Static preview/i)).toBeInTheDocument()
+    expect(screen.getByText(/Login forms need the local stack/i)).toBeInTheDocument()
     expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /API docs/i })).not.toBeInTheDocument()
   })
@@ -763,8 +763,8 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByText(/Static portfolio host/i)).toBeInTheDocument()
-    expect(screen.getByText(/API demo by request/i)).toBeInTheDocument()
+    expect(screen.getByText(/Static preview/i)).toBeInTheDocument()
+    expect(screen.getByText(/Login forms need the local stack/i)).toBeInTheDocument()
     expect(screen.getByText(/API docs by request/i)).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -1099,7 +1099,10 @@ describe('App', () => {
     render(<App />)
 
     expect(screen.getByText(/Workspace forms need a running Campaign API/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /request api demo/i })).toHaveAttribute('href', 'https://bozhi.dev/#request')
+    expect(screen.getByRole('link', { name: /contact for walkthrough/i })).toHaveAttribute(
+      'href',
+      'https://bozhi.dev/#contact',
+    )
     expect(screen.getByRole('button', { name: /find my companies/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeDisabled()
     expect(screen.getByLabelText(/login email.*email lookup input/i)).toBeDisabled()
@@ -1193,7 +1196,7 @@ describe('App', () => {
     expect(screen.getByLabelText(/internal operator command surface/i)).toHaveTextContent(/Quota watch/i)
     expect(screen.getByLabelText(/internal operator command surface/i)).toHaveTextContent(/Access codes ready/i)
     expect(screen.getByLabelText(/internal operator command surface/i)).toHaveTextContent(/Highest scheduled reach/i)
-    expect(screen.getByText(/scheduled reach next 30 days/i)).toBeInTheDocument()
+    expect(screen.getByText(/Next 30 days drive quota watch/i)).toBeInTheDocument()
     expect(screen.getByText(/Tenant health, quotas, and access codes/i)).toBeInTheDocument()
     expect(screen.getAllByText(/Access-code handoff/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Acme Retail/i)).not.toHaveLength(0)
@@ -1815,7 +1818,7 @@ describe('App', () => {
     expect(within(statusMetrics).getByText(/Failed/i)).toBeInTheDocument()
     expect(within(statusMetrics).getAllByText(/Retried/i).length).toBeGreaterThan(0)
     expect(within(statusMetrics).getByText(/Dead-lettered/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/monitor status semantics/i)).toHaveTextContent(/Queued rows are waiting to send/i)
+    expect(screen.getByLabelText(/monitor status semantics/i)).toHaveTextContent(/Queued waits/i)
 
     const countMonitorCalls = () =>
       fetchMock.mock.calls.filter(([request]) => String(request).endsWith('/campaigns/campaign-upcoming/broadcast-monitor'))
@@ -1930,7 +1933,7 @@ describe('App', () => {
     const mediaLibrary = screen.getByLabelText(/media asset library/i)
     expect(within(mediaLibrary).getByText(/CampaignOS preview/i)).toBeInTheDocument()
     expect(within(mediaLibrary).getByText(/Retail offer/i)).toBeInTheDocument()
-    expect(within(mediaLibrary).getByText(/https:\/\/cdn.example\/coupon.png/i)).toBeInTheDocument()
+    expect(within(mediaLibrary).getByText(/cdn.example\/coupon.png/i)).toBeInTheDocument()
     expect(within(mediaLibrary).queryByRole('img')).not.toBeInTheDocument()
 
     await user.clear(screen.getByLabelText(/media filename/i))
