@@ -6,7 +6,7 @@ COPY apps/web-ui ./
 RUN npm run build
 
 FROM nginx:1.29-alpine
-RUN apk upgrade --no-cache libxml2 nghttp2-libs
+RUN apk upgrade --no-cache libcrypto3 libssl3 libxml2 nghttp2-libs
 ENV CAMPAIGN_API_UPSTREAM=http://campaign-api:8080
 COPY apps/web-ui/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
