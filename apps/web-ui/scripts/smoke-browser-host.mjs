@@ -7,7 +7,7 @@ const VISITOR_ENDPOINT = 'https://on-demand-demos.bozhi.dev/api/events';
 const VISITOR_ENDPOINTS = Array.from(new Set([VISITOR_ENDPOINT, `${WEB_BASE}/api/events`]));
 
 const routes = [
-  { path: '/', markers: ['CampaignOS', 'Orchestrate every customer message'] },
+  { path: '/', markers: ['CampaignOS', 'Campaign builder, media library'] },
   { path: '/app/dashboard', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
   { path: '/app/campaigns/scheduled', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
   { path: '/app/subscribers', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
