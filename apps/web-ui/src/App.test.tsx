@@ -1092,20 +1092,20 @@ describe('App', () => {
     expect(await screen.findByText(/Campaign API is not connected for this static portfolio host/i)).toBeInTheDocument()
   })
 
-  it('disables access forms on the configured static portfolio host', () => {
+  it('opens a populated Demo Retail workspace on configured static app routes', () => {
     window.__APP_CONFIG__ = { staticPortfolioHost: true }
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
 
     window.history.pushState(null, '', '/app')
     render(<App />)
 
-    expect(screen.getByText(/Workspace forms need a running Campaign API/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /contact for walkthrough/i })).toHaveAttribute(
-      'href',
-      'https://bozhi.dev/#contact',
-    )
-    expect(screen.getByRole('button', { name: /find my companies/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeDisabled()
-    expect(screen.getByLabelText(/login email.*email lookup input/i)).toBeDisabled()
+    expect(screen.getByRole('heading', { name: /Company dashboard/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Demo Retail Co/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Review Seattle VIP Double Points/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/2,650,000/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /New campaign/i })).toBeEnabled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('explains invite workspace access and renders membership role plus budget cards', async () => {

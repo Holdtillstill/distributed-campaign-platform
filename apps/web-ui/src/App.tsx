@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
-import { API_BASE_URL, PUBLIC_DESIGN_ROUTES_ENABLED, apiErrorMessage, readApiJson } from './api/client'
+import { API_BASE_URL, PUBLIC_DESIGN_ROUTES_ENABLED, apiErrorMessage, isStaticPortfolioHost, readApiJson } from './api/client'
 import { AppShell } from './components/AppShell'
 import { EmptyState } from './components/EmptyState'
 import { CustomerAccessPage } from './pages/CustomerAccessPage'
@@ -14,6 +14,7 @@ import { DesignExploration, routeToExploration } from './pages/DesignExploration
 import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
+import { staticDemoSession } from './staticDemoData'
 import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
 
 type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' } | { page: 'design-review' }
@@ -109,7 +110,11 @@ function publicRouteFromLocation(): PublicRoute | null {
 }
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(() => loadStoredSession())
+  const [session, setSession] = useState<Session | null>(() => {
+    const storedSession = loadStoredSession()
+    if (storedSession) return storedSession
+    return isStaticPortfolioHost() && surfaceFromLocation() === 'app' ? staticDemoSession : null
+  })
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
   const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() => publicRouteFromLocation())
   const [designExploration, setDesignExploration] = useState(() =>

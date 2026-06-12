@@ -20,7 +20,7 @@ export function DataTable<T>({
   ariaLabel: string
 }) {
   return (
-    <div className="table-wrap">
+    <div aria-label={`${ariaLabel} table scroll area`} className="table-wrap" role="region" tabIndex={0}>
       <table aria-label={ariaLabel} className="data-table">
         <thead>
           <tr>

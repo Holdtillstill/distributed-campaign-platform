@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
-import { API_BASE_URL, apiErrorMessage, readApiJson } from '../../api/client'
+import { API_BASE_URL, apiErrorMessage, isStaticPortfolioHost, readApiJson } from '../../api/client'
 import { DataTable } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { MetricCard as Metric } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
 import { QuotaBar } from '../../components/QuotaBar'
 import { getRoleMeta, roleOptions } from '../../roles'
+import {
+  staticDemoBroadcastMonitor,
+  staticDemoCampaignLinks,
+  staticDemoCampaigns,
+  staticDemoDashboardSummary,
+  staticDemoMediaAssets,
+  staticDemoPerformance,
+  staticDemoReminders,
+  staticDemoSubscriberLists,
+  staticDemoSubscribers,
+  staticDemoTeamUsers,
+} from '../../staticDemoData'
 import type {
   AccessCodeResult,
   BroadcastMonitor,
@@ -121,6 +133,40 @@ async function formatCampaignScheduleError(response: Response) {
   return detail.message ?? fallback
 }
 
+function staticSubscriberSearch({
+  q,
+  listId,
+  consentStatus,
+  limit,
+  offset,
+}: {
+  q: string
+  listId: string
+  consentStatus: string
+  limit: number
+  offset: number
+}): SubscriberSearchResult {
+  const query = q.trim().toLowerCase()
+  const rows = staticDemoSubscribers.filter((subscriber) => {
+    if (listId !== 'all' && subscriber.list_id !== listId) return false
+    if (consentStatus !== 'all' && subscriber.consent_status !== consentStatus) return false
+    if (
+      query &&
+      !`${subscriber.phone_number} ${subscriber.source ?? ''} ${subscriber.region ?? ''}`.toLowerCase().includes(query)
+    ) {
+      return false
+    }
+    return true
+  })
+
+  return {
+    rows: rows.slice(offset, offset + limit),
+    total: rows.length,
+    limit,
+    offset,
+  }
+}
+
 export function CompanyWorkspace({
   page,
   session,
@@ -133,17 +179,22 @@ export function CompanyWorkspace({
   onNavigate: (page: CompanyPage, options?: { campaignSubpage?: CampaignSubpage; path?: string }) => void
 }) {
   const companyId = session.companyId
-  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
+  const staticPortfolioHost = isStaticPortfolioHost()
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(() =>
+    staticPortfolioHost ? staticDemoDashboardSummary : null,
+  )
   const [campaignName, setCampaignName] = useState('Memorial Day VIP Weekend')
   const [messageBody, setMessageBody] = useState('Memorial Day starts now: take 30% off summer favorites through Monday. Use code MEMORIAL30 in-store or online.')
   const [messageType, setMessageType] = useState<'regular' | 'smart'>('regular')
   const [campaignSubpage, setCampaignSubpage] = useState<CampaignSubpage>(initialCampaignSubpage ?? 'overview')
   const [scheduledAt, setScheduledAt] = useState('2026-05-25T16:00')
   const [smartMediaAssetId, setSmartMediaAssetId] = useState('')
-  const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>([])
-  const [subscriberListsLoaded, setSubscriberListsLoaded] = useState(false)
-  const [subscribers, setSubscribers] = useState<SubscriberResult[]>([])
-  const [subscriberTotal, setSubscriberTotal] = useState(0)
+  const [subscriberLists, setSubscriberLists] = useState<SubscriberListResult[]>(() =>
+    staticPortfolioHost ? staticDemoSubscriberLists : [],
+  )
+  const [subscriberListsLoaded, setSubscriberListsLoaded] = useState(staticPortfolioHost)
+  const [subscribers, setSubscribers] = useState<SubscriberResult[]>(() => (staticPortfolioHost ? staticDemoSubscribers : []))
+  const [subscriberTotal, setSubscriberTotal] = useState(staticPortfolioHost ? staticDemoSubscribers.length : 0)
   const [subscriberLimit, setSubscriberLimit] = useState(25)
   const [subscriberOffset, setSubscriberOffset] = useState(0)
   const [subscriberSearch, setSubscriberSearch] = useState('')
@@ -151,16 +202,20 @@ export function CompanyWorkspace({
   const [directSubscriberSearch, setDirectSubscriberSearch] = useState('')
   const [directSubscriberRows, setDirectSubscriberRows] = useState<SubscriberResult[]>([])
   const [directSubscriberTotal, setDirectSubscriberTotal] = useState(0)
-  const [selectedListIds, setSelectedListIds] = useState<string[]>([])
+  const [selectedListIds, setSelectedListIds] = useState<string[]>(() =>
+    staticPortfolioHost && staticDemoSubscriberLists[0] ? [staticDemoSubscriberLists[0].id] : [],
+  )
   const [selectedSubscriberIds, setSelectedSubscriberIds] = useState<string[]>([])
-  const [campaigns, setCampaigns] = useState<CampaignListItem[]>([])
+  const [campaigns, setCampaigns] = useState<CampaignListItem[]>(() => (staticPortfolioHost ? staticDemoCampaigns : []))
   const [campaignSearch, setCampaignSearch] = useState('')
   const [campaignStatusFilter, setCampaignStatusFilter] = useState('all')
   const [campaignDateFrom, setCampaignDateFrom] = useState('')
   const [campaignDateTo, setCampaignDateTo] = useState('')
   const [campaign, setCampaign] = useState<Campaign | null>(null)
-  const [selectedMonitorCampaignId, setSelectedMonitorCampaignId] = useState('')
-  const [broadcastMonitor, setBroadcastMonitor] = useState<BroadcastMonitor | null>(null)
+  const [selectedMonitorCampaignId, setSelectedMonitorCampaignId] = useState(staticPortfolioHost ? staticDemoCampaigns[0]?.id ?? '' : '')
+  const [broadcastMonitor, setBroadcastMonitor] = useState<BroadcastMonitor | null>(() =>
+    staticPortfolioHost ? staticDemoBroadcastMonitor : null,
+  )
   const [monitorLoading, setMonitorLoading] = useState(false)
   const [monitorError, setMonitorError] = useState<string | null>(null)
   const [monitorRefreshTick, setMonitorRefreshTick] = useState(0)
@@ -180,23 +235,29 @@ export function CompanyWorkspace({
   const [mediaFilename, setMediaFilename] = useState('memorial-day-hero.png')
   const [mediaContentType, setMediaContentType] = useState('image/png')
   const [mediaUrl, setMediaUrl] = useState('https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80')
-  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
-  const [mediaAssetsLoaded, setMediaAssetsLoaded] = useState(false)
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>(() => (staticPortfolioHost ? staticDemoMediaAssets : []))
+  const [mediaAssetsLoaded, setMediaAssetsLoaded] = useState(staticPortfolioHost)
   const [trackedCampaignId, setTrackedCampaignId] = useState('')
   const [trackedSubscriberId, setTrackedSubscriberId] = useState('')
   const [trackedMediaAssetId, setTrackedMediaAssetId] = useState('')
   const [destinationUrl, setDestinationUrl] = useState('https://example.com/offers/memorial-day')
-  const [campaignLinks, setCampaignLinks] = useState<CampaignLink[]>([])
+  const [campaignLinks, setCampaignLinks] = useState<CampaignLink[]>(() =>
+    staticPortfolioHost ? staticDemoCampaignLinks : [],
+  )
   const [campaignLink, setCampaignLink] = useState<CampaignLink | null>(null)
   const [contentFeedback, setContentFeedback] = useState<string | null>(null)
   const campaignCreationRef = useRef<HTMLDivElement>(null)
-  const [performance, setPerformance] = useState<PerformanceTotals | null>(null)
+  const [performance, setPerformance] = useState<PerformanceTotals | null>(() =>
+    staticPortfolioHost ? staticDemoPerformance : null,
+  )
   const [reminderSourceCampaignId, setReminderSourceCampaignId] = useState('')
   const [reminderAudienceRule, setReminderAudienceRule] = useState('not_clicked')
   const [reminderMessageBody, setReminderMessageBody] = useState('Still thinking it over? Your VIP offer ends tonight. Tap to finish checkout before it expires.')
   const [reminderCampaign, setReminderCampaign] = useState<ReminderCampaign | null>(null)
-  const [reminderCampaigns, setReminderCampaigns] = useState<ReminderCampaign[]>([])
-  const [teamUsers, setTeamUsers] = useState<CompanyUser[]>([])
+  const [reminderCampaigns, setReminderCampaigns] = useState<ReminderCampaign[]>(() =>
+    staticPortfolioHost ? staticDemoReminders : [],
+  )
+  const [teamUsers, setTeamUsers] = useState<CompanyUser[]>(() => (staticPortfolioHost ? staticDemoTeamUsers : []))
   const [inviteRole, setInviteRole] = useState('campaign_manager')
   const [inviteCreditLimit, setInviteCreditLimit] = useState('2000')
   const [accessCodeResult, setAccessCodeResult] = useState<AccessCodeResult | null>(null)
@@ -327,6 +388,8 @@ export function CompanyWorkspace({
   }
 
   useEffect(() => {
+    if (staticPortfolioHost) return
+
     async function loadDashboardSummary() {
       try {
         const response = await fetch(`${API_BASE_URL}/companies/${companyId}/dashboard-summary`)
@@ -336,7 +399,7 @@ export function CompanyWorkspace({
       }
     }
     void loadDashboardSummary()
-  }, [companyId])
+  }, [companyId, staticPortfolioHost])
 
   useEffect(() => {
     if (page === 'campaigns') setCampaignSubpage(initialCampaignSubpage ?? 'overview')
@@ -347,6 +410,8 @@ export function CompanyWorkspace({
   }, [campaignSubpage, page])
 
   useEffect(() => {
+    if (staticPortfolioHost) return
+
     async function loadCampaignPlanningData() {
       setSubscriberListsLoaded(false)
       setMediaAssetsLoaded(false)
@@ -373,9 +438,24 @@ export function CompanyWorkspace({
       }
     }
     void loadCampaignPlanningData()
-  }, [companyId])
+  }, [companyId, staticPortfolioHost])
 
   useEffect(() => {
+    if (staticPortfolioHost) {
+      const result = staticSubscriberSearch({
+        q: subscriberSearch,
+        listId: selectedSubscriberListId,
+        consentStatus: subscriberConsentFilter,
+        limit: subscriberLimit,
+        offset: subscriberOffset,
+      })
+      setSubscribers(result.rows)
+      setSubscriberTotal(result.total)
+      setSubscriberLimit(result.limit)
+      setSubscriberOffset(result.offset)
+      return
+    }
+
     async function loadSubscriberDirectory() {
       try {
         const response = await fetch(
@@ -400,9 +480,30 @@ export function CompanyWorkspace({
       }
     }
     void loadSubscriberDirectory()
-  }, [companyId, selectedSubscriberListId, subscriberConsentFilter, subscriberLimit, subscriberOffset, subscriberSearch])
+  }, [
+    companyId,
+    selectedSubscriberListId,
+    staticPortfolioHost,
+    subscriberConsentFilter,
+    subscriberLimit,
+    subscriberOffset,
+    subscriberSearch,
+  ])
 
   useEffect(() => {
+    if (staticPortfolioHost) {
+      const result = staticSubscriberSearch({
+        q: directSubscriberSearch,
+        listId: 'all',
+        consentStatus: 'all',
+        limit: 10,
+        offset: 0,
+      })
+      setDirectSubscriberRows(result.rows)
+      setDirectSubscriberTotal(result.total)
+      return
+    }
+
     async function loadDirectSubscriberRows() {
       try {
         const response = await fetch(
@@ -425,10 +526,22 @@ export function CompanyWorkspace({
       }
     }
     void loadDirectSubscriberRows()
-  }, [companyId, directSubscriberSearch])
+  }, [companyId, directSubscriberSearch, staticPortfolioHost])
 
   useEffect(() => {
     if (page !== 'campaigns' || campaignSubpage !== 'monitor' || !selectedMonitorCampaignId) return undefined
+
+    if (staticPortfolioHost) {
+      setMonitorError(null)
+      setMonitorLoading(false)
+      setBroadcastMonitor({
+        ...staticDemoBroadcastMonitor,
+        campaign_id: selectedMonitorCampaignId,
+        campaign_name:
+          campaigns.find((item) => item.id === selectedMonitorCampaignId)?.name ?? staticDemoBroadcastMonitor.campaign_name,
+      })
+      return undefined
+    }
 
     let cancelled = false
     async function loadMonitor() {
@@ -453,11 +566,12 @@ export function CompanyWorkspace({
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [campaignSubpage, monitorRefreshTick, page, selectedMonitorCampaignId])
+  }, [campaignSubpage, campaigns, monitorRefreshTick, page, selectedMonitorCampaignId, staticPortfolioHost])
 
   useEffect(() => {
+    if (staticPortfolioHost) return
     if (page === 'settings') void refreshTeamUsers()
-  }, [companyId, page])
+  }, [companyId, page, staticPortfolioHost])
 
   function toggleValue(current: string[], value: string): string[] {
     return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
@@ -535,6 +649,67 @@ export function CompanyWorkspace({
           ? 'Projected sample send exceeds the company credit balance.'
           : 'Projected sample send exceeds your remaining budget allocation.',
       )
+      return
+    }
+    if (staticPortfolioHost) {
+      const staticId = `static-campaign-${campaigns.length + 1}`
+      const remainingCredits = Math.max(0, (dashboardSummary?.credit_balance ?? 0) - projectedSampleCreditCost)
+      const result: Campaign = {
+        id: staticId,
+        company_id: companyId,
+        name: campaignName,
+        message_type: messageType,
+        status: 'scheduled',
+        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        audience_count: selectedModeledAudienceCount,
+        message_count: selectedSampleAudienceCount,
+        sample_message_count: selectedSampleAudienceCount,
+        audience_mode: 'projected_sample',
+        credit_cost: projectedSampleCreditCost,
+        remaining_credits: remainingCredits,
+        tracked_links: [],
+        status_counts: {
+          queued: selectedSampleAudienceCount,
+          sent: 0,
+          failed: 0,
+          retried: 0,
+          dead_lettered: 0,
+        },
+      }
+      setCampaign(result)
+      setCampaigns((current) => [
+        {
+          id: result.id,
+          company_id: result.company_id,
+          name: result.name,
+          body: messageBody,
+          message_type: result.message_type,
+          status: result.status,
+          scheduled_at: result.scheduled_at,
+          created_at: new Date().toISOString(),
+          message_count: result.message_count,
+          audience_count: result.audience_count,
+          audience_mode: result.audience_mode ?? 'projected_sample',
+          credit_cost: result.credit_cost,
+          reminder_count: 0,
+        },
+        ...current.filter((item) => item.id !== result.id),
+      ])
+      setDashboardSummary((current) =>
+        current
+          ? {
+              ...current,
+              credit_balance: result.remaining_credits,
+              credits_used: current.credits_used + result.credit_cost,
+              campaign_count: current.campaign_count + 1,
+              message_count: current.message_count + result.message_count,
+            }
+          : current,
+      )
+      setTrackedCampaignId(result.id)
+      setReminderSourceCampaignId(result.id)
+      setSelectedMonitorCampaignId(result.id)
+      setContentFeedback('Static preview staged this broadcast locally. No provider send was attempted.')
       return
     }
     const response = await fetch(`${API_BASE_URL}/campaigns`, {
@@ -729,6 +904,19 @@ export function CompanyWorkspace({
   async function addMediaAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isReadOnly) return
+    if (staticPortfolioHost) {
+      const result: MediaAsset = {
+        id: `static-media-${mediaAssets.length + 1}`,
+        company_id: companyId,
+        filename: mediaFilename,
+        content_type: mediaContentType,
+        url: mediaUrl,
+      }
+      setMediaAssets((current) => [result, ...current.filter((asset) => asset.id !== result.id)])
+      setTrackedMediaAssetId(result.id ?? '')
+      setContentFeedback(`${result.filename ?? 'Media asset'} added locally for this static preview`)
+      return
+    }
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -746,6 +934,10 @@ export function CompanyWorkspace({
   }
 
   async function refreshMediaAssets() {
+    if (staticPortfolioHost) {
+      setMediaAssets((current) => (current.length ? current : staticDemoMediaAssets))
+      return
+    }
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/media-assets`)
     if (response.ok) {
       const result = await readWorkspaceJson<MediaAsset[]>(response, 'Refresh media failed. Check that the Campaign API is available.')
@@ -763,6 +955,24 @@ export function CompanyWorkspace({
   async function createTrackedLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isReadOnly) return
+    if (staticPortfolioHost) {
+      const result: CampaignLink = {
+        id: `static-link-${campaignLinks.length + 1}`,
+        token: `static-link-${campaignLinks.length + 1}`,
+        public_url: `/r/static-link-${campaignLinks.length + 1}`,
+        company_id: companyId,
+        campaign_id: trackedCampaignId || campaigns[0]?.id,
+        subscriber_id: trackedSubscriberId || staticDemoSubscribers[0]?.id,
+        media_asset_id: trackedMediaAssetId || mediaAssets[0]?.id,
+        destination_url: destinationUrl,
+        click_count: 0,
+        redeemed_count: 0,
+      }
+      setCampaignLink(result)
+      setCampaignLinks((current) => [result, ...current.filter((link) => link.id !== result.id)])
+      setContentFeedback(`Tracking link staged locally: ${result.public_url}`)
+      return
+    }
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-links`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -785,6 +995,10 @@ export function CompanyWorkspace({
   }
 
   async function refreshCampaignLinks() {
+    if (staticPortfolioHost) {
+      setCampaignLinks((current) => (current.length ? current : staticDemoCampaignLinks))
+      return
+    }
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-links`)
     if (response.ok) {
       const result = await readWorkspaceJson<CampaignLink[]>(response, 'Refresh tracked links failed. Check that the Campaign API is available.')
@@ -793,6 +1007,10 @@ export function CompanyWorkspace({
   }
 
   async function refreshPerformance() {
+    if (staticPortfolioHost) {
+      setPerformance(staticDemoPerformance)
+      return
+    }
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}/campaign-performance`)
     if (response.ok) {
       const result = await readWorkspaceJson<PerformanceTotals>(response, 'Refresh performance failed. Check that the Campaign API is available.')

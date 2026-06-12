@@ -2832,6 +2832,11 @@ textarea {
   overflow-x: auto;
 }
 
+.table-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -6671,6 +6676,32 @@ textarea {
   .sidebar {
     position: static;
     height: auto;
+  }
+
+  .brand-lockup {
+    min-height: 44px;
+    margin-bottom: 10px;
+    padding: 0 8px 12px 48px;
+  }
+
+  .brand-lockup::before {
+    top: 0;
+  }
+
+  .sidebar-context,
+  .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .nav-item {
+    min-height: 38px;
+    padding: 8px 7px;
+    text-align: center;
   }
 
   .page-header,

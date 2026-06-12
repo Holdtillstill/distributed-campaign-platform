@@ -8,10 +8,10 @@ const VISITOR_ENDPOINTS = Array.from(new Set([VISITOR_ENDPOINT, `${WEB_BASE}/api
 
 const routes = [
   { path: '/', markers: ['CampaignOS', 'Campaign builder, media library'] },
-  { path: '/app/dashboard', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
-  { path: '/app/campaigns/scheduled', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
-  { path: '/app/subscribers', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
-  { path: '/app/analytics', markers: ['Sign in to your campaign workspace', 'SEEDED DEMO ACCESS'] },
+  { path: '/app/dashboard', markers: ['Company dashboard', 'Demo Retail Co', 'Seattle VIP Double Points'] },
+  { path: '/app/campaigns/scheduled', markers: ['Campaigns', 'Demo Retail Co', 'Seattle VIP Double Points'] },
+  { path: '/app/subscribers', markers: ['Subscribers', 'Demo Retail Co', 'Seattle VIP'] },
+  { path: '/app/analytics', markers: ['Analytics', 'Demo Retail Co', '41,820'] },
   { path: '/internal/dashboard', markers: ['Operator console', 'Admin access'] },
   { path: '/kb/articles', markers: ['Customer knowledge base', 'Internal admin and tenant operations overview'] },
   { path: '/features/broadcast-monitor', markers: ['CampaignOS', 'Broadcast monitor'] },

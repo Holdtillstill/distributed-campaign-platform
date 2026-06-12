@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from 'react'
 
-import { API_DOCS_URL } from '../api/client'
+import { API_DOCS_URL, isStaticPortfolioHost } from '../api/client'
 
 export function PageHeader({
   title,
@@ -17,6 +17,8 @@ export function PageHeader({
   focusRef?: Ref<HTMLDivElement>
   tabIndex?: number
 }) {
+  const showApiDocs = !isStaticPortfolioHost()
+
   return (
     <div className="page-header" ref={focusRef} tabIndex={tabIndex}>
       <div>
@@ -24,12 +26,16 @@ export function PageHeader({
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      <div className="page-actions">
-        {action}
-        <a className="docs-link" href={API_DOCS_URL} target="_blank" rel="noreferrer">
-          API docs
-        </a>
-      </div>
+      {action || showApiDocs ? (
+        <div className="page-actions">
+          {action}
+          {showApiDocs ? (
+            <a className="docs-link" href={API_DOCS_URL} target="_blank" rel="noreferrer">
+              API docs
+            </a>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
