@@ -58,7 +58,7 @@ export function AppShell({
             <strong>{session.email}</strong>
             <p>{roleMeta.permissionSummary}</p>
             <div className="sidebar-budget">
-              <span>Allocation</span>
+              <span>Budget</span>
               <strong>
                 {session.creditLimit !== null && session.creditLimit !== undefined
                   ? `${formatNumber(remainingBudget)} remaining`
@@ -67,7 +67,7 @@ export function AppShell({
               <small>
                 {session.creditLimit !== null && session.creditLimit !== undefined
                   ? `${formatNumber(session.creditsUsed ?? 0)} used of ${formatNumber(session.creditLimit)}`
-                  : 'No user cap'}
+                  : 'No individual allocation on this membership'}
               </small>
             </div>
           </div>
@@ -75,7 +75,7 @@ export function AppShell({
           <div className="sidebar-context" aria-label="Internal role">
             <span className="context-kicker">Internal operator</span>
             <strong>{session.email}</strong>
-            <p>Tenant setup, quota, usage, and platform health.</p>
+            <p>Tenant setup, quota visibility, usage reporting, and platform observability.</p>
           </div>
         )}
         <nav>

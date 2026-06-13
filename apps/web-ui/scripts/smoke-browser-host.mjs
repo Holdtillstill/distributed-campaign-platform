@@ -8,7 +8,7 @@ const VISITOR_ENDPOINTS = Array.from(new Set([VISITOR_ENDPOINT, `${WEB_BASE}/api
 
 const routes = [
   { path: '/', markers: ['CampaignOS', 'Campaign builder, media library'] },
-  { path: '/app/dashboard', markers: ['Campaigns', 'Demo Retail Co', 'Seattle VIP Double Points'] },
+  { path: '/app/dashboard', markers: ['Campaign control', 'Demo Retail Co', 'Seattle VIP Double Points'] },
   { path: '/app/campaigns/scheduled', markers: ['Campaigns', 'Demo Retail Co', 'Seattle VIP Double Points'] },
   { path: '/app/subscribers', markers: ['Subscribers', 'Demo Retail Co', 'Seattle VIP'] },
   { path: '/app/analytics', markers: ['Analytics', 'Demo Retail Co', '41,820'] },
