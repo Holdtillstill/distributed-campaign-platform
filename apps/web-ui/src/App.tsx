@@ -13,15 +13,21 @@ import { AppDesignExploration, routeToAppDesign } from './pages/AppDesignExplora
 import { DesignExploration, routeToExploration } from './pages/DesignExplorations'
 import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
+import { RedesignApp } from './redesign/RedesignApp'
+import { RedesignV2App } from './redesign-v2/RedesignV2App'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
 import { staticDemoSession } from './staticDemoData'
 import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
 
 type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' } | { page: 'design-review' }
 type AuthenticatedRouteUnavailable = { surface: 'app' | 'internal'; path: string }
+type RedesignV2Route =
+  | { mode: 'company'; companyPage: CompanyPage; campaignSubpage?: CampaignSubpage }
+  | { mode: 'admin'; adminPage: AdminPage }
 
 const companyPageIds = ['dashboard', 'campaigns', 'subscribers', 'content', 'analytics', 'settings'] as const
 const adminPageIds = ['dashboard', 'companies', 'usage'] as const
+const USE_LEGACY_AUTHENTICATED_WORKSPACE = import.meta.env.MODE === 'test'
 
 const companyPagePaths: Record<CompanyPage, string> = {
   dashboard: '/app/dashboard',
@@ -36,6 +42,21 @@ const adminPagePaths: Record<AdminPage, string> = {
   dashboard: '/internal/dashboard',
   companies: '/internal/companies',
   usage: '/internal/usage',
+}
+
+const v2CompanyPagePaths: Record<CompanyPage, string> = {
+  dashboard: '/app-v2/dashboard',
+  campaigns: '/app-v2/campaigns',
+  subscribers: '/app-v2/subscribers',
+  content: '/app-v2/content',
+  analytics: '/app-v2/analytics',
+  settings: '/app-v2/settings',
+}
+
+const v2AdminPagePaths: Record<AdminPage, string> = {
+  dashboard: '/internal-v2/dashboard',
+  companies: '/internal-v2/companies',
+  usage: '/internal-v2/usage',
 }
 
 function isCompanyPage(value: string): value is CompanyPage {
@@ -54,6 +75,10 @@ function firstRouteSegment(path: string, basePath: string): string | null {
 
 function isCampaignMonitorPath(path: string): boolean {
   return path === '/monitor' || path.startsWith('/monitor/') || path === '/app/monitor' || path.startsWith('/app/monitor/')
+}
+
+function isV2CampaignMonitorPath(path: string): boolean {
+  return path === '/monitor-v2' || path.startsWith('/monitor-v2/') || path === '/app-v2/monitor' || path.startsWith('/app-v2/monitor/')
 }
 
 function companyPageFromLocation(): CompanyPage {
@@ -81,6 +106,50 @@ function campaignSubpageFromLocation(): CampaignSubpage | undefined {
   if (campaignSegment === 'sent') return 'past'
   if (campaignSegment === 'follow-ups') return 'followups'
   return undefined
+}
+
+function v2CompanyPageFromLocation(): CompanyPage {
+  const path = window.location.pathname
+  if (isV2CampaignMonitorPath(path)) return 'campaigns'
+
+  const segment = firstRouteSegment(path, '/app-v2')
+  if (!segment) return 'dashboard'
+  return isCompanyPage(segment) ? segment : 'dashboard'
+}
+
+function v2AdminPageFromLocation(): AdminPage {
+  const segment = firstRouteSegment(window.location.pathname, '/internal-v2')
+  if (!segment) return 'dashboard'
+  return isAdminPage(segment) ? segment : 'dashboard'
+}
+
+function v2CampaignSubpageFromLocation(): CampaignSubpage | undefined {
+  const path = window.location.pathname
+  if (isV2CampaignMonitorPath(path)) return 'monitor'
+
+  const campaignSegment = firstRouteSegment(path, '/app-v2/campaigns')
+  if (campaignSegment === 'new') return 'create'
+  if (campaignSegment === 'scheduled') return 'scheduled'
+  if (campaignSegment === 'sent') return 'past'
+  if (campaignSegment === 'follow-ups') return 'followups'
+  return undefined
+}
+
+function redesignV2RouteFromLocation(): RedesignV2Route | null {
+  const path = window.location.pathname
+  if (path === '/app-v2' || path.startsWith('/app-v2/') || isV2CampaignMonitorPath(path)) {
+    return {
+      mode: 'company',
+      companyPage: v2CompanyPageFromLocation(),
+      campaignSubpage: v2CampaignSubpageFromLocation(),
+    }
+  }
+
+  if (path === '/internal-v2' || path.startsWith('/internal-v2/')) {
+    return { mode: 'admin', adminPage: v2AdminPageFromLocation() }
+  }
+
+  return null
 }
 
 function unavailableAuthenticatedRouteFromLocation(): AuthenticatedRouteUnavailable | null {
@@ -113,7 +182,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(() => {
     const storedSession = loadStoredSession()
     if (storedSession) return storedSession
-    return isStaticPortfolioHost() && surfaceFromLocation() === 'app' ? staticDemoSession : null
+    const canUseStaticDemoSession = isStaticPortfolioHost() || (import.meta.env.DEV && import.meta.env.MODE !== 'test')
+    return canUseStaticDemoSession && surfaceFromLocation() === 'app' ? staticDemoSession : null
   })
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
   const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() => publicRouteFromLocation())
@@ -123,6 +193,7 @@ export default function App() {
   const [appDesignExploration, setAppDesignExploration] = useState(() =>
     PUBLIC_DESIGN_ROUTES_ENABLED ? routeToAppDesign(window.location.pathname) : null,
   )
+  const [redesignV2Route, setRedesignV2Route] = useState<RedesignV2Route | null>(() => redesignV2RouteFromLocation())
   const [adminPage, setAdminPage] = useState<AdminPage>(() => adminPageFromLocation())
   const [companyPage, setCompanyPage] = useState<CompanyPage>(() => companyPageFromLocation())
   const [companyCampaignSubpage, setCompanyCampaignSubpage] = useState<CampaignSubpage | undefined>(() =>
@@ -144,6 +215,7 @@ export default function App() {
     setPublicRoute(publicRouteFromLocation())
     setDesignExploration(PUBLIC_DESIGN_ROUTES_ENABLED ? routeToExploration(window.location.pathname) : null)
     setAppDesignExploration(PUBLIC_DESIGN_ROUTES_ENABLED ? routeToAppDesign(window.location.pathname) : null)
+    setRedesignV2Route(redesignV2RouteFromLocation())
     setAdminPage(adminPageFromLocation())
     setCompanyPage(companyPageFromLocation())
     setCompanyCampaignSubpage(campaignSubpageFromLocation())
@@ -181,6 +253,19 @@ export default function App() {
     setUnavailableRoute(null)
     setCompanyPage(nextPage)
     setCompanyCampaignSubpage(options.campaignSubpage ?? campaignSubpageFromLocation())
+  }
+
+  function navigateV2AdminPage(nextPage: AdminPage) {
+    pushHistory(v2AdminPagePaths[nextPage])
+    setRedesignV2Route(redesignV2RouteFromLocation())
+  }
+
+  function navigateV2CompanyPage(
+    nextPage: CompanyPage,
+    options: { campaignSubpage?: CampaignSubpage; path?: string } = {},
+  ) {
+    pushHistory(options.path ?? v2CompanyPagePaths[nextPage])
+    setRedesignV2Route(redesignV2RouteFromLocation())
   }
 
   useEffect(() => {
@@ -309,6 +394,7 @@ export default function App() {
     return <AppDesignExploration id={appDesignExploration} />
   }
 
+
   if (publicRoute?.page === 'kb') {
     return <KnowledgeBasePage />
   }
@@ -319,6 +405,39 @@ export default function App() {
 
   if (publicRoute?.page === 'features') {
     return <FeatureMarketingPage activeSlug={publicRoute.activeSlug} />
+  }
+
+  if (redesignV2Route) {
+    if (redesignV2Route.mode === 'admin') {
+      if (session?.role !== 'internal_admin') {
+        return (
+          <InternalLoginPage
+            adminEmail={adminEmail}
+            onAdminEmail={setAdminEmail}
+            onLogin={loginInternalAdmin}
+          />
+        )
+      }
+
+      return (
+        <RedesignV2App
+          initialMode="admin"
+          routeSyncMode="admin"
+          adminPage={redesignV2Route.adminPage}
+          onAdminPage={navigateV2AdminPage}
+        />
+      )
+    }
+
+    return (
+      <RedesignV2App
+        initialMode="company"
+        routeSyncMode="company"
+        companyPage={redesignV2Route.companyPage}
+        campaignSubpage={redesignV2Route.campaignSubpage}
+        onCompanyPage={navigateV2CompanyPage}
+      />
+    )
   }
 
   if (!session) {
@@ -363,6 +482,22 @@ export default function App() {
       (session.role === 'company_user' && unavailableRoute.surface === 'app'))
       ? unavailableRoute
       : null
+
+  if (!USE_LEGACY_AUTHENTICATED_WORKSPACE && !activeUnavailableRoute) {
+    const initialMode = session.role === 'internal_admin' && surface === 'internal' ? 'admin' : 'company'
+
+    return (
+      <RedesignApp
+        initialMode={initialMode}
+        routeSyncMode={initialMode}
+        adminPage={adminPage}
+        companyPage={companyPage}
+        campaignSubpage={companyCampaignSubpage}
+        onAdminPage={navigateAdminPage}
+        onCompanyPage={navigateCompanyPage}
+      />
+    )
+  }
 
   return (
     <AppShell

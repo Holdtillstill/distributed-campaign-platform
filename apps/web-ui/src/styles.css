@@ -31,14 +31,14 @@ body {
     #eef4f6;
 }
 
-button,
-input,
-textarea,
-select {
+body:not(:has(.campaignos-redesign)) button,
+body:not(:has(.campaignos-redesign)) input,
+body:not(:has(.campaignos-redesign)) textarea,
+body:not(:has(.campaignos-redesign)) select {
   font: inherit;
 }
 
-button,
+body:not(:has(.campaignos-redesign)) button,
 .docs-link {
   border: 0;
   border-radius: 8px;
@@ -54,37 +54,37 @@ button,
     transform 140ms ease;
 }
 
-button:hover,
+body:not(:has(.campaignos-redesign)) button:hover,
 .docs-link:hover {
   background: linear-gradient(135deg, var(--brand-teal-dark), #075985);
   box-shadow: 0 12px 26px rgba(15, 118, 110, 0.22);
   transform: translateY(-1px);
 }
 
-button:disabled {
+body:not(:has(.campaignos-redesign)) button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
   transform: none;
 }
 
-button:disabled:hover {
+body:not(:has(.campaignos-redesign)) button:disabled:hover {
   box-shadow: none;
   transform: none;
 }
 
-button.secondary,
+body:not(:has(.campaignos-redesign)) button.secondary,
 .secondary-link {
   background: linear-gradient(180deg, #ffffff, #eef2f7);
   color: #243044;
 }
 
-button.secondary:hover,
+body:not(:has(.campaignos-redesign)) button.secondary:hover,
 .secondary-link:hover {
   background: #dfe7f0;
   box-shadow: none;
 }
 
-button.ghost {
+body:not(:has(.campaignos-redesign)) button.ghost {
   background: transparent;
   color: #64748b;
 }
@@ -1444,7 +1444,7 @@ button.ghost {
   line-height: 1.55;
 }
 
-label {
+body:not(:has(.campaignos-redesign)) label {
   display: grid;
   gap: 7px;
   color: #334155;
@@ -1464,9 +1464,9 @@ label {
   border: 0;
 }
 
-input,
-textarea,
-select {
+body:not(:has(.campaignos-redesign)) input,
+body:not(:has(.campaignos-redesign)) textarea,
+body:not(:has(.campaignos-redesign)) select {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -1475,19 +1475,19 @@ select {
   padding: 10px 12px;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
+body:not(:has(.campaignos-redesign)) input:focus,
+body:not(:has(.campaignos-redesign)) textarea:focus,
+body:not(:has(.campaignos-redesign)) select:focus {
   border-color: var(--brand-cyan);
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14);
   outline: none;
 }
 
-input::placeholder {
+body:not(:has(.campaignos-redesign)) input::placeholder {
   color: #94a3b8;
 }
 
-textarea {
+body:not(:has(.campaignos-redesign)) textarea {
   min-height: 104px;
   resize: vertical;
 }
