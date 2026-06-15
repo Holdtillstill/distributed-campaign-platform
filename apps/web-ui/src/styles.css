@@ -93,28 +93,36 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   position: relative;
   overflow: hidden;
   min-height: 100vh;
-  background:
-    linear-gradient(128deg, rgba(219, 234, 254, 0.9) 0 18%, transparent 38%),
-    linear-gradient(34deg, transparent 0 54%, rgba(255, 237, 213, 0.82) 70%, transparent 88%),
-    linear-gradient(180deg, #fbf8f3 0%, #f4f8fb 48%, #ffffff 100%);
-  color: #172033;
+  background: #0c0d12;
+  color: #e4e6ef;
 }
 
 .marketing-site::before {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(15, 35, 63, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 35, 63, 0.05) 1px, transparent 1px);
-  background-size: 44px 44px;
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 52px 52px;
   content: "";
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent 72%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.62), transparent 78%);
+  pointer-events: none;
+}
+
+.marketing-site::after {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(15, 235, 168, 0.07), transparent 18%),
+    linear-gradient(120deg, rgba(96, 165, 250, 0.11), transparent 34%),
+    linear-gradient(24deg, transparent 58%, rgba(251, 191, 36, 0.07));
+  content: "";
   pointer-events: none;
 }
 
 .marketing-site > * {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .marketing-nav {
@@ -122,26 +130,37 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1240px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 22px 0;
+  padding: 16px 0;
 }
 
 .marketing-nav strong {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  color: #0f4f49;
-  font-size: 1.2rem;
+  color: #e4e6ef;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .marketing-nav strong span {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, var(--brand-cyan), var(--brand-teal) 55%, var(--brand-coral));
-  box-shadow: 0 9px 22px rgba(15, 118, 110, 0.24);
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: #0FEBA8;
+  box-shadow: 0 0 0 1px rgba(15, 235, 168, 0.22);
+}
+
+.marketing-nav strong span::before {
+  width: 9px;
+  height: 9px;
+  border: 2px solid #0c0d12;
+  border-radius: 999px;
+  content: "";
 }
 
 .marketing-nav nav {
@@ -153,31 +172,37 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .marketing-nav a {
-  color: #475569;
-  font-weight: 750;
+  color: #8e98b3;
+  font-size: 0.9rem;
+  font-weight: 700;
   text-decoration: none;
 }
 
+.marketing-nav a:hover {
+  color: #e4e6ef;
+}
+
 .marketing-nav .nav-cta {
-  border: 1px solid rgba(15, 118, 110, 0.22);
-  border-radius: 8px;
-  background: #0f766e;
-  color: #ffffff;
-  padding: 9px 13px;
+  border: 1px solid rgba(15, 235, 168, 0.22);
+  border-radius: 6px;
+  background: #0FEBA8;
+  color: #0c0d12;
+  padding: 8px 12px;
 }
 
 .marketing-nav .nav-cta:hover {
-  background: #0d615b;
-  color: #ffffff;
+  background: #36F2BC;
+  color: #0c0d12;
 }
 
 .marketing-hero {
   display: grid;
-  grid-template-columns: minmax(20px, 1fr) minmax(0, 560px) minmax(390px, 620px) minmax(20px, 1fr);
-  gap: clamp(24px, 5vw, 64px);
+  grid-template-columns: minmax(24px, 1fr) minmax(0, 560px) minmax(440px, 660px) minmax(24px, 1fr);
+  gap: clamp(28px, 5vw, 74px);
   align-items: center;
   width: 100%;
-  padding: 58px 0 48px;
+  min-height: min(760px, calc(100svh - 64px));
+  padding: 42px 0 46px;
 }
 
 .marketing-hero-copy {
@@ -186,26 +211,57 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .marketing-hero h1 {
-  max-width: 760px;
+  max-width: 700px;
   margin: 0;
-  color: #101827;
-  font-size: clamp(3.4rem, 6.5vw, 6.35rem);
+  color: #f2f4fa;
+  font-size: clamp(3.6rem, 5.2vw, 5.9rem);
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.92;
+  line-height: 0.88;
 }
 
 .marketing-hero p:not(.eyebrow) {
-  max-width: 650px;
-  color: #475569;
-  font-size: 1.14rem;
-  line-height: 1.65;
+  max-width: 590px;
+  color: #a1abc2;
+  font-size: 1.04rem;
+  line-height: 1.7;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 26px;
+}
+
+.marketing-site .docs-link,
+.marketing-site button {
+  border: 1px solid rgba(15, 235, 168, 0.24);
+  border-radius: 6px;
+  background: #0FEBA8;
+  color: #0c0d12;
+  box-shadow: none;
+  font-weight: 800;
+  padding: 10px 14px;
+}
+
+.marketing-site .docs-link:hover,
+.marketing-site button:hover {
+  background: #36F2BC;
+  box-shadow: 0 14px 30px rgba(15, 235, 168, 0.12);
+}
+
+.marketing-site .secondary-link,
+.marketing-site button.ghost {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  color: #e4e6ef;
+}
+
+.marketing-site .secondary-link:hover,
+.marketing-site button.ghost:hover {
+  background: rgba(255, 255, 255, 0.075);
+  box-shadow: none;
 }
 
 .marketing-tertiary-links {
@@ -217,7 +273,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .marketing-tertiary-links a {
-  color: #64748b;
+  color: #8e98b3;
   font-size: 0.92rem;
   font-weight: 850;
   text-decoration: none;
@@ -226,7 +282,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .marketing-tertiary-links .docs-link {
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: #8e98b3;
   padding: 0;
 }
 
@@ -242,15 +298,15 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .api-mode-banner {
   display: inline-grid;
   gap: 2px;
-  margin-top: 16px;
-  border: 1px solid rgba(15, 35, 63, 0.12);
+  margin-top: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.035);
   padding: 10px 12px;
 }
 
 .api-mode-banner span {
-  color: #64748b;
+  color: #0FEBA8;
   font-size: 0.72rem;
   font-weight: 850;
   letter-spacing: 0.08em;
@@ -258,82 +314,57 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .api-mode-banner strong {
-  color: #172033;
+  color: #e4e6ef;
   font-size: 0.95rem;
 }
 
 .api-mode-live {
-  border-color: rgba(15, 118, 110, 0.24);
-  background: rgba(240, 253, 250, 0.76);
+  border-color: rgba(15, 235, 168, 0.24);
+  background: rgba(15, 235, 168, 0.08);
 }
 
 .api-mode-live span {
-  color: #0f766e;
+  color: #0FEBA8;
 }
 
 .campaign-flow-visual {
   position: relative;
   grid-column: 3;
-  min-height: 570px;
+  min-height: 590px;
   animation: marketing-rise 680ms 120ms ease both;
 }
 
 .campaign-flow-visual::before {
   position: absolute;
-  inset: 34px 24px 48px 34px;
-  border: 1px solid rgba(15, 35, 63, 0.12);
-  border-radius: 8px;
+  inset: 20px 10px 28px;
+  border: 1px solid rgba(15, 235, 168, 0.16);
+  border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(14, 165, 233, 0.2), transparent 34%),
-    linear-gradient(24deg, transparent 0 56%, rgba(249, 115, 22, 0.18)),
-    rgba(255, 255, 255, 0.54);
-  box-shadow: 0 44px 120px rgba(15, 23, 42, 0.14);
+    linear-gradient(145deg, rgba(15, 235, 168, 0.08), transparent 34%),
+    linear-gradient(28deg, transparent 0 58%, rgba(96, 165, 250, 0.1)),
+    #10131b;
+  box-shadow: 0 44px 120px rgba(0, 0, 0, 0.24);
   content: "";
-  transform: rotate(-1.5deg);
-}
-
-.flow-orbit {
-  position: absolute;
-  border: 1px solid rgba(15, 118, 110, 0.2);
-  border-radius: 999px;
-  pointer-events: none;
-}
-
-.flow-orbit-one {
-  top: 28px;
-  right: 32px;
-  width: 230px;
-  height: 132px;
-  transform: rotate(-18deg);
-}
-
-.flow-orbit-two {
-  bottom: 64px;
-  left: 8px;
-  width: 310px;
-  height: 150px;
-  border-color: rgba(249, 115, 22, 0.22);
-  transform: rotate(18deg);
 }
 
 .visual-card {
   position: absolute;
   display: grid;
   gap: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.92)),
-    #ffffff;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
+  background: #151821;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
   padding: 18px;
   transition:
+    border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
 }
 
 .visual-card:hover {
-  box-shadow: 0 32px 86px rgba(15, 23, 42, 0.18);
+  border-color: rgba(15, 235, 168, 0.24);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.28);
   transform: translateY(-2px);
 }
 
@@ -343,17 +374,18 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .workflow-lane span,
 .depth-link-grid span,
 .pricing-grid span {
-  color: #9a3412;
+  color: #8e98b3;
   font-size: 0.72rem;
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .visual-card-main {
-  top: 68px;
-  right: 54px;
-  width: min(440px, 82%);
+  top: 66px;
+  right: 42px;
+  width: min(470px, 82%);
+  border-color: rgba(15, 235, 168, 0.2);
 }
 
 .visual-card-top {
@@ -364,7 +396,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .visual-card-top strong {
-  color: #111827;
+  color: #f2f4fa;
   font-size: 1.25rem;
 }
 
@@ -375,21 +407,21 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .workspace-chips span {
-  border: 1px solid rgba(15, 118, 110, 0.18);
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #0f766e;
+  border: 1px solid rgba(15, 235, 168, 0.22);
+  border-radius: 6px;
+  background: rgba(15, 235, 168, 0.09);
+  color: #0FEBA8;
   letter-spacing: 0;
-  padding: 7px 10px;
+  padding: 6px 9px;
   text-transform: none;
 }
 
 .broadcast-meter {
   display: grid;
   gap: 10px;
-  border: 1px solid #d9e2ef;
+  border: 1px solid rgba(255, 255, 255, 0.065);
   border-radius: 8px;
-  background: #f8fafc;
+  background: #0f1219;
   padding: 14px;
 }
 
@@ -401,7 +433,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .broadcast-meter strong {
-  color: #10233f;
+  color: #f2f4fa;
 }
 
 .broadcast-meter i {
@@ -410,7 +442,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   overflow: hidden;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, var(--brand-teal) 0 68%, var(--brand-cyan) 68% 78%, #d9e2ef 78% 100%);
+    linear-gradient(90deg, #0FEBA8 0 12%, rgba(255, 255, 255, 0.1) 12% 100%);
 }
 
 .visual-stats {
@@ -421,32 +453,34 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .visual-stats div {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   padding-top: 10px;
 }
 
 .visual-stats dd {
   margin: 5px 0 0;
-  color: #111827;
+  color: #f2f4fa;
   font-weight: 950;
 }
 
 .visual-card-live {
-  top: 26px;
-  left: 42px;
-  width: 238px;
+  top: 22px;
+  left: 32px;
+  width: 250px;
   background:
-    linear-gradient(145deg, rgba(14, 165, 233, 0.18), transparent 42%),
-    #10233f;
+    linear-gradient(180deg, rgba(15, 235, 168, 0.12), rgba(15, 235, 168, 0.04)),
+    #08170f;
+  border-color: rgba(15, 235, 168, 0.22);
   color: #ffffff;
 }
 
 .visual-card-live span,
 .visual-card-live p {
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .visual-card-live strong {
+  color: #0FEBA8;
   font-size: 2rem;
 }
 
@@ -483,7 +517,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .live-bars span {
   display: block;
   border-radius: 8px 8px 2px 2px;
-  background: linear-gradient(180deg, #67e8f9, #14b8a6);
+  background: linear-gradient(180deg, #36F2BC, #0FEBA8);
 }
 
 .live-bars span:nth-child(1) {
@@ -503,17 +537,17 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .visual-card-sms {
-  right: 22px;
-  bottom: 44px;
-  width: 292px;
+  right: 28px;
+  bottom: 54px;
+  width: 310px;
 }
 
 .visual-card-sms p {
   position: relative;
   margin: 0;
   border-radius: 8px;
-  background: #ecfeff;
-  color: #155e75;
+  background: #0f1219;
+  color: #d7dbea;
   line-height: 1.45;
   padding: 13px;
 }
@@ -524,21 +558,21 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   bottom: -8px;
   width: 16px;
   height: 16px;
-  background: #ecfeff;
+  background: #0f1219;
   content: "";
   transform: rotate(45deg);
 }
 
 .visual-card-sms small,
 .visual-card-route small {
-  color: #64748b;
+  color: #8e98b3;
   font-weight: 750;
 }
 
 .visual-card-route {
-  bottom: 112px;
-  left: 22px;
-  width: 250px;
+  bottom: 114px;
+  left: 28px;
+  width: 270px;
 }
 
 .visual-card-route::before {
@@ -548,7 +582,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   width: 118px;
   height: 2px;
   background:
-    linear-gradient(90deg, rgba(15, 118, 110, 0), rgba(15, 118, 110, 0.52), rgba(14, 165, 233, 0));
+    linear-gradient(90deg, rgba(15, 235, 168, 0), rgba(15, 235, 168, 0.62), rgba(96, 165, 250, 0));
   content: "";
   animation: marketing-route 2.7s ease-in-out infinite;
 }
@@ -557,7 +591,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .marketing-workflow,
 .marketing-depth,
 .pricing-section {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1240px, calc(100vw - 32px));
   margin: 0 auto;
 }
 
@@ -565,18 +599,18 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  padding: 4px 0 60px;
+  padding: 10px 0 66px;
 }
 
 .marketing-check-strip div {
-  border-top: 1px solid rgba(15, 35, 63, 0.14);
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
   padding: 16px 4px 0;
 }
 
 .marketing-check-strip strong {
   display: block;
   margin-top: 9px;
-  color: #111827;
+  color: #f2f4fa;
   font-size: 1.15rem;
 }
 
@@ -584,7 +618,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .marketing-section-copy p,
 .workflow-lane p,
 .pricing-grid p {
-  color: #64748b;
+  color: #8e98b3;
   line-height: 1.55;
 }
 
@@ -593,13 +627,13 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   grid-template-columns: minmax(0, 0.58fr) minmax(0, 1fr);
   gap: 36px;
   align-items: start;
-  padding: 28px 0 68px;
+  padding: 28px 0 70px;
 }
 
 .marketing-section-copy h2 {
   max-width: 760px;
   margin: 0;
-  color: #111827;
+  color: #f2f4fa;
   font-size: clamp(2rem, 4vw, 3.65rem);
   letter-spacing: 0;
   line-height: 1.02;
@@ -617,7 +651,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   bottom: 26px;
   left: 22px;
   width: 2px;
-  background: linear-gradient(180deg, var(--brand-cyan), var(--brand-teal), var(--brand-coral));
+  background: linear-gradient(180deg, #0FEBA8, #60a5fa, #fbbf24);
   content: "";
 }
 
@@ -626,11 +660,10 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   display: grid;
   gap: 5px;
   margin-left: 52px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
+  background: #13151e;
   padding: 20px;
-  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.055);
 }
 
 .workflow-lane article::before {
@@ -639,10 +672,10 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   left: -38px;
   width: 14px;
   height: 14px;
-  border: 3px solid #ffffff;
+  border: 3px solid #0c0d12;
   border-radius: 999px;
-  background: var(--brand-teal);
-  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.2);
+  background: #0FEBA8;
+  box-shadow: 0 0 0 1px rgba(15, 235, 168, 0.22);
   content: "";
 }
 
@@ -650,7 +683,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 .pricing-grid strong,
 .depth-link-grid strong {
   margin: 0;
-  color: #111827;
+  color: #f2f4fa;
 }
 
 .marketing-depth {
@@ -658,7 +691,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr);
   gap: 34px;
   align-items: start;
-  border-top: 1px solid rgba(15, 35, 63, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
   padding: 58px 0;
 }
 
@@ -673,11 +706,9 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   gap: 8px;
   min-height: 134px;
   align-content: space-between;
-  border: 1px solid rgba(148, 163, 184, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(14, 165, 233, 0.08), transparent 42%),
-    #ffffff;
+  background: #13151e;
   padding: 18px;
   text-decoration: none;
   transition:
@@ -687,8 +718,8 @@ body:not(:has(.campaignos-redesign)) button.ghost {
 }
 
 .depth-link-grid a:hover {
-  border-color: rgba(15, 118, 110, 0.38);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 235, 168, 0.24);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
   transform: translateY(-2px);
 }
 
@@ -696,7 +727,7 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   display: grid;
   grid-template-columns: minmax(260px, 0.5fr) minmax(0, 1fr);
   gap: 34px;
-  border-top: 1px solid rgba(15, 35, 63, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
   padding: 58px 0 76px;
 }
 
@@ -710,9 +741,9 @@ body:not(:has(.campaignos-redesign)) button.ghost {
   display: grid;
   gap: 8px;
   align-content: start;
-  border: 1px solid #d9e2ef;
+  border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 8px;
-  background: #ffffff;
+  background: #13151e;
   padding: 20px;
 }
 
@@ -6653,7 +6684,7 @@ body:not(:has(.campaignos-redesign)) textarea {
   }
 
   .marketing-hero h1 {
-    font-size: clamp(3rem, 12vw, 4.2rem);
+    font-size: clamp(3rem, 11vw, 4rem);
   }
 
   .campaign-flow-visual {
@@ -6892,5 +6923,22 @@ body:not(:has(.campaignos-redesign)) textarea {
 
   .data-exec-strip div:last-child {
     border-bottom: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .marketing-nav {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .marketing-nav nav {
+    justify-content: flex-start;
+    gap: 12px 16px;
+  }
+
+  .marketing-nav .nav-cta {
+    order: -1;
   }
 }
