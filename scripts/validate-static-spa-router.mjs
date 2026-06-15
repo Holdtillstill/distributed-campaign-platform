@@ -44,7 +44,7 @@ function assertSecurityHeaders(response) {
 
   assert.match(csp, /default-src 'self'/)
   assert.ok(csp.includes("base-uri 'self'"))
-  assert.ok(csp.includes("connect-src 'self' https://on-demand-demos.bozhi.dev"))
+  assert.ok(csp.includes("connect-src 'self' https://on-demand-demos.bozhi.dev https://fonts.googleapis.com"))
   assert.ok(csp.includes("frame-ancestors 'none'"))
   assert.ok(csp.includes("img-src 'self' data: https://platform-academy.bozhi.dev https://images.unsplash.com"))
   assert.ok(csp.includes("script-src 'self' https://on-demand-demos.bozhi.dev"))
