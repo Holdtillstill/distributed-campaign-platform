@@ -1,7 +1,7 @@
 function securityHeaders() {
   return {
     'content-security-policy': {
-      value: "default-src 'self'; base-uri 'self'; connect-src 'self' https://on-demand-demos.bozhi.dev; font-src 'self' data: https://fonts.gstatic.com; frame-ancestors 'none'; img-src 'self' data: https://platform-academy.bozhi.dev https://images.unsplash.com; object-src 'none'; script-src 'self' https://on-demand-demos.bozhi.dev; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; upgrade-insecure-requests",
+      value: "default-src 'self'; base-uri 'self'; connect-src 'self' https://on-demand-demos.bozhi.dev https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-ancestors 'none'; img-src 'self' data: https://platform-academy.bozhi.dev https://images.unsplash.com; object-src 'none'; script-src 'self' https://on-demand-demos.bozhi.dev; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; upgrade-insecure-requests",
     },
     'strict-transport-security': { value: 'max-age=31536000; includeSubDomains; preload' },
     'x-content-type-options': { value: 'nosniff' },
