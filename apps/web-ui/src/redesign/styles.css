@@ -1,0 +1,252 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@source './**/*.{ts,tsx}';
+@source '../redesign-v2/**/*.{ts,tsx}';
+
+@custom-variant dark (&:is(.dark *));
+
+:root,
+.campaignos-redesign {
+  --font-size: 13px;
+
+  --background: #0C0D12;
+  --foreground: #E4E6EF;
+  --card: #13151E;
+  --card-foreground: #E4E6EF;
+  --popover: #1A1C28;
+  --popover-foreground: #E4E6EF;
+
+  --primary: #0FEBA8;
+  --primary-foreground: #0C0D12;
+  --secondary: #1C1F2E;
+  --secondary-foreground: #A8B1C7;
+  --muted: #181B27;
+  --muted-foreground: #A1ABC2;
+  --accent: #0FEBA8;
+  --accent-foreground: #0C0D12;
+
+  --destructive: #F05252;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(255,255,255,0.06);
+  --input: #1A1C28;
+  --input-background: #1A1C28;
+  --switch-background: #2A2D3E;
+  --ring: #0FEBA8;
+
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --radius: 0.5rem;
+
+  --chart-1: #0FEBA8;
+  --chart-2: #60A5FA;
+  --chart-3: #FBBF24;
+  --chart-4: #A78BFA;
+  --chart-5: #F472B6;
+
+  --sidebar: #08090D;
+  --sidebar-foreground: #C8CCE0;
+  --sidebar-primary: #0FEBA8;
+  --sidebar-primary-foreground: #08090D;
+  --sidebar-accent: #14162090;
+  --sidebar-accent-foreground: #E4E6EF;
+  --sidebar-border: rgba(255,255,255,0.045);
+  --sidebar-ring: #0FEBA8;
+
+  --status-scheduled-bg: rgba(96, 165, 250, 0.1);
+  --status-scheduled-text: #93C5FD;
+  --status-scheduled-border: rgba(96, 165, 250, 0.25);
+  --status-queued-bg: rgba(251, 191, 36, 0.1);
+  --status-queued-text: #FCD34D;
+  --status-queued-border: rgba(251, 191, 36, 0.25);
+  --status-sent-bg: rgba(52, 211, 153, 0.1);
+  --status-sent-text: #6EE7B7;
+  --status-sent-border: rgba(52, 211, 153, 0.25);
+  --status-failed-bg: rgba(248, 113, 113, 0.1);
+  --status-failed-text: #FCA5A5;
+  --status-failed-border: rgba(248, 113, 113, 0.25);
+  --status-cancelled-bg: rgba(107, 114, 128, 0.08);
+  --status-cancelled-text: #A1ABC2;
+  --status-cancelled-border: rgba(107, 114, 128, 0.2);
+  --status-live-bg: rgba(15, 235, 168, 0.1);
+  --status-live-text: #0FEBA8;
+  --status-live-border: rgba(15, 235, 168, 0.3);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html:has(.campaignos-redesign) {
+    font-size: var(--font-size);
+  }
+
+  body:has(.campaignos-redesign) {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body:has(.campaignos-redesign) ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  body:has(.campaignos-redesign) ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  body:has(.campaignos-redesign) ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+  }
+
+  body:has(.campaignos-redesign) ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.14);
+  }
+
+  .campaignos-redesign,
+  .campaignos-redesign *,
+  .campaignos-redesign::before,
+  .campaignos-redesign::after,
+  .campaignos-redesign *::before,
+  .campaignos-redesign *::after {
+    box-sizing: border-box;
+  }
+
+  :where(.campaignos-redesign, .campaignos-redesign *, .campaignos-redesign::before, .campaignos-redesign::after, .campaignos-redesign *::before, .campaignos-redesign *::after) {
+    border-color: var(--border);
+  }
+
+  :where(.campaignos-redesign h1, .campaignos-redesign h2, .campaignos-redesign h3, .campaignos-redesign h4, .campaignos-redesign p) {
+    margin: 0;
+  }
+
+  :where(.campaignos-redesign h1, .campaignos-redesign h2, .campaignos-redesign h3, .campaignos-redesign h4) {
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  :where(.campaignos-redesign button, .campaignos-redesign input, .campaignos-redesign select, .campaignos-redesign textarea, .campaignos-redesign optgroup) {
+    color: inherit;
+    font-family: inherit;
+  }
+
+  :where(.campaignos-redesign button) {
+    appearance: none;
+    background: transparent;
+    border-style: solid;
+    border-width: 0;
+    border-radius: 0;
+    cursor: pointer;
+    font-weight: 500;
+    line-height: 1.5;
+    padding: 0;
+    text-align: inherit;
+  }
+
+  :where(.campaignos-redesign input) {
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  :where(.campaignos-redesign label) {
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  :where(.campaignos-redesign table) {
+    border-collapse: collapse;
+    border-color: inherit;
+    text-indent: 0;
+  }
+
+  :where(.campaignos-redesign svg) {
+    display: block;
+    vertical-align: middle;
+  }
+
+  :where(.campaignos-redesign code, .campaignos-redesign pre, .campaignos-redesign .font-mono) {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+}
+
+.campaignos-redesign {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+body:has(.campaignos-redesign) {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body:has(.campaignos-redesign) ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+body:has(.campaignos-redesign) ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body:has(.campaignos-redesign) ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+}
+
+body:has(.campaignos-redesign) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.14);
+}
