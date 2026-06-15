@@ -62,12 +62,15 @@ const functionArn = process.env.FUNCTION_ARN;
 const config = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
 const defaultBehavior = config.DefaultCacheBehavior;
 const associations = defaultBehavior.FunctionAssociations || { Quantity: 0 };
-const items = (associations.Items || []).filter((item) => item.EventType !== "viewer-request");
+const managedEventTypes = new Set(["viewer-request", "viewer-response"]);
+const items = (associations.Items || []).filter((item) => !managedEventTypes.has(item.EventType));
 
-items.push({
-  EventType: "viewer-request",
-  FunctionARN: functionArn
-});
+for (const eventType of managedEventTypes) {
+  items.push({
+    EventType: eventType,
+    FunctionARN: functionArn
+  });
+}
 
 defaultBehavior.FunctionAssociations = {
   Quantity: items.length,
@@ -78,7 +81,7 @@ fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`);
 NODE
 }
 
-viewer_request_association_status() {
+function_association_status() {
   FUNCTION_ARN="${function_arn}" node - "${distribution_config}" <<'NODE'
 const fs = require("node:fs");
 
@@ -87,13 +90,17 @@ const functionArn = process.env.FUNCTION_ARN;
 const config = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
 const associations = config.DefaultCacheBehavior?.FunctionAssociations || { Quantity: 0 };
 const items = associations.Items || [];
-const viewerRequestItems = items.filter((item) => item.EventType === "viewer-request");
+const requiredEventTypes = ["viewer-request", "viewer-response"];
 
-if (viewerRequestItems.length === 1 && viewerRequestItems[0].FunctionARN === functionArn) {
-  process.stdout.write("current");
-} else {
-  process.stdout.write("update");
+for (const eventType of requiredEventTypes) {
+  const matches = items.filter((item) => item.EventType === eventType);
+  if (matches.length !== 1 || matches[0].FunctionARN !== functionArn) {
+    process.stdout.write("update");
+    process.exit(0);
+  }
 }
+
+process.stdout.write("current");
 NODE
 }
 
@@ -111,7 +118,7 @@ for attempt in $(seq 1 "${max_update_attempts}"); do
     --query DistributionConfig \
     --output json >"${distribution_config}"
 
-  if [ "$(viewer_request_association_status)" = "current" ]; then
+  if [ "$(function_association_status)" = "current" ]; then
     echo "Static edge router is published and already associated."
     exit 0
   fi
