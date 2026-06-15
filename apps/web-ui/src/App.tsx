@@ -13,7 +13,6 @@ import { AppDesignExploration, routeToAppDesign } from './pages/AppDesignExplora
 import { DesignExploration, routeToExploration } from './pages/DesignExplorations'
 import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
-import { RedesignApp } from './redesign/RedesignApp'
 import { RedesignV2App } from './redesign-v2/RedesignV2App'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
 import { staticDemoSession } from './staticDemoData'
@@ -487,7 +486,7 @@ export default function App() {
     const initialMode = session.role === 'internal_admin' && surface === 'internal' ? 'admin' : 'company'
 
     return (
-      <RedesignApp
+      <RedesignV2App
         initialMode={initialMode}
         routeSyncMode={initialMode}
         adminPage={adminPage}
