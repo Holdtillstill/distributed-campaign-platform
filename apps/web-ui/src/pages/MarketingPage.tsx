@@ -57,9 +57,9 @@ export function MarketingPage({
 
       <section className="marketing-hero" aria-label="CampaignOS campaign control plane">
         <div className="marketing-hero-copy">
-          <p className="eyebrow">Messaging operations workspace</p>
+          <p className="eyebrow">CampaignOS workspace</p>
           <h1>CampaignOS</h1>
-          <p>Campaign builder, media library, broadcast monitor, tenant admin, and role-aware budgets in one UI.</p>
+          <p>Campaign builder, media library, broadcast monitor, tenant admin, and role-aware budgets in one v2 command surface.</p>
           <div className="hero-actions">
             {requestOnly ? <a className="docs-link" href="/app">Open workspace</a> : <button onClick={onCustomerAccess}>Customer login</button>}
             <a className="docs-link secondary-link" href="/features">
@@ -88,41 +88,41 @@ export function MarketingPage({
         <div className="campaign-flow-visual" aria-label="CampaignOS campaign flow preview">
           <section className="visual-card visual-card-main" aria-label="Workspace command preview">
             <div className="visual-card-top">
-              <span>Demo Retail Co</span>
+              <span>Next scheduled send</span>
               <strong>Seattle VIP Double Points</strong>
             </div>
             <div className="workspace-chips" aria-label="Workspace routing">
-              <span>Seattle VIP</span>
-              <span>Customer admin</span>
-              <span>Smart SMS</span>
+              <span>Demo Retail Co</span>
+              <span>Customer Company Admin</span>
+              <span>All Markets</span>
             </div>
             <div className="broadcast-meter" aria-label="Credit meter">
               <div>
-                <span>Modeled reach</span>
-                <strong>275,000</strong>
+                <span>Monthly send quota</span>
+                <strong>2,250 / 4,800,000</strong>
               </div>
               <i aria-hidden="true" />
             </div>
             <dl className="visual-stats" aria-label="Campaign preview metrics">
               <div>
-                <dt>Sample rows</dt>
-                <dd>140</dd>
+                <dt>Modeled reach</dt>
+                <dd>2.65M</dd>
               </div>
               <div>
                 <dt>Status</dt>
                 <dd>Scheduled</dd>
               </div>
               <div>
-                <dt>Credits</dt>
-                <dd>4.8M</dd>
+                <dt>Clicks</dt>
+                <dd>41,820</dd>
               </div>
             </dl>
           </section>
 
           <section className="visual-card visual-card-live" aria-label="Broadcast monitor state">
             <span>Broadcast monitor</span>
-            <strong>0/min</strong>
-            <p>Scheduled campaign with delivery, retry, and dead-letter counters.</p>
+            <strong>35%</strong>
+            <p>Spring Clearance live with sent, queued, failed, and ETA signals.</p>
             <div className="live-bars" aria-hidden="true">
               <span />
               <span />
@@ -132,34 +132,34 @@ export function MarketingPage({
           </section>
 
           <section className="visual-card visual-card-sms" aria-label="SMS preview">
-            <span>SMS preview</span>
+            <span>MMS preview</span>
             <p>Double points open Friday. Tap for your VIP preview pass.</p>
-            <small>Tracked link + reminder rule attached</small>
+            <small>Media asset, tracked link, and reminder rule attached</small>
           </section>
 
           <section className="visual-card visual-card-route" aria-label="Tenant routing">
             <span>Access</span>
-            <strong>Role budget checked</strong>
-            <small>Owner, manager, analyst, viewer</small>
+            <strong>Scope locked to customer company</strong>
+            <small>SaaS internal admin stays separate</small>
           </section>
         </div>
       </section>
 
       <section className="marketing-check-strip" aria-label="Platform operating checks">
         <div>
-          <span>Modeled reach</span>
+          <span>Audience</span>
           <strong>2.65M subscribers</strong>
-          <p>Large audiences, small local sample rows.</p>
+          <p>Modeled reach and sample rows stay explicit.</p>
         </div>
         <div>
-          <span>Builder</span>
+          <span>Send flow</span>
           <strong>Broadcast monitor</strong>
-          <p>Audience, message, media, schedule, and estimate.</p>
+          <p>Audience, message, media, schedule, and review.</p>
         </div>
         <div>
           <span>Access</span>
           <strong>Roles + budgets</strong>
-          <p>Access codes carry role and credit scope.</p>
+          <p>Access codes carry role, expiry, and credit scope.</p>
         </div>
         <div>
           <span>Operations</span>
@@ -171,8 +171,8 @@ export function MarketingPage({
       <section className="marketing-workflow" id="platform" aria-label="CampaignOS workflow">
         <div className="marketing-section-copy">
           <p className="eyebrow">Platform flow</p>
-          <h2>Tenant setup to broadcast review.</h2>
-          <p>Internal operators create customers. Customer teams plan, schedule, monitor, and report.</p>
+          <h2>Tenant setup to live monitor.</h2>
+          <p>Internal operators create customers. Customer teams plan, schedule, monitor, and report without crossing company scope.</p>
         </div>
         <div className="workflow-lane">
           <article>
@@ -201,8 +201,8 @@ export function MarketingPage({
       <section className="marketing-depth" aria-label="Feature and help links">
         <div className="marketing-section-copy">
           <p className="eyebrow">Routes</p>
-          <h2>Public pages map to workspace surfaces.</h2>
-          <p>Feature notes, help articles, app routes, and admin routes share the same workflow.</p>
+          <h2>Public routes echo the workspace.</h2>
+          <p>Feature notes, help articles, app routes, and admin routes now share the same v2 operating language.</p>
         </div>
         <div className="depth-link-grid">
           <a href="/features">
@@ -227,7 +227,7 @@ export function MarketingPage({
       <section className="pricing-section" id="runtime">
         <div className="marketing-section-copy">
           <p className="eyebrow">Boundary</p>
-          <h2>Preview open. API actions run locally.</h2>
+          <h2>Preview routes. API actions run locally.</h2>
           <p>Public routes stay open. Dispatch behavior uses the local stack.</p>
         </div>
         <div className="pricing-grid">
