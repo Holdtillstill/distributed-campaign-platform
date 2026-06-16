@@ -6,7 +6,7 @@ import { compactNumber, formatNumber, useV2Data } from "../mockData";
 type Tab = "overview" | "scheduled" | "sent" | "followups";
 
 export function Campaigns({ onNavigate }: { onNavigate: (k: string) => void }) {
-  const { campaigns, subscriberLists } = useV2Data();
+  const { campaigns, subscriberLists, activeCompanyName, activeRoleLabel } = useV2Data();
   const [tab, setTab] = useState<Tab>("overview");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All statuses");
@@ -57,7 +57,7 @@ export function Campaigns({ onNavigate }: { onNavigate: (k: string) => void }) {
           </Btn>
         }
       />
-      <RoleStrip role="Customer Company Admin" company="Demo Retail Co" scope="Demo Retail Co only · All Markets" />
+      <RoleStrip role={activeRoleLabel} company={activeCompanyName} scope={`${activeCompanyName} only · All Markets`} />
 
       <div className="flex-1 p-5 space-y-4 max-w-[1300px] mx-auto w-full">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -9,13 +9,14 @@ import { FeatureMarketingPage } from './pages/FeatureMarketingPage'
 import { InternalLoginPage } from './pages/InternalLoginPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { MarketingPage } from './pages/MarketingPage'
+import { PortfolioResume, routeToResumeVariant } from './pages/PortfolioResume'
 import { AppDesignExploration, routeToAppDesign } from './pages/AppDesignExplorations'
 import { DesignExploration, routeToExploration } from './pages/DesignExplorations'
 import { AdminWorkspace } from './pages/admin/AdminWorkspace'
 import { CompanyWorkspace } from './pages/app/CompanyWorkspace'
 import { RedesignV2App } from './redesign-v2/RedesignV2App'
+import { createStaticDemoCompany, lookupStaticDemoMemberships, signupStaticDemoAccessCode } from './redesign-v2/mockData'
 import { asMemberships, loadStoredSession, SESSION_KEY, surfaceFromLocation } from './state/session'
-import { staticDemoSession } from './staticDemoData'
 import type { AdminPage, CampaignSubpage, CompanyPage, Membership, Session, Surface } from './types'
 
 type PublicRoute = { page: 'features'; activeSlug?: string } | { page: 'kb' } | { page: 'design-review' }
@@ -181,8 +182,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(() => {
     const storedSession = loadStoredSession()
     if (storedSession) return storedSession
-    const canUseStaticDemoSession = isStaticPortfolioHost() || (import.meta.env.DEV && import.meta.env.MODE !== 'test')
-    return canUseStaticDemoSession && surfaceFromLocation() === 'app' ? staticDemoSession : null
+    return null
   })
   const [surface, setSurface] = useState<Surface>(() => surfaceFromLocation())
   const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() => publicRouteFromLocation())
@@ -192,6 +192,7 @@ export default function App() {
   const [appDesignExploration, setAppDesignExploration] = useState(() =>
     PUBLIC_DESIGN_ROUTES_ENABLED ? routeToAppDesign(window.location.pathname) : null,
   )
+  const [resumeVariant, setResumeVariant] = useState(() => routeToResumeVariant(window.location.pathname))
   const [redesignV2Route, setRedesignV2Route] = useState<RedesignV2Route | null>(() => redesignV2RouteFromLocation())
   const [adminPage, setAdminPage] = useState<AdminPage>(() => adminPageFromLocation())
   const [companyPage, setCompanyPage] = useState<CompanyPage>(() => companyPageFromLocation())
@@ -207,6 +208,10 @@ export default function App() {
   const [signupEmail, setSignupEmail] = useState('')
   const [signupName, setSignupName] = useState('')
   const [accessCode, setAccessCode] = useState('')
+  const [setupCompanyName, setSetupCompanyName] = useState('')
+  const [setupCompanySlug, setSetupCompanySlug] = useState('')
+  const [setupAdminEmail, setSetupAdminEmail] = useState('')
+  const [setupMonthlyLimit, setSetupMonthlyLimit] = useState('500000')
   const [memberships, setMemberships] = useState<Membership[]>([])
 
   function syncRouteStateFromLocation() {
@@ -214,6 +219,7 @@ export default function App() {
     setPublicRoute(publicRouteFromLocation())
     setDesignExploration(PUBLIC_DESIGN_ROUTES_ENABLED ? routeToExploration(window.location.pathname) : null)
     setAppDesignExploration(PUBLIC_DESIGN_ROUTES_ENABLED ? routeToAppDesign(window.location.pathname) : null)
+    setResumeVariant(routeToResumeVariant(window.location.pathname))
     setRedesignV2Route(redesignV2RouteFromLocation())
     setAdminPage(adminPageFromLocation())
     setCompanyPage(companyPageFromLocation())
@@ -236,6 +242,7 @@ export default function App() {
     setPublicRoute(null)
     setDesignExploration(null)
     setAppDesignExploration(null)
+    setResumeVariant(null)
     setUnavailableRoute(null)
     setAdminPage(nextPage)
   }
@@ -249,6 +256,7 @@ export default function App() {
     setPublicRoute(null)
     setDesignExploration(null)
     setAppDesignExploration(null)
+    setResumeVariant(null)
     setUnavailableRoute(null)
     setCompanyPage(nextPage)
     setCompanyCampaignSubpage(options.campaignSubpage ?? campaignSubpageFromLocation())
@@ -300,6 +308,18 @@ export default function App() {
   async function lookupMemberships(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAuthMessage(null)
+    if (isStaticPortfolioHost()) {
+      try {
+        const result = lookupStaticDemoMemberships(loginEmail)
+        setMemberships(result)
+        if (result.length === 0) {
+          setAuthMessage('No companies found. Use the seeded owner email, sign up with an access code, or create a demo company.')
+        }
+      } catch (error) {
+        setAuthMessage(error instanceof Error ? error.message : 'Membership lookup failed.')
+      }
+      return
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/me/memberships`, {
         headers: { 'X-User-Email': loginEmail },
@@ -321,6 +341,16 @@ export default function App() {
   async function signupWithAccessCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAuthMessage(null)
+    if (isStaticPortfolioHost()) {
+      try {
+        const nextSession = signupStaticDemoAccessCode({ email: signupEmail, name: signupName, accessCode })
+        persistSession(nextSession)
+        syncRouteStateFromLocation()
+      } catch (error) {
+        setAuthMessage(error instanceof Error ? error.message : 'Access code signup failed. Check the code and try again.')
+      }
+      return
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/signup/access-code`, {
         method: 'POST',
@@ -354,6 +384,32 @@ export default function App() {
     }
   }
 
+  function createCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setAuthMessage(null)
+    if (!isStaticPortfolioHost()) {
+      setAuthMessage('Company setup starts in Internal Admin for this environment.')
+      return
+    }
+    try {
+      const monthlyLimit = Number(setupMonthlyLimit.replace(/,/g, ''))
+      const nextSession = createStaticDemoCompany({
+        name: setupCompanyName,
+        slug: setupCompanySlug,
+        adminEmail: setupAdminEmail,
+        monthlyLimit,
+      })
+      persistSession(nextSession)
+      setSetupCompanyName('')
+      setSetupCompanySlug('')
+      setSetupAdminEmail('')
+      setSetupMonthlyLimit('500000')
+      syncRouteStateFromLocation()
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : 'Company could not be created.')
+    }
+  }
+
   function openMembership(membership: Membership) {
     persistSession({
       role: 'company_user',
@@ -373,15 +429,28 @@ export default function App() {
       signupName={signupName}
       accessCode={accessCode}
       loginEmail={loginEmail}
+      setupCompanyName={setupCompanyName}
+      setupCompanySlug={setupCompanySlug}
+      setupAdminEmail={setupAdminEmail}
+      setupMonthlyLimit={setupMonthlyLimit}
       memberships={memberships}
       authMessage={authMessage}
       onSignupEmail={setSignupEmail}
       onSignupName={setSignupName}
       onAccessCode={setAccessCode}
       onLoginEmail={setLoginEmail}
+      onSetupCompanyName={(value) => {
+        setSetupCompanyName(value)
+        setSetupCompanySlug(value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+      }}
+      onSetupCompanySlug={setSetupCompanySlug}
+      onSetupAdminEmail={setSetupAdminEmail}
+      onSetupMonthlyLimit={setSetupMonthlyLimit}
       onSignup={(event) => void signupWithAccessCode(event)}
       onLookup={(event) => void lookupMemberships(event)}
+      onCreateCompany={createCompany}
       onOpenMembership={openMembership}
+      onInternalAccess={() => navigate('internal')}
     />
   )
 
@@ -393,6 +462,9 @@ export default function App() {
     return <AppDesignExploration id={appDesignExploration} />
   }
 
+  if (resumeVariant) {
+    return <PortfolioResume variant={resumeVariant} />
+  }
 
   if (publicRoute?.page === 'kb') {
     return <KnowledgeBasePage />
@@ -423,9 +495,14 @@ export default function App() {
           initialMode="admin"
           routeSyncMode="admin"
           adminPage={redesignV2Route.adminPage}
+          session={session}
           onAdminPage={navigateV2AdminPage}
         />
       )
+    }
+
+    if (session?.role !== 'company_user') {
+      return customerAccess
     }
 
     return (
@@ -434,6 +511,7 @@ export default function App() {
         routeSyncMode="company"
         companyPage={redesignV2Route.companyPage}
         campaignSubpage={redesignV2Route.campaignSubpage}
+        session={session}
         onCompanyPage={navigateV2CompanyPage}
       />
     )
@@ -441,7 +519,7 @@ export default function App() {
 
   if (!session) {
     if (surface === 'marketing') {
-      return <MarketingPage onCustomerAccess={() => navigate('app')} />
+      return <MarketingPage onCustomerAccess={() => navigate('app')} onInternalAccess={() => navigate('internal')} />
     }
 
     if (surface === 'internal') {
@@ -482,7 +560,7 @@ export default function App() {
       ? unavailableRoute
       : null
 
-  if (!USE_LEGACY_AUTHENTICATED_WORKSPACE && !activeUnavailableRoute) {
+  if ((!USE_LEGACY_AUTHENTICATED_WORKSPACE || isStaticPortfolioHost()) && !activeUnavailableRoute) {
     const initialMode = session.role === 'internal_admin' && surface === 'internal' ? 'admin' : 'company'
 
     return (
@@ -492,8 +570,11 @@ export default function App() {
         adminPage={adminPage}
         companyPage={companyPage}
         campaignSubpage={companyCampaignSubpage}
+        session={session}
+        companyRoutePrefix="/app"
         onAdminPage={navigateAdminPage}
         onCompanyPage={navigateCompanyPage}
+        onLogout={logout}
       />
     )
   }

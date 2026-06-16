@@ -4,7 +4,7 @@ import { Btn, PageHeader, Panel, SearchInput } from "./ui-primitives";
 import { useV2Data, type MessageType } from "../mockData";
 
 export function ContentLibrary({ onNavigate }: { onNavigate: (k: string) => void }) {
-  const { templates, mediaAssets, addTemplate, addMediaAsset, selectTemplate, selectMediaAsset } = useV2Data();
+  const { templates, mediaAssets, activeCompanySlug, addTemplate, addMediaAsset, selectTemplate, selectMediaAsset } = useV2Data();
   const [tab, setTab] = useState<"templates" | "media">("templates");
   const [search, setSearch] = useState("");
   const [advanced, setAdvanced] = useState(false);
@@ -20,8 +20,8 @@ export function ContentLibrary({ onNavigate }: { onNavigate: (k: string) => void
   const [assetUrl, setAssetUrl] = useState("https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=210&fit=crop&auto=format");
   const [assetDims, setAssetDims] = useState("1200x628");
   const [assetSize, setAssetSize] = useState("260 KB");
-  const [destinationUrl, setDestinationUrl] = useState("https://demo-retail.com/promo/summer");
-  const [trackingUrl, setTrackingUrl] = useState("https://trk.campaignos.io/c/demo-retail/abc123");
+  const [destinationUrl, setDestinationUrl] = useState(`https://${activeCompanySlug}.example.test/promo/summer`);
+  const [trackingUrl, setTrackingUrl] = useState(`https://trk.campaignos.io/c/${activeCompanySlug}/abc123`);
   const [libraryMessage, setLibraryMessage] = useState<{ text: string; tone: "success" | "error" } | null>(null);
 
   const copy = (id: string, text: string) => {
@@ -77,8 +77,8 @@ export function ContentLibrary({ onNavigate }: { onNavigate: (k: string) => void
     }
   };
   const generateTrackingUrl = () => {
-    const suffix = btoa(destinationUrl.trim() || "demo-retail").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toLowerCase() || "abc123";
-    setTrackingUrl(`https://trk.campaignos.io/c/demo-retail/${suffix}`);
+    const suffix = btoa(destinationUrl.trim() || activeCompanySlug).replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toLowerCase() || "abc123";
+    setTrackingUrl(`https://trk.campaignos.io/c/${activeCompanySlug}/${suffix}`);
   };
 
   return (
@@ -270,7 +270,7 @@ export function ContentLibrary({ onNavigate }: { onNavigate: (k: string) => void
               <div className="pt-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--muted-foreground)" }}>Destination URL</p>
                 <div className="flex gap-2">
-                  <input type="url" placeholder="https://demo-retail.com/promo/summer" value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)}
+                  <input type="url" placeholder={`https://${activeCompanySlug}.example.test/promo/summer`} value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)}
                     className="flex-1 h-8 rounded border px-3 text-[13px] focus:outline-none"
                     style={{ background: "var(--input)", color: "var(--foreground)", borderColor: "var(--border)" }} />
                   <Btn variant="outline" size="sm" onClick={generateTrackingUrl}>Generate</Btn>

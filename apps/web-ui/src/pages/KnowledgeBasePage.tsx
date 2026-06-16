@@ -221,7 +221,7 @@ const kbArticles: KbArticle[] = [
     category: 'Campaigns',
     title: 'Monitor broadcast throughput',
     summary:
-      'Use the broadcast monitor to validate throughput, percent complete, ETA, provider outcomes, retries, and dead letters.',
+      'Use the broadcast monitor to validate throughput, percent complete, ETA, delivery outcomes, retries, and dead letters.',
     appliesTo: 'Operators and campaign managers',
     productArea: 'Broadcast monitor',
     workflowStage: 'Post-schedule monitoring',

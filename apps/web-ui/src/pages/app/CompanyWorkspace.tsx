@@ -1741,7 +1741,7 @@ export function CompanyWorkspace({
                       <div>
                         <dt>Sent</dt>
                         <dd>{formatNumber(broadcastMonitor.sent)}</dd>
-                        <dd className="metric-note">Simulator accepted</dd>
+                        <dd className="metric-note">Accepted</dd>
                       </div>
                       <div>
                         <dt>Failed</dt>

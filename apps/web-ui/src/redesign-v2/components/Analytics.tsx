@@ -23,7 +23,7 @@ const TT = ({ active, payload, label }: any) => active && payload?.length ? (
 ) : null;
 
 export function Analytics() {
-  const { campaigns, subscriberLists } = useV2Data();
+  const { campaigns, subscriberLists, activeTenant } = useV2Data();
   const totalSubscribers = subscriberLists.find((list) => list.name === "All Subscribers")?.count ?? Number.MAX_SAFE_INTEGER;
   const scheduledReach = Math.min(
     campaigns
@@ -32,10 +32,10 @@ export function Analytics() {
     totalSubscribers,
   );
   const activeLists = subscriberLists.filter((list) => list.name !== "All Subscribers").length;
-  const messagesSentThisMonth = 2250;
-  const monthlyLimit = 4800000;
-  const clickTotal = 41820;
-  const redemptionTotal = 7405;
+  const messagesSentThisMonth = activeTenant.messages;
+  const monthlyLimit = activeTenant.monthlyLimit;
+  const clickTotal = activeTenant.clicks;
+  const redemptionTotal = Math.round(activeTenant.clicks * 0.18);
   const campaignRows = campaigns.map((campaign) => {
     const hasPerformance = campaign.status === "sent";
     const clicks = hasPerformance ? Math.round(campaign.reach * 0.022) : null;

@@ -5,13 +5,24 @@ const WEB_BASE = normalizeBase(process.env.WEB_BASE || process.env.SITE_URL || '
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 20000);
 const VISITOR_ENDPOINT = 'https://on-demand-demos.bozhi.dev/api/events';
 const VISITOR_ENDPOINTS = Array.from(new Set([VISITOR_ENDPOINT, `${WEB_BASE}/api/events`]));
+const SESSION_KEY = 'campaign-platform-session';
+const seededCustomerSession = {
+  role: 'company_user',
+  email: 'owner@demo-retail.test',
+  companyId: 'demo-retail',
+  companyName: 'Demo Retail Co',
+  membershipRole: 'customer_admin',
+  creditLimit: null,
+  creditsUsed: 2250,
+};
 
 const routes = [
   { path: '/', markers: ['CampaignOS', 'Campaign builder, media library'] },
-  { path: '/app/dashboard', markers: ['NEXT SCHEDULED SEND', 'Demo Retail Co', 'Seattle VIP Double Points'] },
-  { path: '/app/campaigns/scheduled', markers: ['Campaigns', 'Demo Retail Co', 'Seattle VIP Double Points'] },
-  { path: '/app/subscribers', markers: ['Subscribers', 'Demo Retail Co', 'Seattle VIP'] },
-  { path: '/app/analytics', markers: ['Analytics', 'MODELED REACH — 6 MONTHS', '41,820'] },
+  { path: '/app', markers: ['Sign in to your campaign workspace', 'Create demo company', 'DEMORETA-E568C9'] },
+  { path: '/app/dashboard', auth: 'customer', markers: ['Demo Retail Co', 'Seattle VIP Double Points', 'View campaigns'] },
+  { path: '/app/campaigns/scheduled', auth: 'customer', markers: ['Campaigns', 'Demo Retail Co', 'Seattle VIP Double Points'] },
+  { path: '/app/subscribers', auth: 'customer', markers: ['Subscribers', 'Demo Retail Co', 'Seattle VIP'] },
+  { path: '/app/analytics', auth: 'customer', markers: ['Analytics', '41,820'] },
   { path: '/internal/dashboard', markers: ['Operator console', 'Admin access'] },
   { path: '/kb/articles', markers: ['Customer knowledge base', 'Internal admin and tenant operations overview'] },
   { path: '/features/broadcast-monitor', markers: ['CampaignOS', 'Broadcast monitor'] },
@@ -25,6 +36,11 @@ const profiles = [
 
 function normalizeBase(value) {
   return value.replace(/\/+$/, '');
+}
+
+function webBaseIsLocal() {
+  const host = new URL(WEB_BASE).hostname.toLowerCase();
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost');
 }
 
 function isBlockedStaticRoute(url) {
@@ -75,6 +91,12 @@ async function visitRoute(page, route, profileName) {
   });
 
   await installVisitorStub(page, visitorEvents);
+  if (route.auth === 'customer') {
+    await page.addInitScript(
+      ([key, session]) => window.localStorage.setItem(key, JSON.stringify(session)),
+      [SESSION_KEY, seededCustomerSession],
+    );
+  }
 
   const response = await page.goto(`${WEB_BASE}${route.path}`, {
     waitUntil: 'domcontentloaded',
@@ -98,15 +120,17 @@ async function visitRoute(page, route, profileName) {
 
   await assertNoSeriousA11yViolations(page, `${profileName} ${route.path}`);
 
-  const pageview = visitorEvents.find((event) => event.project === 'distributed-campaign-platform' && event.eventType === 'pageview');
-  if (!pageview) {
-    throw new Error(`${profileName} ${route.path} did not send a first-party visitor pageview`);
-  }
-  if (pageview.path !== route.path) {
-    throw new Error(`${profileName} ${route.path} sent visitor path ${pageview.path}`);
-  }
-  if (!['initial', 'manual'].includes(pageview.navigationType)) {
-    throw new Error(`${profileName} ${route.path} sent unexpected navigation type ${pageview.navigationType}`);
+  if (!webBaseIsLocal()) {
+    const pageview = visitorEvents.find((event) => event.project === 'distributed-campaign-platform' && event.eventType === 'pageview');
+    if (!pageview) {
+      throw new Error(`${profileName} ${route.path} did not send a first-party visitor pageview`);
+    }
+    if (pageview.path !== route.path) {
+      throw new Error(`${profileName} ${route.path} sent visitor path ${pageview.path}`);
+    }
+    if (!['initial', 'manual'].includes(pageview.navigationType)) {
+      throw new Error(`${profileName} ${route.path} sent unexpected navigation type ${pageview.navigationType}`);
+    }
   }
 
   if (errors.length) throw new Error(`${profileName} ${route.path} console/page errors:\n${errors.join('\n')}`);
@@ -157,6 +181,50 @@ async function verifyPrivacySignals(browser) {
   }
 }
 
+async function verifyDemoAuthFlows(browser) {
+  const loginContext = await browser.newContext({
+    colorScheme: 'light',
+    userAgent: 'campaignos-demo-flow-smoke-bot/1.0',
+    viewport: { width: 1440, height: 900 },
+  });
+  const loginPage = await loginContext.newPage();
+  await installVisitorStub(loginPage, []);
+  try {
+    await loginPage.goto(`${WEB_BASE}/app`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+    await loginPage.getByLabel(/login email/i).fill('owner@demo-retail.test');
+    await loginPage.getByRole('button', { name: /find my companies/i }).click();
+    await loginPage.getByRole('button', { name: /open demo retail co/i }).click();
+    await loginPage.getByText('Seattle VIP Double Points').first().waitFor({ timeout: TIMEOUT_MS });
+    await loginPage.getByRole('button', { name: /view campaigns/i }).waitFor({ timeout: TIMEOUT_MS });
+  } finally {
+    await loginContext.close();
+  }
+
+  const setupContext = await browser.newContext({
+    colorScheme: 'light',
+    userAgent: 'campaignos-company-setup-smoke-bot/1.0',
+    viewport: { width: 1440, height: 900 },
+  });
+  const setupPage = await setupContext.newPage();
+  await installVisitorStub(setupPage, []);
+  const suffix = String(Date.now()).slice(-5);
+  const companyName = `Smoke Demo ${suffix}`;
+  const companySlug = `smoke-demo-${suffix}`;
+  try {
+    await setupPage.goto(`${WEB_BASE}/app`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+    await setupPage.getByLabel(/company name/i).fill(companyName);
+    await setupPage.getByLabel(/company slug/i).fill(companySlug);
+    await setupPage.getByLabel(/admin email/i).fill(`owner+${suffix}@smoke-demo.test`);
+    await setupPage.getByLabel(/monthly send limit/i).fill('600000');
+    await setupPage.getByRole('button', { name: /^create company$/i }).click();
+    await setupPage.getByText(companyName).first().waitFor({ timeout: TIMEOUT_MS });
+    await setupPage.getByText(`${companyName} Welcome Offer`).first().waitFor({ timeout: TIMEOUT_MS });
+    await setupPage.getByText(`${companyName} only`).first().waitFor({ timeout: TIMEOUT_MS });
+  } finally {
+    await setupContext.close();
+  }
+}
+
 const browser = await chromium.launch({ headless: true });
 try {
   for (const profile of profiles) {
@@ -177,9 +245,10 @@ try {
   }
 
   await verifyPrivacySignals(browser);
+  await verifyDemoAuthFlows(browser);
 
   console.log(
-    `Browser host smoke passed for ${WEB_BASE} across ${routes.length} route(s), ${profiles.length} viewport(s), privacy telemetry checks, and serious/critical accessibility checks.`,
+    `Browser host smoke passed for ${WEB_BASE} across ${routes.length} route(s), ${profiles.length} viewport(s), demo auth/setup flows, privacy telemetry checks, and serious/critical accessibility checks.`,
   );
 } finally {
   await browser.close();

@@ -111,7 +111,7 @@ export function InternalLoginPage({
                 <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Internal team</p>
                 <h2 className="mt-1 text-[16px] font-semibold" style={{ color: 'var(--foreground)' }}>Admin access</h2>
                 <p className="mt-2 text-[12px] leading-5" style={{ color: 'var(--muted-foreground)' }}>
-                  Demo login uses <span className="font-mono" style={{ color: 'var(--foreground)' }}>ops@example.test</span>. No password is required in this demo flow.
+                  Demo login uses <span className="font-mono" style={{ color: 'var(--foreground)' }}>ops@example.test</span>. Production access is designed for SSO/MFA and internal role provisioning.
                 </p>
               </div>
 

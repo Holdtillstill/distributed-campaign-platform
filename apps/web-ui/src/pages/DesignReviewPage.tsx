@@ -1,5 +1,6 @@
 const marketingExplorations = ['/1', '/2', '/3', '/4', '/5']
 const appExplorations = Array.from({ length: 10 }, (_, index) => `/app-designs/${index + 1}`)
+const resumeExplorations = ['/resume/base', '/resume/signal', '/resume/editorial', '/resume/systems', '/resume/compact']
 const productionRoutes = ['/app', '/monitor', '/internal', '/kb', '/features']
 
 const recommendations = [
@@ -96,6 +97,7 @@ export function DesignReviewPage() {
         <LinkList label="Production routes" routes={productionRoutes} />
         <LinkList label="Marketing explorations" routes={marketingExplorations} />
         <LinkList label="App design explorations" routes={appExplorations} />
+        <LinkList label="Resume explorations" routes={resumeExplorations} />
       </div>
     </main>
   )

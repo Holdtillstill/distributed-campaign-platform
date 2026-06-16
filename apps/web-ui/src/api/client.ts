@@ -15,7 +15,7 @@ export const API_BASE_URL = configuredApiBaseUrl.trim() || '/api'
 export const API_DOCS_URL = `${API_BASE_URL.replace(/\/$/, '')}/docs`
 
 export const API_UNAVAILABLE_MESSAGE =
-  'Campaign API is not connected for this static portfolio host. Start an approved demo environment or use the local demo stack for API-backed workflows.'
+  'The campaign service is not available right now. Open the demo workspace, or try again when the service is online.'
 
 export const PUBLIC_DESIGN_ROUTES_ENABLED =
   import.meta.env.DEV ||

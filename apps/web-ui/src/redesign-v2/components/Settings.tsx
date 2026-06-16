@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Copy, Plus, Shield, Trash2, UserCog } from "lucide-react";
 import { Btn, DataTable, PageHeader, Panel, QuotaMeter } from "./ui-primitives";
-import { formatNumber, useV2Data } from "../mockData";
+import { companyInitials, formatNumber, useV2Data } from "../mockData";
 
 const DEMO_TODAY = "2026-06-14";
 const MAX_ACCESS_CODE_DAYS = 30;
@@ -33,7 +33,11 @@ export function Settings() {
   const {
     teamMembers,
     accessCodes,
-    platformTenants,
+    activeTenant,
+    activeCompanyName,
+    activeCompanySlug,
+    activeUserEmail,
+    activeRoleLabel,
     addTeamMember,
     generateAccessCode: createAccessCode,
     deleteAccessCode,
@@ -52,9 +56,8 @@ export function Settings() {
   const maxExpiry = addDays(DEMO_TODAY, MAX_ACCESS_CODE_DAYS);
   const [newRole, setNewRole] = useState("Campaign Manager");
   const [newExpiry, setNewExpiry] = useState(addDays(DEMO_TODAY, 14));
-  const demoTenant = platformTenants.find((tenant) => tenant.slug === "demo-retail");
-  const monthlyLimit = demoTenant?.monthlyLimit ?? 4800000;
-  const creditsRemaining = demoTenant?.creditsRemaining ?? 4797750;
+  const monthlyLimit = activeTenant.monthlyLimit;
+  const creditsRemaining = activeTenant.creditsRemaining;
   const expiryOutOfRange = !isISODate(newExpiry) || newExpiry < minExpiry || newExpiry > maxExpiry;
   const canGenerateAccessCode = !expiryOutOfRange && !accessCodeError;
   const copy = (code: string) => {
@@ -119,14 +122,14 @@ export function Settings() {
             <Panel title="Company identity">
               <div className="flex items-center gap-4 mb-5">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center text-[20px] font-black shrink-0"
-                  style={{ background: "linear-gradient(135deg, #0FEBA8, #0BC8A0)", color: "#0C0D12" }}>DR</div>
+                  style={{ background: "linear-gradient(135deg, #0FEBA8, #0BC8A0)", color: "#0C0D12" }}>{companyInitials(activeCompanyName)}</div>
                 <div>
-                  <p className="text-[16px] font-bold" style={{ color: "var(--foreground)" }}>Demo Retail Co</p>
-                  <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>demo-retail · owner@demo-retail.test</p>
+                  <p className="text-[16px] font-bold" style={{ color: "var(--foreground)" }}>{activeCompanyName}</p>
+                  <p className="text-[12px]" style={{ color: "var(--muted-foreground)" }}>{activeCompanySlug} · {activeUserEmail}</p>
                 </div>
               </div>
               <div className="space-y-0 divide-y" style={{ borderColor: "var(--border)" }}>
-                {[["Slug", "demo-retail"], ["Plan", "Enterprise"], ["Timezone", "America/Los_Angeles"], ["Member since", "Jan 1, 2026"]].map(([l, v]) => (
+                {[["Slug", activeCompanySlug], ["Plan", "Enterprise"], ["Timezone", "America/Los_Angeles"], ["Member since", activeTenant.created]].map(([l, v]) => (
                   <div key={l} className="flex justify-between py-2.5 text-[13px]">
                     <span style={{ color: "var(--muted-foreground)" }}>{l}</span>
                     <span className="font-semibold" style={{ color: "var(--foreground)" }}>{v}</span>
@@ -177,8 +180,8 @@ export function Settings() {
                       <button
                         className="w-6 h-6 flex items-center justify-center rounded transition-opacity hover:opacity-70 disabled:opacity-25 disabled:cursor-not-allowed"
                         style={{ color: "rgba(248,113,113,0.6)" }}
-                        disabled={m.email === "owner@demo-retail.test"}
-                        aria-label={m.email === "owner@demo-retail.test" ? "Owner cannot be removed" : `Remove ${m.name}`}
+                        disabled={m.email === activeTenant.admin}
+                        aria-label={m.email === activeTenant.admin ? "Owner cannot be removed" : `Remove ${m.name}`}
                         onClick={() => deleteTeamMember(m.email)}
                       >
                         <Trash2 size={12} />
@@ -291,7 +294,7 @@ export function Settings() {
               <div className="flex items-center gap-2 mb-3 p-3 rounded-lg"
                 style={{ background: "rgba(15,235,168,0.06)", border: "1px solid rgba(15,235,168,0.18)" }}>
                 <Shield size={14} style={{ color: "#0FEBA8" }} />
-                <span className="text-[12px] font-bold" style={{ color: "#0FEBA8" }}>Customer Company Admin</span>
+                <span className="text-[12px] font-bold" style={{ color: "#0FEBA8" }}>{activeRoleLabel}</span>
               </div>
               <div className="space-y-2">
                 {["Create & manage campaigns","Manage subscribers & lists","View full analytics","Manage team access","Set user budgets","Configure compliance","Manage content library"].map((p) => (

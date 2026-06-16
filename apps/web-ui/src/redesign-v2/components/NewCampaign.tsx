@@ -15,11 +15,10 @@ const compliance = [
 ];
 
 export function NewCampaign({ onBack, onNavigate }: { onBack: () => void; onNavigate: (k: string) => void }) {
-  const { subscriberLists, selectedTemplate, selectedMediaAsset, mediaAssets, platformTenants, createCampaign, selectTemplate, selectMediaAsset } = useV2Data();
-  const lists = subscriberLists.filter((list) => list.key !== "all");
-  const demoTenant = platformTenants.find((tenant) => tenant.slug === "demo-retail");
-  const monthlyLimit = demoTenant?.monthlyLimit ?? 4800000;
-  const creditsRemaining = demoTenant?.creditsRemaining ?? 4797750;
+  const { subscriberLists, selectedTemplate, selectedMediaAsset, mediaAssets, activeTenant, activeCompanyName, activeRoleLabel, createCampaign, selectTemplate, selectMediaAsset } = useV2Data();
+  const lists = subscriberLists.filter((list) => list.name !== "All Subscribers");
+  const monthlyLimit = activeTenant.monthlyLimit;
+  const creditsRemaining = activeTenant.creditsRemaining;
   const [step, setStep] = useState<Step>("audience");
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
   const [name, setName] = useState("");
@@ -102,7 +101,7 @@ export function NewCampaign({ onBack, onNavigate }: { onBack: () => void; onNavi
       <PageHeader title="New Campaign" breadcrumb="Campaigns / New" description={`Step ${stepIdx + 1} of 3`}
         action={<Btn variant="ghost" size="sm" onClick={handleCancel}><X size={13} /> Cancel</Btn>}
       />
-      <RoleStrip role="Customer Company Admin" company="Demo Retail Co" scope="Demo Retail Co only · All Markets" />
+      <RoleStrip role={activeRoleLabel} company={activeCompanyName} scope={`${activeCompanyName} only · All Markets`} />
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Main */}

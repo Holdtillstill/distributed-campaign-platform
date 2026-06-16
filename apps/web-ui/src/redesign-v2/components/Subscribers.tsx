@@ -6,7 +6,7 @@ import { formatNumber, useV2Data } from "../mockData";
 type PanelType = "none" | "create-list" | "csv" | "single" | "optin";
 
 export function Subscribers() {
-  const { subscriberLists, subscribers, addSubscriber, importSubscribers, addSubscriberList } = useV2Data();
+  const { subscriberLists, subscribers, activeCompanyName, activeCompanySlug, activeRoleLabel, addSubscriber, importSubscribers, addSubscriberList } = useV2Data();
   const listCards = subscriberLists.map((list) => ({
     key: list.key,
     name: list.name,
@@ -14,7 +14,7 @@ export function Subscribers() {
     consent: list.consent,
     c: list.color,
   }));
-  const listOptions = subscriberLists.filter((list) => list.key !== "all").map((list) => list.name);
+  const listOptions = subscriberLists.filter((list) => list.name !== "All Subscribers").map((list) => list.name);
   const [panel, setPanel] = useState<PanelType>("none");
   const [search, setSearch] = useState("");
   const [consent, setConsent] = useState("all");
@@ -31,11 +31,12 @@ export function Subscribers() {
   const [singleEmail, setSingleEmail] = useState("");
   const [singleList, setSingleList] = useState(listOptions[0] ?? "Seattle VIP");
   const [singleConsentConfirmed, setSingleConsentConfirmed] = useState(true);
-  const [optInTitle, setOptInTitle] = useState("Join Demo Retail SMS");
+  const [optInTitle, setOptInTitle] = useState(`Join ${activeCompanyName} SMS`);
   const [optInList, setOptInList] = useState(listOptions[0] ?? "Seattle VIP");
   const [status, setStatus] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"success" | "error">("success");
   const activeCard = listCards.find((l) => l.key === activeList) ?? listCards[0];
+  const activeIsAllSubscribers = activeCard?.name === "All Subscribers";
   const setSuccess = (message: string) => {
     setStatus(message);
     setStatusTone("success");
@@ -47,7 +48,7 @@ export function Subscribers() {
 
   const filtered = subscribers.filter((s) => {
     const query = search.toLowerCase();
-    if (activeList !== "all" && !s.segments.includes(activeCard.name)) return false;
+    if (!activeIsAllSubscribers && !s.segments.includes(activeCard.name)) return false;
     if (query && ![s.phone, s.region, s.source, ...s.segments].some((v) => v.toLowerCase().includes(query))) return false;
     if (consent === "opted-in" && s.consent !== "Opted In") return false;
     if (consent === "opted-out" && s.consent !== "Opted Out") return false;
@@ -65,7 +66,7 @@ export function Subscribers() {
           </div>
         }
       />
-      <RoleStrip role="Customer Company Admin" company="Demo Retail Co" scope="Demo Retail Co only · All Markets" />
+      <RoleStrip role={activeRoleLabel} company={activeCompanyName} scope={`${activeCompanyName} only · All Markets`} />
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -124,7 +125,7 @@ export function Subscribers() {
             </div>
           } noPad>
             <div className="px-3 py-2.5 text-[11px]" style={{ color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" }}>
-              Showing {visibleRows.length} of {filtered.length} sample records from {activeCard.count} {activeList === "all" ? "unique subscribers" : "segment members"}.
+              Showing {visibleRows.length} of {filtered.length} sample records from {activeCard.count} {activeIsAllSubscribers ? "unique subscribers" : "segment members"}.
             </div>
             <DataTable
               columns={[
@@ -269,15 +270,15 @@ export function Subscribers() {
                   <p className="text-[11px] font-bold mb-1.5" style={{ color: "#0FEBA8" }}>Public opt-in link</p>
                   <div className="flex items-center gap-2">
                     <code className="text-[11px] flex-1 truncate font-mono" style={{ color: "rgba(255,255,255,0.6)" }}>
-                      campaignos.io/optin/demo-retail
+                      campaignos.io/optin/{activeCompanySlug}
                     </code>
                     <button onClick={() => {
-                      navigator.clipboard?.writeText("https://campaignos.io/optin/demo-retail").catch(() => {});
+                      navigator.clipboard?.writeText(`https://campaignos.io/optin/${activeCompanySlug}`).catch(() => {});
                       setSuccess("Opt-in link copied");
                     }} className="hover:opacity-70" style={{ color: "#0FEBA8" }} aria-label="Copy opt-in link"><Link size={13} /></button>
                   </div>
                 </div>
-                <Field label="Landing page title" placeholder="Join Demo Retail SMS" value={optInTitle} onChange={setOptInTitle} />
+                <Field label="Landing page title" placeholder={`Join ${activeCompanyName} SMS`} value={optInTitle} onChange={setOptInTitle} />
                 <Field label="Default list" type="select" options={listOptions} value={optInList} onChange={setOptInList} />
                 <Btn variant="accent" onClick={() => setSuccess("Opt-in page settings saved")} className="w-full justify-center">Save opt-in page</Btn>
               </>}

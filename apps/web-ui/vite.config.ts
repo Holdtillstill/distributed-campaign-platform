@@ -31,7 +31,7 @@ export default defineConfig({
             },
             {
               name: 'design-explorations',
-              test: /[\\/]src[\\/]pages[\\/](AppDesignExplorations|DesignExplorations)[.]/,
+              test: /[\\/]src[\\/]pages[\\/](AppDesignExplorations|DesignExplorations|PortfolioResume)[.]/,
             },
           ],
         },

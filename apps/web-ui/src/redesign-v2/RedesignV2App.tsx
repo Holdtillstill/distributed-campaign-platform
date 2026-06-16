@@ -12,7 +12,7 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { Companies } from "./components/Companies";
 import { Usage } from "./components/Usage";
 import { V2DataProvider } from "./mockData";
-import type { AdminPage, CampaignSubpage, CompanyPage } from "../types";
+import type { AdminPage, CampaignSubpage, CompanyPage, Session } from "../types";
 
 /* MARKER-MAKE-KIT-INVOKED */
 
@@ -75,16 +75,22 @@ export function RedesignV2App({
   companyPage = "dashboard",
   adminPage = "dashboard",
   campaignSubpage,
+  session,
+  companyRoutePrefix = "/app-v2",
   onCompanyPage,
   onAdminPage,
+  onLogout,
 }: {
   initialMode?: RedesignMode;
   routeSyncMode?: RedesignMode;
   companyPage?: CompanyPage;
   adminPage?: AdminPage;
   campaignSubpage?: CampaignSubpage;
+  session?: Session | null;
+  companyRoutePrefix?: "/app" | "/app-v2";
   onCompanyPage?: (page: CompanyPage, options?: { campaignSubpage?: CampaignSubpage; path?: string }) => void;
   onAdminPage?: (page: AdminPage) => void;
+  onLogout?: () => void;
 }) {
   const [screen, setScreen] = useState<Screen>(() =>
     screenFromRoute({ mode: initialMode, companyPage, adminPage, campaignSubpage }),
@@ -104,8 +110,8 @@ export function RedesignV2App({
     if (routeSyncMode === "company") {
       if (nextScreen === "dashboard") onCompanyPage?.("dashboard");
       if (nextScreen === "campaigns") onCompanyPage?.("campaigns");
-      if (nextScreen === "new-campaign") onCompanyPage?.("campaigns", { campaignSubpage: "create", path: "/app-v2/campaigns/new" });
-      if (nextScreen === "monitor") onCompanyPage?.("campaigns", { campaignSubpage: "monitor", path: "/app-v2/monitor" });
+      if (nextScreen === "new-campaign") onCompanyPage?.("campaigns", { campaignSubpage: "create", path: `${companyRoutePrefix}/campaigns/new` });
+      if (nextScreen === "monitor") onCompanyPage?.("campaigns", { campaignSubpage: "monitor", path: `${companyRoutePrefix}/monitor` });
       if (nextScreen === "subscribers") onCompanyPage?.("subscribers");
       if (nextScreen === "content") onCompanyPage?.("content");
       if (nextScreen === "analytics") onCompanyPage?.("analytics");
@@ -120,7 +126,7 @@ export function RedesignV2App({
   };
 
   return (
-    <V2DataProvider>
+    <V2DataProvider session={session}>
       <div className="campaignos-redesign campaignos-redesign-v2 dark flex h-screen w-full overflow-hidden bg-background" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <Sidebar
           active={screen}
@@ -128,12 +134,14 @@ export function RedesignV2App({
           mode={mode}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
+          onLogout={onLogout}
         />
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <MobileHeader
             title={pageTitles[screen] || ""}
             onMenuOpen={() => setMobileOpen(true)}
+            onLogout={onLogout}
           />
 
           <main className="flex-1 overflow-y-auto">

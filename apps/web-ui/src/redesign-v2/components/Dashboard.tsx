@@ -3,9 +3,8 @@ import { Btn, MetricCard, Panel, QuotaMeter, RoleStrip, StatusChip } from "./ui-
 import { compactNumber, formatNumber, useV2Data } from "../mockData";
 
 export function Dashboard({ onNavigate }: { onNavigate: (k: string) => void }) {
-  const { campaigns, subscriberLists, teamMembers, platformTenants } = useV2Data();
+  const { campaigns, subscriberLists, teamMembers, activeTenant, activeCompanyName, activeRoleLabel } = useV2Data();
   const totalSubscribers = subscriberLists.find((list) => list.name === "All Subscribers")?.count ?? 0;
-  const demoTenant = platformTenants.find((tenant) => tenant.slug === "demo-retail");
   const activeCampaigns = campaigns.filter((campaign) => campaign.status === "scheduled" || campaign.status === "queued");
   const scheduledCampaigns = campaigns.filter((campaign) => campaign.status === "scheduled");
   const queuedCampaigns = campaigns.filter((campaign) => campaign.status === "queued");
@@ -15,10 +14,10 @@ export function Dashboard({ onNavigate }: { onNavigate: (k: string) => void }) {
   );
   const nextScheduled = scheduledCampaigns.slice().sort((a, b) => a.dateISO.localeCompare(b.dateISO))[0] ?? activeCampaigns[0];
   const liveCampaign = queuedCampaigns[0] ?? activeCampaigns[0];
-  const monthlyLimit = demoTenant?.monthlyLimit ?? 4800000;
-  const creditsRemaining = demoTenant?.creditsRemaining ?? 4797750;
+  const monthlyLimit = activeTenant.monthlyLimit;
+  const creditsRemaining = activeTenant.creditsRemaining;
   const messagesSentThisMonth = Math.max(0, monthlyLimit - creditsRemaining);
-  const clicks = demoTenant?.clicks ?? 41820;
+  const clicks = activeTenant.clicks;
   const clickRate = 4.9;
   const redemptions = 7405;
   const reminderOpps = 18340;
@@ -28,7 +27,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (k: string) => void }) {
 
   return (
     <div className="flex flex-col min-h-full" style={{ background: "var(--background)" }}>
-      <RoleStrip role="Customer Company Admin" company="Demo Retail Co" scope="Demo Retail Co only · All Markets" />
+      <RoleStrip role={activeRoleLabel} company={activeCompanyName} scope={`${activeCompanyName} only · All Markets`} />
 
       <div className="flex-1 p-5 space-y-5 max-w-[1300px] mx-auto w-full">
 
@@ -205,7 +204,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (k: string) => void }) {
             {/* Team */}
             <Panel title="Team access">
               <div className="space-y-3">
-                {teamMembers.filter((member) => member.email !== "owner@demo-retail.test").slice(0, 3).map((u) => (
+                {teamMembers.filter((member) => member.email !== activeTenant.admin).slice(0, 3).map((u) => (
                   <div key={u.email} className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
                       style={{ background: `${u.rc}20`, color: u.rc, border: `1px solid ${u.rc}30` }}>

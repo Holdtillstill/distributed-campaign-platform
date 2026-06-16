@@ -24,7 +24,7 @@ const featureSpotlights: FeatureSpotlight[] = [
     summary:
       'Track queued, sent, failed, retried, and dead-lettered messages with throughput, progress, and projected ETA.',
     note: 'Monitor projected/sample broadcasts before the full modeled audience is moved.',
-    bullets: ['Messages per minute and per second', 'Projected completion and ETA', 'Provider outcome counters'],
+    bullets: ['Messages per minute and per second', 'Projected completion and ETA', 'Delivery outcome counters'],
     ctaHref: '/monitor',
     ctaLabel: 'Open customer login',
   },

@@ -1,6 +1,6 @@
 import { cn } from "./ui/utils";
-import { LayoutDashboard, Megaphone, Users, BookOpen, BarChart3, Settings, Building2, Activity, Radio, Menu, X, ChevronRight, type LucideIcon } from "lucide-react";
-import { useV2Data } from "../mockData";
+import { LayoutDashboard, Megaphone, Users, BookOpen, BarChart3, Settings, Building2, Activity, Radio, Menu, X, ChevronRight, LogOut, type LucideIcon } from "lucide-react";
+import { companyInitials, useV2Data } from "../mockData";
 
 type NavItem = { key: string; label: string; icon: LucideIcon; badge?: string };
 
@@ -22,21 +22,22 @@ const adminNav: NavItem[] = [
 const BG = "#08090D";
 const BORDER = "rgba(255,255,255,0.045)";
 
-function NavContent({ active, onNavigate, mode, onClose }: {
+function NavContent({ active, onNavigate, mode, onClose, onLogout }: {
   active: string; onNavigate: (k: string) => void;
   mode: "company" | "admin";
   onClose?: () => void;
+  onLogout?: () => void;
 }) {
-  const { campaigns } = useV2Data();
+  const { campaigns, activeCompanyName, activeUserEmail, activeRoleLabel } = useV2Data();
   const activeCampaignCount = campaigns.filter((campaign) => campaign.status === "scheduled" || campaign.status === "queued").length;
   const nav = mode === "company"
     ? companyNav.map((item) => item.key === "campaigns" ? { ...item, badge: String(activeCampaignCount) } : item)
     : adminNav;
   const go = (k: string) => { onNavigate(k); onClose?.(); };
   const isAdminMode = mode === "admin";
-  const roleLabel = isAdminMode ? "SaaS Internal Admin" : "Customer Company Admin";
-  const userInitials = isAdminMode ? "OP" : "OD";
-  const userEmail = isAdminMode ? "ops@example.test" : "owner@demo-retail.test";
+  const roleLabel = isAdminMode ? "SaaS Internal Admin" : activeRoleLabel;
+  const userInitials = isAdminMode ? "OP" : companyInitials(activeUserEmail.split("@")[0]?.replace(/[._-]+/g, " ") || activeCompanyName);
+  const userEmail = isAdminMode ? "ops@example.test" : activeUserEmail;
 
   return (
     <div className="flex flex-col h-full select-none" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -64,7 +65,7 @@ function NavContent({ active, onNavigate, mode, onClose }: {
             {isAdminMode ? "Active console" : "Active company"}
           </p>
           <p className="text-[13px] font-semibold" style={{ color: "#E4E6EF" }}>
-            {isAdminMode ? "CampaignOS SaaS" : "Demo Retail Co"}
+            {isAdminMode ? "CampaignOS SaaS" : activeCompanyName}
           </p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-widest"
@@ -82,7 +83,7 @@ function NavContent({ active, onNavigate, mode, onClose }: {
             {isAdminMode ? "Platform scope" : "Company scope"}
           </p>
           <p className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.66)" }}>
-            {isAdminMode ? "All customer companies" : "Demo Retail Co only"}
+            {isAdminMode ? "All customer companies" : `${activeCompanyName} only`}
           </p>
         </div>
       </div>
@@ -131,33 +132,54 @@ function NavContent({ active, onNavigate, mode, onClose }: {
         <div className="flex items-center gap-2.5 px-2">
           <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
             style={{ background: "linear-gradient(135deg, #0FEBA8, #0BC8A0)", color: "#08090D" }}>{userInitials}</div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-[12px] font-medium truncate" style={{ color: "rgba(255,255,255,0.7)" }}>{userEmail}</p>
             <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.66)" }}>{roleLabel}</p>
           </div>
         </div>
+        {onLogout && (
+          <button
+            aria-label="Logout"
+            onClick={() => {
+              onClose?.();
+              onLogout();
+            }}
+            className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg text-[12px] font-semibold transition-all"
+            style={{
+              minHeight: 34,
+              color: "#E4E6EF",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.04)",
+            }}
+            type="button"
+          >
+            <LogOut size={13} />
+            Log out
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-export function Sidebar({ active, onNavigate, mode, mobileOpen, onMobileClose }: {
+export function Sidebar({ active, onNavigate, mode, mobileOpen, onMobileClose, onLogout }: {
   active: string; onNavigate: (k: string) => void;
   mode: "company" | "admin";
   mobileOpen?: boolean; onMobileClose?: () => void;
+  onLogout?: () => void;
 }) {
   return (
     <>
       <aside className="hidden lg:flex flex-col w-[216px] shrink-0 h-screen sticky top-0"
         style={{ background: BG, borderRight: `1px solid ${BORDER}` }}>
-        <NavContent active={active} onNavigate={onNavigate} mode={mode} />
+        <NavContent active={active} onNavigate={onNavigate} mode={mode} onLogout={onLogout} />
       </aside>
 
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onMobileClose} />
           <aside className="relative z-10 flex flex-col w-64 h-full" style={{ background: BG }}>
-            <NavContent active={active} onNavigate={onNavigate} mode={mode} onClose={onMobileClose} />
+            <NavContent active={active} onNavigate={onNavigate} mode={mode} onClose={onMobileClose} onLogout={onLogout} />
           </aside>
         </div>
       )}
@@ -165,7 +187,7 @@ export function Sidebar({ active, onNavigate, mode, mobileOpen, onMobileClose }:
   );
 }
 
-export function MobileHeader({ title, onMenuOpen }: { title: string; onMenuOpen: () => void }) {
+export function MobileHeader({ title, onMenuOpen, onLogout }: { title: string; onMenuOpen: () => void; onLogout?: () => void }) {
   return (
     <div className="lg:hidden flex items-center gap-3 px-4 h-12 shrink-0"
       style={{ background: BG, borderBottom: `1px solid ${BORDER}` }}>
@@ -179,6 +201,22 @@ export function MobileHeader({ title, onMenuOpen }: { title: string; onMenuOpen:
         <span className="text-[13px] font-bold" style={{ color: "#E4E6EF" }}>CampaignOS</span>
       </div>
       <span className="text-[12px] truncate ml-1" style={{ color: "rgba(255,255,255,0.66)" }}>/ {title}</span>
+      {onLogout && (
+        <button
+          aria-label="Log out"
+          onClick={onLogout}
+          className="ml-auto flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-semibold"
+          style={{
+            color: "#E4E6EF",
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.04)",
+          }}
+          type="button"
+        >
+          <LogOut size={13} />
+          <span className="hidden sm:inline">Log out</span>
+        </button>
+      )}
     </div>
   );
 }

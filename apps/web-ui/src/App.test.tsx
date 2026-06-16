@@ -737,22 +737,24 @@ describe('App', () => {
     expect(screen.getAllByRole('link', { name: /^Knowledge base$/i })[0]).toHaveAttribute('href', '/kb')
     expect(screen.getAllByRole('button', { name: /^Customer login$/i }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: /Feature map/i })[0]).toHaveAttribute('href', '/features')
-    expect(await screen.findByText(/API connected/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Workspace online/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /API docs/i })).toHaveAttribute('href', '/api/docs')
     expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Modeled reach/i)
     expect(screen.getByLabelText(/CampaignOS campaign flow preview/i)).toHaveTextContent(/Broadcast monitor/i)
-    expect(screen.getAllByText(/Static UI/i)).not.toHaveLength(0)
+    expect(screen.getAllByText(/Plan campaigns/i)).not.toHaveLength(0)
+    expect(screen.getAllByRole('link', { name: /SaaS admin demo/i }).some((link) => link.getAttribute('href') === '/internal')).toBe(true)
+    expect(screen.getByRole('link', { name: /Open SaaS admin demo/i })).toHaveAttribute('href', '/internal')
     expect(screen.queryByRole('button', { name: /login as internal admin/i })).not.toBeInTheDocument()
   })
 
-  it('labels the static portfolio host when the API route returns the app shell', async () => {
+  it('labels the demo workspace when the API route returns the app shell', async () => {
     vi.stubGlobal('fetch', vi.fn(() => htmlAppShell()))
 
     render(<App />)
 
-    expect(await screen.findByText(/Public preview/i)).toBeInTheDocument()
-    expect(screen.getByText(/Workspace is open/i)).toBeInTheDocument()
-    expect(screen.getByText(/API docs offline/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Demo workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/Create or open a company/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Product tour/i })).toHaveAttribute('href', '/features')
     expect(screen.queryByRole('link', { name: /API docs/i })).not.toBeInTheDocument()
   })
 
@@ -763,9 +765,9 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(screen.getByText(/Public preview/i)).toBeInTheDocument()
-    expect(screen.getByText(/Workspace is open/i)).toBeInTheDocument()
-    expect(screen.getByText(/API docs offline/i)).toBeInTheDocument()
+    expect(screen.getByText(/Demo workspace/i)).toBeInTheDocument()
+    expect(screen.getByText(/Create or open a company/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Product tour/i })).toHaveAttribute('href', '/features')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -928,6 +930,60 @@ describe('App', () => {
     expect(renderedHeadings.size).toBe(5)
   })
 
+  it('renders the base resume page and four visual resume variants', () => {
+    const resumes = [
+      {
+        route: '/resume',
+        heading: 'Building platforms that last.',
+        keyContent: [/Selected Work/i, /Subway Offer and Promotion Wallet/i, /AWS Certified Solutions Architect - Professional/i],
+      },
+      {
+        route: '/resume/signal',
+        heading: 'Reliability, migration, and production ownership at scale.',
+        keyContent: [/23M\+ weekly messages/i, /Security governance/i, /sub-30-minute RTO/i],
+      },
+      {
+        route: '/resume/editorial',
+        heading: 'Turning operational risk into infrastructure standards.',
+        keyContent: [/Trusted production owner/i, /Apache Superset/i, /Arizona State University/i],
+      },
+      {
+        route: '/resume/systems',
+        heading: 'DevOps Engineer',
+        keyContent: [/Infrastructure systems map/i, /AWS Organizations/i, /Terraform/i],
+      },
+      {
+        route: '/resume/compact',
+        heading: 'DevOps Engineer',
+        keyContent: [/Jun 2018 - Jun 2026/i, /MSSQL Server restore/i, /Supply Chain Management/i],
+      },
+    ]
+
+    const renderedRoutes = new Set<string>()
+
+    for (const resume of resumes) {
+      window.history.pushState(null, '', resume.route)
+      const { unmount } = render(<App />)
+
+      expect(screen.getByRole('heading', { level: 1, name: resume.heading })).toBeInTheDocument()
+      renderedRoutes.add(resume.route)
+      for (const content of resume.keyContent) {
+        expect(screen.getAllByText(content).length).toBeGreaterThan(0)
+      }
+      if (resume.route === '/resume') {
+        expect(screen.queryByRole('navigation', { name: /resume versions/i })).not.toBeInTheDocument()
+      } else {
+        expect(screen.getByRole('navigation', { name: /resume versions/i })).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: /base cv/i })).toHaveAttribute('href', '/resume/base')
+        expect(screen.getByRole('link', { name: /compact/i })).toHaveAttribute('href', '/resume/compact')
+      }
+
+      unmount()
+    }
+
+    expect(renderedRoutes.size).toBe(5)
+  })
+
   it('renders five unique full-app design explorations on /app-designs/1 through /app-designs/5', () => {
     const appDesigns = [
       {
@@ -1052,6 +1108,8 @@ describe('App', () => {
     expect(screen.getByText(/invite-based workspace access/i)).toBeInTheDocument()
     expect(screen.getByText(/owner@demo-retail.test/i)).toBeInTheDocument()
     expect(screen.getByText(/DEMORETA-E568C9/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/SaaS admin demo access/i)).toHaveTextContent(/SSO\/MFA/i)
+    expect(screen.getByRole('link', { name: /Open SaaS admin demo/i })).toHaveAttribute('href', '/internal')
   })
 
   it('shows customer access first when the monitor deep link is opened signed out', () => {
@@ -1089,22 +1147,52 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/login email.*email lookup input/i), 'owner@demo-retail.test')
     await user.click(screen.getByRole('button', { name: /find my companies/i }))
 
-    expect(await screen.findByText(/Campaign API is not connected for this static portfolio host/i)).toBeInTheDocument()
+    expect(await screen.findByText(/The campaign service is not available right now/i)).toBeInTheDocument()
   })
 
-  it('opens a populated Demo Retail workspace on configured static app routes', () => {
+  it('opens a populated Demo Retail workspace after static demo login', async () => {
     window.__APP_CONFIG__ = { staticPortfolioHost: true }
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
 
     window.history.pushState(null, '', '/app')
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /Campaign control/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /sign in to your campaign workspace/i })).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/login email.*email lookup input/i), 'owner@demo-retail.test')
+    await user.click(screen.getByRole('button', { name: /find my companies/i }))
+    await user.click(await screen.findByRole('button', { name: /open demo retail co/i }))
+
     expect(screen.getAllByText(/Demo Retail Co/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Seattle VIP Double Points/i)).toBeInTheDocument()
+    expect((await screen.findAllByText(/Seattle VIP Double Points/i)).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/2,650,000/i).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: /New campaign/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /View campaigns/i })).toBeEnabled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('creates a static demo company and opens it as the first customer company admin', async () => {
+    window.__APP_CONFIG__ = { staticPortfolioHost: true }
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+
+    window.history.pushState(null, '', '/app')
+    render(<App />)
+
+    await user.type(screen.getByLabelText(/company name/i), 'Launch Demo Co')
+    expect(screen.getByLabelText(/company slug/i)).toHaveValue('launch-demo-co')
+    await user.clear(screen.getByLabelText(/company slug/i))
+    await user.type(screen.getByLabelText(/company slug/i), 'launch-demo')
+    await user.type(screen.getByLabelText(/admin email/i), 'owner@launch-demo.test')
+    await user.clear(screen.getByLabelText(/monthly send limit/i))
+    await user.type(screen.getByLabelText(/monthly send limit/i), '600000')
+    await user.click(screen.getByRole('button', { name: /^create company$/i }))
+
+    expect((await screen.findAllByText(/Launch Demo Co/i)).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Launch Demo Co only · All Markets/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Launch Demo Co Welcome Offer/i).length).toBeGreaterThan(0)
+    expect(window.localStorage.getItem(SESSION_KEY)).toContain('launch-demo')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -1136,6 +1224,7 @@ describe('App', () => {
 
     expect(screen.getByRole('heading', { name: /sign in to your campaign workspace/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign up with access code/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Open SaaS admin demo/i })).toHaveAttribute('href', '/internal')
     expect(screen.queryByRole('button', { name: /^companies$/i })).not.toBeInTheDocument()
   })
 
@@ -1157,7 +1246,7 @@ describe('App', () => {
 
     window.history.pushState(null, '', '/internal')
     render(<App />)
-    expect(screen.getByText(/No password is required in this demo flow/i)).toBeInTheDocument()
+    expect(screen.getByText(/Production access is designed for SSO\/MFA/i)).toBeInTheDocument()
     await loginAsInternalAdmin(user)
 
     expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument()
@@ -1234,7 +1323,7 @@ describe('App', () => {
     await loginAsInternalAdmin(user)
     await user.click(screen.getByRole('button', { name: /refresh checks/i }))
 
-    expect(await screen.findAllByText(/Campaign API is not connected for this static portfolio host/i)).not.toHaveLength(0)
+    expect(await screen.findAllByText(/The campaign service is not available right now/i)).not.toHaveLength(0)
   })
 
   it('shows internal admin layout and company health table scaffold', async () => {

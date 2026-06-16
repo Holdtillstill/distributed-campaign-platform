@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type Context, type ReactNode } from "react";
+import type { Membership, Session } from "../types";
 
 export type CampaignStatus = "scheduled" | "queued" | "sent" | "failed" | "cancelled";
 export type MessageType = "SMS" | "MMS";
 export type ListKey = "all" | "seattle-vip" | "west-loyalty" | "winback" | string;
 
 export type SubscriberList = {
+  tenantSlug?: string;
   key: ListKey;
   name: string;
   count: number;
@@ -13,6 +15,7 @@ export type SubscriberList = {
 };
 
 export type Subscriber = {
+  tenantSlug?: string;
   phone: string;
   source: string;
   region: string;
@@ -23,6 +26,7 @@ export type Subscriber = {
 };
 
 export type Campaign = {
+  tenantSlug?: string;
   id: string;
   name: string;
   status: CampaignStatus;
@@ -38,6 +42,7 @@ export type Campaign = {
 };
 
 export type Template = {
+  tenantSlug?: string;
   id: string;
   name: string;
   type: MessageType;
@@ -47,6 +52,7 @@ export type Template = {
 };
 
 export type MediaAsset = {
+  tenantSlug?: string;
   id: string;
   name: string;
   type: string;
@@ -56,6 +62,7 @@ export type MediaAsset = {
 };
 
 export type TeamMember = {
+  tenantSlug?: string;
   name: string;
   email: string;
   role: string;
@@ -64,6 +71,7 @@ export type TeamMember = {
 };
 
 export type AccessCode = {
+  tenantSlug?: string;
   code: string;
   role: string;
   created: string;
@@ -208,7 +216,7 @@ const initialAccessCodes: AccessCode[] = [
 ];
 
 const initialPlatformTenants: PlatformTenant[] = [
-  { name: "Demo Retail Co", slug: "demo-retail", admin: "owner@demo-retail.test", subscribers: 2650000, campaigns: 3, scheduledReach: 2650000, creditsRemaining: 4797750, monthlyLimit: 4800000, messages: 2250, media: 6, links: 24, clicks: 41820, reminders: 8, created: "Jan 1, 2026", accessCode: "demo-retail-invite", status: "active" },
+  { name: "Demo Retail Co", slug: "demo-retail", admin: "owner@demo-retail.test", subscribers: 2650000, campaigns: 3, scheduledReach: 2650000, creditsRemaining: 4797750, monthlyLimit: 4800000, messages: 2250, media: 6, links: 24, clicks: 41820, reminders: 8, created: "Jan 1, 2026", accessCode: "DEMORETA-E568C9", status: "active" },
   { name: "Pacific Grocery", slug: "pacific-grocery", admin: "ops@pacific-grocery.test", subscribers: 1230000, campaigns: 2, scheduledReach: 2100000, creditsRemaining: 1850000, monthlyLimit: 2000000, messages: 8240, media: 4, links: 18, clicks: 28400, reminders: 4, created: "Feb 15, 2026", accessCode: "pacific-grocery-invite", status: "active" },
   { name: "Northwest Fitness", slug: "nw-fitness", admin: "admin@nwfitness.test", subscribers: 84000, campaigns: 1, scheduledReach: 84000, creditsRemaining: 190000, monthlyLimit: 200000, messages: 3110, media: 2, links: 9, clicks: 10200, reminders: 2, created: "Mar 1, 2026", accessCode: "northwest-fitness-invite", status: "active" },
   { name: "Coastal Brands", slug: "coastal-brands", admin: "campaigns@coastal.test", subscribers: 420000, campaigns: 4, scheduledReach: 1200000, creditsRemaining: 48000, monthlyLimit: 500000, messages: 2890, media: 8, links: 31, clicks: 9800, reminders: 6, created: "Apr 10, 2026", accessCode: "coastal-brands-invite", status: "active" },
@@ -216,7 +224,9 @@ const initialPlatformTenants: PlatformTenant[] = [
 ];
 
 const PLATFORM_TENANTS_STORAGE_KEY = "campaignos-v2-platform-tenants";
+const STATIC_DEMO_MEMBERSHIPS_STORAGE_KEY = "campaignos-v2-static-memberships";
 const WORKSPACE_STORAGE_KEY = "campaignos-v2-workspace-state";
+const DEMO_RETAIL_ACCESS_CODE = "DEMORETA-E568C9";
 const MAX_ACCESS_CODE_DAYS = 30;
 export const DEMO_TODAY = "2026-06-14";
 export const DEMO_NOW_TIME = "15:30";
@@ -272,6 +282,11 @@ type V2DataContextValue = {
   teamMembers: TeamMember[];
   accessCodes: AccessCode[];
   platformTenants: PlatformTenant[];
+  activeTenant: PlatformTenant;
+  activeCompanyName: string;
+  activeCompanySlug: string;
+  activeUserEmail: string;
+  activeRoleLabel: string;
   selectedTemplate: Template | null;
   selectedMediaAsset: MediaAsset | null;
   createCampaign: (input: NewCampaignInput) => Campaign;
@@ -509,7 +524,7 @@ function accessCodeFor(companyName: string, slug: string) {
   return `${letters}-${slug.slice(0, 4).toUpperCase()}-${String(Date.now()).slice(-4)}`;
 }
 
-function loadPlatformTenants() {
+export function loadPlatformTenants() {
   if (typeof window === "undefined") return initialPlatformTenants;
   try {
     const stored = window.localStorage.getItem(PLATFORM_TENANTS_STORAGE_KEY);
@@ -527,6 +542,319 @@ function loadPlatformTenants() {
   } catch {
     return initialPlatformTenants;
   }
+}
+
+function savePlatformTenants(tenants: PlatformTenant[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PLATFORM_TENANTS_STORAGE_KEY, JSON.stringify(tenants));
+}
+
+type StaticDemoMembership = Membership & {
+  email: string;
+  display_name?: string;
+};
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizeCode(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function roleLabelToMembershipRole(role: string) {
+  const normalized = role.toLowerCase();
+  if (normalized.includes("customer") || normalized.includes("admin")) return "customer_admin";
+  if (normalized.includes("regional")) return "regional_manager";
+  if (normalized.includes("campaign")) return "campaign_manager";
+  return "viewer";
+}
+
+function membershipRoleToV2Label(role?: string | null) {
+  if (role === "customer_admin") return "Customer Company Admin";
+  if (role === "campaign_manager") return "Campaign Manager";
+  if (role === "regional_manager") return "Regional Manager";
+  if (role === "analyst") return "Analyst";
+  if (role === "viewer") return "Viewer";
+  return "Customer Company Admin";
+}
+
+export function companyInitials(name: string) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+  return initials || "CO";
+}
+
+function tenantToMembership(tenant: PlatformTenant, role = "customer_admin"): Membership {
+  return {
+    company_id: tenant.slug,
+    company_name: tenant.name,
+    company_slug: tenant.slug,
+    role,
+    credit_limit: null,
+    credits_used: Math.max(0, tenant.monthlyLimit - tenant.creditsRemaining),
+  };
+}
+
+function sessionForTenant(
+  tenant: PlatformTenant,
+  email: string,
+  role = "customer_admin",
+): Extract<Session, { role: "company_user" }> {
+  return {
+    role: "company_user",
+    email: normalizeEmail(email),
+    companyId: tenant.slug,
+    companyName: tenant.name,
+    membershipRole: role,
+    creditLimit: null,
+    creditsUsed: Math.max(0, tenant.monthlyLimit - tenant.creditsRemaining),
+  };
+}
+
+function loadStaticDemoMemberships(): StaticDemoMembership[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = window.localStorage.getItem(STATIC_DEMO_MEMBERSHIPS_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((membership): membership is StaticDemoMembership => (
+      membership &&
+      typeof membership.email === "string" &&
+      typeof membership.company_id === "string" &&
+      typeof membership.company_name === "string" &&
+      typeof membership.role === "string"
+    ));
+  } catch {
+    return [];
+  }
+}
+
+function saveStaticDemoMembership(membership: StaticDemoMembership) {
+  if (typeof window === "undefined") return;
+  const normalizedMembership = { ...membership, email: normalizeEmail(membership.email) };
+  const next = [
+    normalizedMembership,
+    ...loadStaticDemoMemberships().filter((item) => (
+      normalizeEmail(item.email) !== normalizedMembership.email ||
+      item.company_id !== normalizedMembership.company_id
+    )),
+  ];
+  window.localStorage.setItem(STATIC_DEMO_MEMBERSHIPS_STORAGE_KEY, JSON.stringify(next));
+}
+
+function isItemForTenant(item: { tenantSlug?: string }, activeSlug: string) {
+  return activeSlug === "demo-retail"
+    ? !item.tenantSlug || item.tenantSlug === activeSlug
+    : item.tenantSlug === activeSlug;
+}
+
+function seedWorkspaceForTenant(tenant: PlatformTenant) {
+  const total = tenant.subscribers;
+  const primary = Math.max(Math.round(total * 0.52), total > 0 ? 1 : 0);
+  const loyalty = Math.max(Math.round(total * 0.34), total > 0 ? 1 : 0);
+  const winback = Math.max(total - primary - loyalty, 0);
+  const primaryList = `${tenant.name} VIP`;
+  const loyaltyList = `${tenant.name} Loyalty`;
+  const tenantSlug = tenant.slug;
+  const colors = ["#0FEBA8", "#60A5FA", "#FBBF24"];
+
+  const subscriberLists: SubscriberList[] = [
+    { tenantSlug, key: `${tenantSlug}-all`, name: "All Subscribers", count: total, consent: "98.7%", color: "#60A5FA" },
+    { tenantSlug, key: `${tenantSlug}-vip`, name: primaryList, count: primary, consent: "99.1%", color: colors[0] },
+    { tenantSlug, key: `${tenantSlug}-loyalty`, name: loyaltyList, count: loyalty, consent: "98.4%", color: colors[1] },
+    { tenantSlug, key: `${tenantSlug}-winback`, name: "Winback Shoppers", count: winback, consent: "96.8%", color: colors[2] },
+  ];
+
+  const regions = ["Phoenix, AZ", "Denver, CO", "Austin, TX", "Seattle, WA", "Portland, OR", "San Diego, CA"];
+  const subscribers: Subscriber[] = Array.from({ length: Math.min(48, Math.max(18, Math.ceil(total / 2500))) }, (_, index) => {
+    const segments = index % 5 === 0 ? ["Winback Shoppers"] : index % 3 === 0 ? [loyaltyList] : [primaryList];
+    return {
+      tenantSlug,
+      phone: `+1 (${["480", "602", "720", "512", "206", "503"][index % 6]}) 555-${String(3100 + index).padStart(4, "0")}`,
+      source: ["CSV Import", "Opt-in Form", "Retail POS", "API"][index % 4],
+      region: regions[index % regions.length],
+      segments,
+      consent: index % 17 === 0 ? "Opted Out" : "Opted In",
+      mkt: index % 17 === 0 ? "Suppressed" : segments.includes("Winback Shoppers") ? "Inactive" : "Active",
+      created: `Jun ${String((index % 14) + 1).padStart(2, "0")}, 2026`,
+    };
+  });
+
+  const campaigns: Campaign[] = total > 0 ? [
+    {
+      tenantSlug,
+      id: `${tenantSlug}-welcome`,
+      name: `${tenant.name} Welcome Offer`,
+      status: "scheduled",
+      date: "Jun 18, 2026 10:00 AM",
+      dateISO: "2026-06-18",
+      type: "SMS",
+      reach: primary,
+      sample: Math.min(Math.ceil(primary * 0.00036), 1000),
+      credits: Math.ceil(primary * 0.001),
+      reminders: 1,
+      list: primaryList,
+      body: `Welcome to ${tenant.name}. Tap for this week's offer: {link}. Reply STOP to opt out.`,
+    },
+    {
+      tenantSlug,
+      id: `${tenantSlug}-loyalty-preview`,
+      name: `${tenant.name} Loyalty Preview`,
+      status: "sent",
+      date: "Jun 8, 2026 9:00 AM",
+      dateISO: "2026-06-08",
+      type: "SMS",
+      reach: loyalty,
+      sample: Math.min(Math.ceil(loyalty * 0.00036), 1000),
+      credits: Math.ceil(loyalty * 0.001),
+      reminders: 1,
+      list: loyaltyList,
+      body: `${tenant.name} loyalty members get early access today: {link}. Reply STOP to opt out.`,
+    },
+  ] : [];
+
+  const teamMembers: TeamMember[] = [
+    {
+      tenantSlug,
+      name: "Owner Demo",
+      email: tenant.admin,
+      role: "Customer Company Admin",
+      budget: "Unlimited",
+      rc: "#0FEBA8",
+    },
+  ];
+
+  const accessCodes: AccessCode[] = [
+    {
+      tenantSlug,
+      code: tenant.accessCode,
+      role: "Campaign Manager",
+      created: DEMO_TODAY,
+      uses: 0,
+      max: 5,
+      expires: displayDateFromISO(addDays(DEMO_TODAY, 14)),
+    },
+  ];
+
+  return { subscriberLists, subscribers, campaigns, teamMembers, accessCodes };
+}
+
+function mergeWorkspaceSeed(tenant: PlatformTenant) {
+  const current = loadWorkspaceState();
+  const seed = seedWorkspaceForTenant(tenant);
+  const withoutTenant = {
+    campaigns: current.campaigns.filter((item) => item.tenantSlug !== tenant.slug),
+    subscriberLists: current.subscriberLists.filter((item) => item.tenantSlug !== tenant.slug),
+    subscribers: current.subscribers.filter((item) => item.tenantSlug !== tenant.slug),
+    templates: current.templates,
+    mediaAssets: current.mediaAssets,
+    teamMembers: current.teamMembers.filter((item) => item.tenantSlug !== tenant.slug),
+    accessCodes: current.accessCodes.filter((item) => item.tenantSlug !== tenant.slug),
+  };
+  const next: WorkspaceState = {
+    ...withoutTenant,
+    campaigns: [...seed.campaigns, ...withoutTenant.campaigns],
+    subscriberLists: [...withoutTenant.subscriberLists, ...seed.subscriberLists],
+    subscribers: [...seed.subscribers, ...withoutTenant.subscribers],
+    teamMembers: [...seed.teamMembers, ...withoutTenant.teamMembers],
+    accessCodes: [...seed.accessCodes, ...withoutTenant.accessCodes],
+  };
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(next));
+  }
+}
+
+export function lookupStaticDemoMemberships(email: string): Membership[] {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return [];
+  const tenants = loadPlatformTenants();
+  const adminMemberships = tenants
+    .filter((tenant) => normalizeEmail(tenant.admin) === normalizedEmail)
+    .map((tenant) => tenantToMembership(tenant, "customer_admin"));
+  const storedMemberships = loadStaticDemoMemberships()
+    .filter((membership) => normalizeEmail(membership.email) === normalizedEmail)
+    .map(({ email: _email, display_name: _displayName, ...membership }) => membership);
+  return [...adminMemberships, ...storedMemberships].filter((membership, index, all) => (
+    all.findIndex((item) => item.company_id === membership.company_id) === index
+  ));
+}
+
+export function signupStaticDemoAccessCode(input: { email: string; name: string; accessCode: string }) {
+  const email = normalizeEmail(input.email);
+  const code = normalizeCode(input.accessCode);
+  assertEmail(email, "Work email");
+  if (!input.name.trim()) throw new Error("Full name is required.");
+  if (!code) throw new Error("Access code is required.");
+
+  const tenants = loadPlatformTenants();
+  const tenantFromPlatformCode = tenants.find((tenant) => normalizeCode(tenant.accessCode) === code);
+  const workspaceAccessCode = loadWorkspaceState().accessCodes.find((accessCode) => normalizeCode(accessCode.code) === code);
+  const tenant = tenantFromPlatformCode
+    ?? tenants.find((candidate) => candidate.slug === (workspaceAccessCode?.tenantSlug ?? "demo-retail"))
+    ?? tenants.find((candidate) => candidate.slug === "demo-retail");
+
+  if (!tenant || (normalizeCode(tenant.accessCode) !== code && normalizeCode(DEMO_RETAIL_ACCESS_CODE) !== code && !workspaceAccessCode)) {
+    throw new Error("Access code signup failed. Check the code and try again.");
+  }
+
+  const role = workspaceAccessCode ? roleLabelToMembershipRole(workspaceAccessCode.role) : "customer_admin";
+  saveStaticDemoMembership({
+    ...tenantToMembership(tenant, role),
+    email,
+    display_name: input.name.trim(),
+  });
+
+  return sessionForTenant(tenant, email, role);
+}
+
+export function createStaticDemoCompany(input: {
+  name: string;
+  slug: string;
+  adminEmail: string;
+  monthlyLimit: number;
+}) {
+  const name = input.name.trim();
+  const slug = input.slug.trim() || initialsSlug(name);
+  const adminEmail = normalizeEmail(input.adminEmail);
+  const monthlyLimit = Math.round(input.monthlyLimit);
+  if (!name) throw new Error("Company name is required.");
+  assertTenantSlug(slug);
+  assertEmail(adminEmail, "Admin email");
+  assertTenantLimits(monthlyLimit, monthlyLimit);
+
+  const current = loadPlatformTenants();
+  if (current.some((tenant) => tenant.slug === slug)) throw new Error("A company with that slug already exists.");
+  const subscribers = Math.min(Math.max(Math.round(monthlyLimit * 0.08), 12500), 250000);
+  const campaigns = subscribers > 0 ? 2 : 0;
+  const messages = Math.min(Math.ceil(subscribers * 0.012), Math.max(monthlyLimit - 1, 0));
+  const tenant: PlatformTenant = {
+    name,
+    slug,
+    admin: adminEmail,
+    subscribers,
+    campaigns,
+    scheduledReach: Math.min(subscribers, Math.round(subscribers * 0.52)),
+    creditsRemaining: Math.max(0, monthlyLimit - messages),
+    monthlyLimit,
+    messages,
+    media: 2,
+    links: 4,
+    clicks: Math.ceil(subscribers * 0.018),
+    reminders: campaigns,
+    created: displayDateFromISO(DEMO_TODAY),
+    accessCode: accessCodeFor(name, slug),
+    status: "active",
+  };
+  savePlatformTenants([tenant, ...current]);
+  mergeWorkspaceSeed(tenant);
+  saveStaticDemoMembership({ ...tenantToMembership(tenant, "customer_admin"), email: adminEmail, display_name: "Owner Demo" });
+  return sessionForTenant(tenant, adminEmail, "customer_admin");
 }
 
 function storedArray<T>(value: unknown, fallback: T[]) {
@@ -554,7 +882,7 @@ function loadWorkspaceState(): WorkspaceState {
   }
 }
 
-export function V2DataProvider({ children }: { children: ReactNode }) {
+export function V2DataProvider({ children, session }: { children: ReactNode; session?: Session | null }) {
   const [initialWorkspace] = useState(loadWorkspaceState);
   const [campaigns, setCampaigns] = useState(initialWorkspace.campaigns);
   const [subscriberLists, setSubscriberLists] = useState(initialWorkspace.subscriberLists);
@@ -566,6 +894,49 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
   const [platformTenants, setPlatformTenants] = useState<PlatformTenant[]>(loadPlatformTenants);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [selectedMediaAsset, setSelectedMediaAsset] = useState<MediaAsset | null>(null);
+  const activeTenant = useMemo(() => {
+    const fallback = platformTenants.find((tenant) => tenant.slug === "demo-retail") ?? platformTenants[0] ?? initialPlatformTenants[0];
+    if (session?.role !== "company_user") return fallback;
+    return platformTenants.find((tenant) => (
+      tenant.slug === session.companyId ||
+      tenant.slug === session.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") ||
+      tenant.name === session.companyName
+    )) ?? fallback;
+  }, [platformTenants, session]);
+  const activeCompanySlug = activeTenant.slug;
+  const activeCompanyName = activeTenant.name;
+  const activeUserEmail = session?.role === "company_user" ? session.email : activeTenant.admin;
+  const activeRoleLabel = session?.role === "company_user"
+    ? membershipRoleToV2Label(session.membershipRole)
+    : "Customer Company Admin";
+  const activeCampaigns = useMemo(
+    () => campaigns.filter((campaign) => isItemForTenant(campaign, activeCompanySlug)),
+    [activeCompanySlug, campaigns],
+  );
+  const activeSubscriberLists = useMemo(
+    () => subscriberLists.filter((list) => isItemForTenant(list, activeCompanySlug)),
+    [activeCompanySlug, subscriberLists],
+  );
+  const activeSubscribers = useMemo(
+    () => subscribers.filter((subscriber) => isItemForTenant(subscriber, activeCompanySlug)),
+    [activeCompanySlug, subscribers],
+  );
+  const activeTemplates = useMemo(
+    () => templates.filter((template) => !template.tenantSlug || template.tenantSlug === activeCompanySlug),
+    [activeCompanySlug, templates],
+  );
+  const activeMediaAssets = useMemo(
+    () => mediaAssets.filter((asset) => !asset.tenantSlug || asset.tenantSlug === activeCompanySlug),
+    [activeCompanySlug, mediaAssets],
+  );
+  const activeTeamMembers = useMemo(
+    () => teamMembers.filter((member) => isItemForTenant(member, activeCompanySlug)),
+    [activeCompanySlug, teamMembers],
+  );
+  const activeAccessCodes = useMemo(
+    () => accessCodes.filter((code) => isItemForTenant(code, activeCompanySlug)),
+    [accessCodes, activeCompanySlug],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
@@ -585,34 +956,40 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
 
   const incrementListCounts = (listName: string, uniqueDelta: number, segmentDelta: number) => {
     setSubscriberLists((current) => current.map((list) => (
-      list.name === "All Subscribers" ? { ...list, count: list.count + uniqueDelta }
+      !isItemForTenant(list, activeCompanySlug) ? list
+      : list.name === "All Subscribers" ? { ...list, count: list.count + uniqueDelta }
       : list.name === listName ? { ...list, count: list.count + segmentDelta }
       : list
     )));
   };
 
-  const updateDemoTenant = (updater: (tenant: PlatformTenant) => PlatformTenant) => {
-    setPlatformTenants((current) => current.map((tenant) => tenant.slug === "demo-retail" ? updater(tenant) : tenant));
+  const updateActiveTenant = (updater: (tenant: PlatformTenant) => PlatformTenant) => {
+    setPlatformTenants((current) => current.map((tenant) => tenant.slug === activeCompanySlug ? updater(tenant) : tenant));
   };
 
   const value = useMemo<V2DataContextValue>(() => ({
-    campaigns,
-    subscriberLists,
-    subscribers,
-    templates,
-    mediaAssets,
-    teamMembers,
-    accessCodes,
+    campaigns: activeCampaigns,
+    subscriberLists: activeSubscriberLists,
+    subscribers: activeSubscribers,
+    templates: activeTemplates,
+    mediaAssets: activeMediaAssets,
+    teamMembers: activeTeamMembers,
+    accessCodes: activeAccessCodes,
     platformTenants,
+    activeTenant,
+    activeCompanyName,
+    activeCompanySlug,
+    activeUserEmail,
+    activeRoleLabel,
     selectedTemplate,
     selectedMediaAsset,
     createCampaign: (input) => {
-      const reach = assertCampaignCompliant(input, subscriberLists);
+      const reach = assertCampaignCompliant(input, activeSubscriberLists);
       const credits = input.type === "MMS" ? Math.ceil(reach * 0.002) : Math.ceil(reach * 0.001);
-      const demoTenant = platformTenants.find((tenant) => tenant.slug === "demo-retail");
-      if (demoTenant && credits > demoTenant.creditsRemaining) throw new Error("Campaign exceeds remaining company credits.");
+      if (credits > activeTenant.creditsRemaining) throw new Error("Campaign exceeds remaining company credits.");
       const campaign: Campaign = {
-        id: `camp-${Date.now()}`,
+        tenantSlug: activeCompanySlug,
+        id: `${activeCompanySlug}-camp-${Date.now()}`,
         name: input.name.trim(),
         status: "scheduled",
         date: formatDateTime(input.dateISO, input.time),
@@ -626,7 +1003,7 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
         body: input.body,
       };
       setCampaigns((current) => [campaign, ...current]);
-      updateDemoTenant((tenant) => ({
+      updateActiveTenant((tenant) => ({
         ...tenant,
         campaigns: tenant.campaigns + 1,
         scheduledReach: Math.min(tenant.subscribers, tenant.scheduledReach + reach),
@@ -638,59 +1015,68 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
     },
     addSubscriber: (input) => {
       assertSubscriberConsent(input.consentConfirmed);
-      assertKnownSubscriberList(input.listName, subscriberLists);
+      assertKnownSubscriberList(input.listName, activeSubscriberLists);
       assertSubscriberPhone(input.phone);
       const subscriber: Subscriber = {
+        tenantSlug: activeCompanySlug,
         phone: input.phone.trim(),
         source: "Manual",
         region: "Manual entry",
         segments: [input.listName],
         consent: "Opted In",
         mkt: "Active",
-        created: "Jun 14, 2026",
+        created: DEMO_TODAY,
       };
-      const result = upsertSubscribersByPhone(subscribers, [subscriber], input.listName);
-      setSubscribers(result.nextSubscribers);
+      const result = upsertSubscribersByPhone(activeSubscribers, [subscriber], input.listName);
+      setSubscribers((current) => [
+        ...result.nextSubscribers,
+        ...current.filter((item) => !isItemForTenant(item, activeCompanySlug)),
+      ]);
       if (result.segmentAdded > 0 || result.uniqueAdded > 0) {
         incrementListCounts(input.listName, result.uniqueAdded, result.segmentAdded);
       }
       if (result.uniqueAdded > 0) {
-        updateDemoTenant((tenant) => ({ ...tenant, subscribers: tenant.subscribers + result.uniqueAdded }));
+        updateActiveTenant((tenant) => ({ ...tenant, subscribers: tenant.subscribers + result.uniqueAdded }));
       }
       return result.affected[0] ?? subscriber;
     },
     importSubscribers: (rawCsv, listName, consentConfirmed) => {
       assertSubscriberConsent(consentConfirmed);
-      assertKnownSubscriberList(listName, subscriberLists);
+      assertKnownSubscriberList(listName, activeSubscriberLists);
       const rows = rawCsv.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
       const parsed = rows.flatMap((line, index): Subscriber[] => {
         const [phone = `+1 (206) 555-${String(7000 + index).slice(-4)}`, first = "", last = "", region = "Imported"] = line.split(",").map((part) => part.trim());
         if (normalizePhone(phone).length < 10) return [];
         return [{
+          tenantSlug: activeCompanySlug,
           phone,
           source: "CSV Import",
           region: region || [first, last].filter(Boolean).join(" ") || "Imported",
           segments: [listName],
           consent: "Opted In",
           mkt: "Active",
-          created: "Jun 14, 2026",
+          created: DEMO_TODAY,
         }];
       });
       if (parsed.length === 0) throw new Error("CSV import must include at least one valid phone number.");
-      const result = upsertSubscribersByPhone(subscribers, parsed, listName);
-      setSubscribers(result.nextSubscribers);
+      const result = upsertSubscribersByPhone(activeSubscribers, parsed, listName);
+      setSubscribers((current) => [
+        ...result.nextSubscribers,
+        ...current.filter((item) => !isItemForTenant(item, activeCompanySlug)),
+      ]);
       if (result.segmentAdded > 0 || result.uniqueAdded > 0) {
         incrementListCounts(listName, result.uniqueAdded, result.segmentAdded);
       }
       if (result.uniqueAdded > 0) {
-        updateDemoTenant((tenant) => ({ ...tenant, subscribers: tenant.subscribers + result.uniqueAdded }));
+        updateActiveTenant((tenant) => ({ ...tenant, subscribers: tenant.subscribers + result.uniqueAdded }));
       }
       return result.segmentAdded;
     },
     addSubscriberList: (name, scope) => {
-      assertUniqueSubscriberList(name, subscriberLists);
+      assertUniqueSubscriberList(name, activeSubscriberLists);
       const list: SubscriberList = {
-        key: initialsSlug(name.trim()),
+        tenantSlug: activeCompanySlug,
+        key: `${activeCompanySlug}-${initialsSlug(name.trim())}`,
         name: name.trim(),
         count: 0,
         consent: "0%",
@@ -704,6 +1090,7 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
       assertTemplateInput(template);
       const next: Template = {
         ...template,
+        tenantSlug: activeCompanySlug,
         name: template.name.trim(),
         tags: template.tags.map((tag) => tag.trim()).filter(Boolean),
         preview: template.preview.trim(),
@@ -717,6 +1104,7 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
       assertMediaAssetInput(asset);
       const next: MediaAsset = {
         ...asset,
+        tenantSlug: activeCompanySlug,
         name: asset.name.trim(),
         type: asset.type.trim().toUpperCase(),
         size: asset.size.trim(),
@@ -735,13 +1123,17 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
       assertRole(member.role);
       const next: TeamMember = {
         ...member,
+        tenantSlug: activeCompanySlug,
         name: member.name.trim(),
         email: member.email.trim(),
         role: member.role,
         budget: member.budget.trim() || "$10,000",
         rc: member.rc ?? (member.role.includes("Admin") ? "#0FEBA8" : member.role.includes("Regional") ? "#A78BFA" : "#60A5FA"),
       };
-      setTeamMembers((current) => [next, ...current.filter((item) => item.email !== next.email)]);
+      setTeamMembers((current) => [
+        next,
+        ...current.filter((item) => !isItemForTenant(item, activeCompanySlug) || item.email !== next.email),
+      ]);
       return next;
     },
     createPlatformTenant: (input) => {
@@ -771,6 +1163,12 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
         status: "active",
       };
       setPlatformTenants((current) => [tenant, ...current.filter((item) => item.slug !== tenant.slug)]);
+      const seed = seedWorkspaceForTenant(tenant);
+      setCampaigns((current) => [...seed.campaigns, ...current.filter((item) => item.tenantSlug !== tenant.slug)]);
+      setSubscriberLists((current) => [...current.filter((item) => item.tenantSlug !== tenant.slug), ...seed.subscriberLists]);
+      setSubscribers((current) => [...seed.subscribers, ...current.filter((item) => item.tenantSlug !== tenant.slug)]);
+      setTeamMembers((current) => [...seed.teamMembers, ...current.filter((item) => item.tenantSlug !== tenant.slug)]);
+      setAccessCodes((current) => [...seed.accessCodes, ...current.filter((item) => item.tenantSlug !== tenant.slug)]);
       return tenant;
     },
     updatePlatformTenantLimits: (slug, monthlyLimit, creditsRemaining) => {
@@ -790,6 +1188,7 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
       assertAccessCodeExpiry(expiresISO, createdISO);
       const rolePart = role.split(" ").map((part) => part[0]).join("").slice(0, 3).padEnd(3, "X").toUpperCase();
       const code: AccessCode = {
+        tenantSlug: activeCompanySlug,
         code: `DMRT-${rolePart}-${expiresISO.replaceAll("-", "").slice(4)}`,
         role,
         created: displayDateFromISO(createdISO),
@@ -802,10 +1201,26 @@ export function V2DataProvider({ children }: { children: ReactNode }) {
     },
     deleteAccessCode: (code) => setAccessCodes((current) => current.filter((item) => item.code !== code)),
     deleteTeamMember: (email) => {
-      if (email === "owner@demo-retail.test") throw new Error("The workspace owner cannot be removed.");
-      setTeamMembers((current) => current.filter((member) => member.email !== email));
+      if (email === activeTenant.admin) throw new Error("The workspace owner cannot be removed.");
+      setTeamMembers((current) => current.filter((member) => !isItemForTenant(member, activeCompanySlug) || member.email !== email));
     },
-  }), [accessCodes, campaigns, mediaAssets, platformTenants, selectedMediaAsset, selectedTemplate, subscriberLists, subscribers, teamMembers, templates]);
+  }), [
+    activeAccessCodes,
+    activeCampaigns,
+    activeCompanyName,
+    activeCompanySlug,
+    activeMediaAssets,
+    activeRoleLabel,
+    activeSubscriberLists,
+    activeSubscribers,
+    activeTeamMembers,
+    activeTemplates,
+    activeTenant,
+    activeUserEmail,
+    platformTenants,
+    selectedMediaAsset,
+    selectedTemplate,
+  ]);
 
   return <V2DataContext.Provider value={value}>{children}</V2DataContext.Provider>;
 }
